@@ -1,0 +1,56 @@
+{
+  "leader": {
+    "name": "Leader",
+    "icon": "👑",
+    "bias": [
+      "mechanism",
+      "metal"
+    ],
+    "space": "Decisive, responsible, commanding, influential"
+  },
+  "caretaker": {
+    "name": "Caretaker",
+    "icon": "🕊️",
+    "bias": [
+      "essence",
+      "fiber"
+    ],
+    "space": "Protective, supportive, diplomatic, nurturing"
+  },
+  "achiever": {
+    "name": "Achiever",
+    "icon": "🏅",
+    "bias": [
+      "metal",
+      "mechanism"
+    ],
+    "space": "Ambitious, disciplined, competitive, career-focused"
+  },
+  "rebel": {
+    "name": "Rebel",
+    "icon": "🔥",
+    "bias": [
+      "compound",
+      "mechanism"
+    ],
+    "space": "Defiant, independent, disruptive, unconventional"
+  },
+  "dreamer": {
+    "name": "Dreamer",
+    "icon": "🌙",
+    "bias": [
+      "essence",
+      "mineral"
+    ],
+    "space": "Imaginative, curious, scholarly, spiritual, idealistic"
+  },
+  "freespirit": {
+    "name": "Free Spirit",
+    "icon": "🪁",
+    "bias": [
+      "fiber",
+      "essence"
+    ],
+    "space": "Playful, impulsive, adventurous, relaxed, hedonistic"
+  }
+}

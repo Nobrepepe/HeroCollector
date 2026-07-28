@@ -1,0 +1,92 @@
+{
+  "contentVersion": "2.0.0",
+  "energy": {
+    "dailyGrant": 120,
+    "storageCap": 240,
+    "resetHour": 4
+  },
+  "starShards": [
+    10,
+    20,
+    30,
+    50,
+    75,
+    110,
+    155
+  ],
+  "starPowerCumulative": [
+    150,
+    300,
+    500,
+    750,
+    1000,
+    1250,
+    1500
+  ],
+  "basePower": 1000,
+  "gearTierPower": [
+    100,
+    120,
+    150,
+    180,
+    220,
+    260,
+    310,
+    360,
+    390,
+    410
+  ],
+  "gearSlotShareBp": 1000,
+  "gearCompletionShareBp": 4000,
+  "shardChanceBp": 7000,
+  "shardPityAfterMisses": 1,
+  "shardAttemptsPerDay": 5,
+  "synergyCapBp": 2500,
+  "upcraftRatio": 5,
+  "nodeDefaults": {
+    "ordinary": {
+      "energy": 6,
+      "repeat": {
+        "count": 1,
+        "bonusChanceBp": 4000
+      }
+    },
+    "advanced": {
+      "energy": 8,
+      "repeat": {
+        "count": 2,
+        "bonusChanceBp": 3500
+      }
+    },
+    "shard": {
+      "energy": 10,
+      "repeat": {
+        "count": 1,
+        "bonusChanceBp": 0
+      }
+    },
+    "world": {
+      "energy": 10,
+      "repeat": {
+        "count": 2,
+        "bonusChanceBp": 0
+      }
+    }
+  },
+  "acquisitionTiers": {
+    "minor": {
+      "unlockStar": 1,
+      "cumulativeShards": 10
+    },
+    "medium": {
+      "unlockStar": 4,
+      "cumulativeShards": 110
+    },
+    "major": {
+      "unlockStar": 7,
+      "cumulativeShards": 450
+    }
+  },
+  "partySize": 5,
+  "partyPresetCount": 6
+}

@@ -1,0 +1,231 @@
+// Content validation (GDD 12.4): every referenced ID exists, campaigns chain
+// correctly, thresholds never decrease, recipes are obtainable, Archive
+// fragments map 1:1 onto World Campaign first clears, and synergy definitions
+// stay inside the global cap. Produces a human-readable error list.
+import { equipmentRecipe } from './content.js';
+
+export function validateContent(content) {
+  const errors = [];
+  const err = (msg) => errors.push(msg);
+
+  // --- unique IDs across all entity groups
+  const seen = new Set();
+  const uniq = (id, kind) => {
+    if (seen.has(id)) err(`Duplicate ID: ${id} (${kind})`);
+    seen.add(id);
+  };
+  for (const w of content.worlds) uniq(w.id, 'world');
+  for (const m of content.materials) uniq(m.id, 'material');
+  for (const k of content.components) uniq(k.id, 'component');
+  for (const c of content.characters) uniq(c.id, 'character');
+  for (const t of content.tags) uniq(t.id, 'tag');
+  for (const n of content.nodes) uniq(n.id, 'node');
+
+  // --- characters: exactly one world and one archetype; valid references
+  for (const c of content.characters) {
+    if (!content.worldById[c.world]) err(`${c.id}: unknown world ${c.world}`);
+    if (!content.archetypes[c.archetype]) err(`${c.id}: unknown archetype ${c.archetype}`);
+    if (c.faction && !content.tagById[c.faction]) err(`${c.id}: unknown faction ${c.faction}`);
+    for (const t of c.extraTags ?? []) if (!content.tagById[t]) err(`${c.id}: unknown extra tag ${t}`);
+    for (const slot of content.characterMeta.slotOrder) {
+      if (!c.equipmentLines[slot]) err(`${c.id}: missing equipment line for slot ${slot}`);
+    }
+    // every unlockable/promotable character needs a reachable shard source
+    if ((content.shardNodesByCharacter[c.id] ?? []).length === 0) {
+      err(`${c.id}: no shard source node`);
+    }
+  }
+
+  // --- materials / components
+  for (const m of content.materials) {
+    if (m.conversionTarget && !content.materialById[m.conversionTarget]) {
+      err(`${m.id}: unknown conversion target ${m.conversionTarget}`);
+    }
+  }
+  for (const k of content.components) {
+    for (const input of k.inputs) {
+      if (!content.materialById[input.materialId]) err(`${k.id}: unknown material ${input.materialId}`);
+      if (input.qty < 1) err(`${k.id}: non-positive input quantity`);
+    }
+  }
+
+  // --- recipe templates: every archetype × slot combination exists
+  for (const a of Object.keys(content.archetypes)) {
+    for (const slot of content.characterMeta.slotOrder) {
+      const tpl = content.templateByKey[`${a}:${slot}`];
+      if (!tpl) { err(`Missing recipe template ${a}:${slot}`); continue; }
+      for (const compFam of [tpl.primaryComponent, tpl.secondaryComponent]) {
+        if (!content.componentMeta.pairs[compFam]) err(`${tpl.id}: unknown component family ${compFam}`);
+      }
+    }
+  }
+  for (const p of content.tierProfiles) {
+    if (!content.materialMeta.grades[p.grade]) err(`Tier profile ${p.tier}: unknown grade ${p.grade}`);
+  }
+
+  // --- every equipment recipe's inputs must resolve to real components
+  for (const c of content.characters) {
+    for (const slot of content.characterMeta.slotOrder) {
+      for (const p of content.tierProfiles) {
+        const recipe = equipmentRecipe(content, c.id, slot, p.tier);
+        for (const input of recipe.inputs) {
+          if (!content.componentById[input.componentId]) {
+            err(`${c.id}/${slot}/T${p.tier}: unknown component ${input.componentId}`);
+          }
+        }
+      }
+    }
+  }
+
+  // --- campaigns: continuous previous chains, nondecreasing thresholds
+  for (const [campaign, nodes] of Object.entries(content.nodesByCampaign)) {
+    const sorted = [...nodes].sort((a, b) => a.number - b.number);
+    let prevThreshold = 0, prevId = null;
+    const shadowThresholds = {};
+    for (const n of sorted) {
+      if (campaign === 'shadow') {
+        if (n.previous !== null) err(`${n.id}: Shadow nodes do not have a previous Shadow prerequisite`);
+        const mirror = content.nodeById[n.mirrorNode];
+        if (!mirror || mirror.campaign !== 'main' || mirror.number !== n.number) {
+          err(`${n.id}: invalid matching Main node ${n.mirrorNode}`);
+        }
+        const prior = shadowThresholds[n.chapter] ?? 0;
+        if (n.threshold < prior) err(`${n.id}: threshold ${n.threshold} decreases within Shadow chapter ${n.chapter}`);
+        shadowThresholds[n.chapter] = n.threshold;
+      } else {
+        if (n.previous !== prevId) err(`${n.id}: previous should be ${prevId}, is ${n.previous}`);
+        if (n.threshold < prevThreshold) err(`${n.id}: threshold ${n.threshold} decreases (prev ${prevThreshold})`);
+      }
+      if (!content.materialById[n.material]) err(`${n.id}: unknown material ${n.material}`);
+      if (n.shardCharacter && !content.characterById[n.shardCharacter]) err(`${n.id}: unknown shard character`);
+      if (n.firstClear?.shards && !content.characterById[n.firstClear.shards.characterId]) {
+        err(`${n.id}: unknown first-clear shard character ${n.firstClear.shards.characterId}`);
+      }
+      for (const m of n.firstClear?.materials ?? []) {
+        if (!content.materialById[m.materialId]) err(`${n.id}: unknown first-clear material ${m.materialId}`);
+      }
+      if (n.objective) {
+        if (!content.tagById[n.objective.tagId]) err(`${n.id}: objective references unknown tag ${n.objective.tagId}`);
+        for (const m of n.objective.reward?.materials ?? []) {
+          if (!content.materialById[m.materialId]) err(`${n.id}: unknown objective material ${m.materialId}`);
+        }
+      }
+      if (campaign !== 'shadow') {
+        prevThreshold = n.threshold;
+        prevId = n.id;
+      }
+    }
+  }
+
+  // --- every material every recipe needs must be reachable from a freely
+  // repeatable node: either dropped directly, or upcraftable from a lower
+  // grade of the same family that drops freely. Shard nodes are attempt-
+  // limited (5/day) and must never be a family's only source, or progression
+  // can soft-stall. Skipped while the game has no nodes at all (setup mode).
+  if (content.nodes.length > 0) {
+    const freeMinRankByFamily = {};
+    for (const n of content.nodes) {
+      if (n.shardCharacter) continue;
+      const m = content.materialById[n.material];
+      if (!m) continue;
+      const rank = content.materialMeta.grades[m.grade].rank;
+      if (freeMinRankByFamily[m.family] === undefined || rank < freeMinRankByFamily[m.family]) {
+        freeMinRankByFamily[m.family] = rank;
+      }
+    }
+    const needed = new Set();
+    const gradesUsed = new Set(content.tierProfiles.map(p => p.grade));
+    for (const k of content.components) {
+      if (gradesUsed.has(k.grade)) for (const i of k.inputs) needed.add(i.materialId);
+    }
+    for (const matId of needed) {
+      const m = content.materialById[matId];
+      const best = freeMinRankByFamily[m.family];
+      if (best === undefined || best > content.materialMeta.grades[m.grade].rank) {
+        err(`Material ${matId} is required by recipes but no freely repeatable (non-shard) node drops ${m.family} at that grade or below`);
+      }
+    }
+  }
+
+  // --- archives: fragments map to world-campaign first clears; totals complete every relic
+  const skinIds = new Set();
+  for (const a of content.archives) {
+    const fragIds = new Set();
+    for (const col of a.collections) {
+      if (col.rewardSkin) {
+        if (skinIds.has(col.rewardSkin.id)) err(`Duplicate skin ID: ${col.rewardSkin.id}`);
+        skinIds.add(col.rewardSkin.id);
+        const skinChar = content.characterById[col.rewardSkin.characterId];
+        if (!skinChar) err(`${col.id}: collection skin references unknown character`);
+        else if (skinChar.world !== a.world) err(`${col.id}: collection skin character is from another world`);
+      }
+      for (const relic of col.relics) {
+        if (relic.fragments.length !== 2) err(`${relic.id}: needs exactly 2 fragments`);
+        for (const frag of relic.fragments) {
+          if (fragIds.has(frag.id)) err(`${a.id}: duplicate fragment ${frag.id}`);
+          fragIds.add(frag.id);
+          const node = content.nodeById[frag.sourceNode];
+          if (!node) { err(`${frag.id}: unknown source node ${frag.sourceNode}`); continue; }
+          if (node.type !== 'world') err(`${frag.id}: source ${node.id} is not a world node`);
+          if (node.firstClear?.archiveFragment !== frag.id) {
+            err(`${frag.id}: source node ${node.id} does not award this fragment`);
+          }
+        }
+      }
+    }
+    const worldNodes = content.nodes.filter(n => n.world === a.world && n.firstClear?.archiveFragment);
+    if (worldNodes.length !== fragIds.size) {
+      err(`${a.id}: ${worldNodes.length} fragment-awarding nodes vs ${fragIds.size} required fragments`);
+    }
+    const skinChar = content.characterById[a.fullReward?.characterId];
+    if (a.fullReward?.id) {
+      if (skinIds.has(a.fullReward.id)) err(`Duplicate skin ID: ${a.fullReward.id}`);
+      skinIds.add(a.fullReward.id);
+    }
+    if (!skinChar) err(`${a.id}: full-archive skin references unknown character`);
+    else if (skinChar.world !== a.world) err(`${a.id}: skin character is from another world`);
+  }
+
+  // --- synergy: no single definition exceeds the global cap
+  for (const t of content.tags) {
+    for (const th of t.thresholds ?? []) {
+      if (th.bonusBp > content.balance.synergyCapBp) {
+        err(`${t.id}: threshold bonus ${th.bonusBp}bp exceeds the ${content.balance.synergyCapBp}bp cap`);
+      }
+      if (th.bonusBp < 0) err(`${t.id}: negative synergy is not allowed`);
+    }
+  }
+
+  return { ok: errors.length === 0, errors };
+}
+
+// Save-file validation: every ID the save references must exist in content.
+export function validateSave(content, state) {
+  const errors = [];
+  for (const id of Object.keys(state.characters)) {
+    if (!content.characterById[id]) errors.push(`Save references unknown character ${id}`);
+    const selectedSkinId = state.characters[id].selectedSkinId;
+    if (selectedSkinId && !content.skinById[selectedSkinId]) errors.push(`Save references unknown skin ${selectedSkinId}`);
+  }
+  for (const id of Object.keys(state.inventory.materials)) {
+    if (!content.materialById[id]) errors.push(`Save references unknown material ${id}`);
+    if (state.inventory.materials[id] < 0) errors.push(`Negative material quantity: ${id}`);
+  }
+  for (const id of Object.keys(state.inventory.components)) {
+    if (!content.componentById[id]) errors.push(`Save references unknown component ${id}`);
+    if (state.inventory.components[id] < 0) errors.push(`Negative component quantity: ${id}`);
+  }
+  for (const id of Object.keys(state.nodes)) {
+    if (!content.nodeById[id]) errors.push(`Save references unknown node ${id}`);
+  }
+  for (const id of Object.keys(state.archive.fragments)) {
+    if (!content.fragmentById[id]) errors.push(`Save references unknown fragment ${id}`);
+  }
+  for (const party of state.parties) {
+    for (const m of party.members) {
+      if (m !== null && !content.characterById[m]) errors.push(`Party "${party.name}" references unknown character ${m}`);
+    }
+  }
+  if (state.energy < 0) errors.push('Negative Energy');
+  return { ok: errors.length === 0, errors };
+}

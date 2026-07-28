@@ -1,0 +1,600 @@
+{
+  "pairs": {
+    "framework": {
+      "name": "Framework",
+      "icon": "🏗️",
+      "pair": [
+        "metal",
+        "mineral"
+      ],
+      "use": "Rigid structures, emblems, protective forms"
+    },
+    "weave": {
+      "name": "Weave",
+      "icon": "🪡",
+      "pair": [
+        "fiber",
+        "compound"
+      ],
+      "use": "Attire, coverings, documents, soft assemblies"
+    },
+    "focus": {
+      "name": "Focus",
+      "icon": "🔮",
+      "pair": [
+        "mineral",
+        "essence"
+      ],
+      "use": "Keepsakes, symbols, magical or intellectual objects"
+    },
+    "apparatus": {
+      "name": "Apparatus",
+      "icon": "🔧",
+      "pair": [
+        "mechanism",
+        "metal"
+      ],
+      "use": "Tools, devices, professional equipment"
+    },
+    "binding": {
+      "name": "Binding",
+      "icon": "🎀",
+      "pair": [
+        "fiber",
+        "essence"
+      ],
+      "use": "Personal accessories, seals, social or emotional objects"
+    },
+    "matrix": {
+      "name": "Matrix",
+      "icon": "🧬",
+      "pair": [
+        "compound",
+        "mechanism"
+      ],
+      "use": "Complex signature items and transformative assemblies"
+    }
+  },
+  "components": [
+    {
+      "id": "comp_framework_basic",
+      "family": "framework",
+      "grade": "basic",
+      "displayName": "Basic Framework",
+      "icon": "🏗️",
+      "use": "Rigid structures, emblems, protective forms",
+      "inputs": [
+        {
+          "materialId": "mat_metal_basic",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_mineral_basic",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_framework_improved",
+      "family": "framework",
+      "grade": "improved",
+      "displayName": "Improved Framework",
+      "icon": "🏗️",
+      "use": "Rigid structures, emblems, protective forms",
+      "inputs": [
+        {
+          "materialId": "mat_metal_improved",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_mineral_improved",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_framework_advanced",
+      "family": "framework",
+      "grade": "advanced",
+      "displayName": "Advanced Framework",
+      "icon": "🏗️",
+      "use": "Rigid structures, emblems, protective forms",
+      "inputs": [
+        {
+          "materialId": "mat_metal_advanced",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_mineral_advanced",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_framework_superior",
+      "family": "framework",
+      "grade": "superior",
+      "displayName": "Superior Framework",
+      "icon": "🏗️",
+      "use": "Rigid structures, emblems, protective forms",
+      "inputs": [
+        {
+          "materialId": "mat_metal_superior",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_mineral_superior",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_framework_masterwork",
+      "family": "framework",
+      "grade": "masterwork",
+      "displayName": "Masterwork Framework",
+      "icon": "🏗️",
+      "use": "Rigid structures, emblems, protective forms",
+      "inputs": [
+        {
+          "materialId": "mat_metal_masterwork",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_mineral_masterwork",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_weave_basic",
+      "family": "weave",
+      "grade": "basic",
+      "displayName": "Basic Weave",
+      "icon": "🪡",
+      "use": "Attire, coverings, documents, soft assemblies",
+      "inputs": [
+        {
+          "materialId": "mat_fiber_basic",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_compound_basic",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_weave_improved",
+      "family": "weave",
+      "grade": "improved",
+      "displayName": "Improved Weave",
+      "icon": "🪡",
+      "use": "Attire, coverings, documents, soft assemblies",
+      "inputs": [
+        {
+          "materialId": "mat_fiber_improved",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_compound_improved",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_weave_advanced",
+      "family": "weave",
+      "grade": "advanced",
+      "displayName": "Advanced Weave",
+      "icon": "🪡",
+      "use": "Attire, coverings, documents, soft assemblies",
+      "inputs": [
+        {
+          "materialId": "mat_fiber_advanced",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_compound_advanced",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_weave_superior",
+      "family": "weave",
+      "grade": "superior",
+      "displayName": "Superior Weave",
+      "icon": "🪡",
+      "use": "Attire, coverings, documents, soft assemblies",
+      "inputs": [
+        {
+          "materialId": "mat_fiber_superior",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_compound_superior",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_weave_masterwork",
+      "family": "weave",
+      "grade": "masterwork",
+      "displayName": "Masterwork Weave",
+      "icon": "🪡",
+      "use": "Attire, coverings, documents, soft assemblies",
+      "inputs": [
+        {
+          "materialId": "mat_fiber_masterwork",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_compound_masterwork",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_focus_basic",
+      "family": "focus",
+      "grade": "basic",
+      "displayName": "Basic Focus",
+      "icon": "🔮",
+      "use": "Keepsakes, symbols, magical or intellectual objects",
+      "inputs": [
+        {
+          "materialId": "mat_mineral_basic",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_essence_basic",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_focus_improved",
+      "family": "focus",
+      "grade": "improved",
+      "displayName": "Improved Focus",
+      "icon": "🔮",
+      "use": "Keepsakes, symbols, magical or intellectual objects",
+      "inputs": [
+        {
+          "materialId": "mat_mineral_improved",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_essence_improved",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_focus_advanced",
+      "family": "focus",
+      "grade": "advanced",
+      "displayName": "Advanced Focus",
+      "icon": "🔮",
+      "use": "Keepsakes, symbols, magical or intellectual objects",
+      "inputs": [
+        {
+          "materialId": "mat_mineral_advanced",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_essence_advanced",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_focus_superior",
+      "family": "focus",
+      "grade": "superior",
+      "displayName": "Superior Focus",
+      "icon": "🔮",
+      "use": "Keepsakes, symbols, magical or intellectual objects",
+      "inputs": [
+        {
+          "materialId": "mat_mineral_superior",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_essence_superior",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_focus_masterwork",
+      "family": "focus",
+      "grade": "masterwork",
+      "displayName": "Masterwork Focus",
+      "icon": "🔮",
+      "use": "Keepsakes, symbols, magical or intellectual objects",
+      "inputs": [
+        {
+          "materialId": "mat_mineral_masterwork",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_essence_masterwork",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_apparatus_basic",
+      "family": "apparatus",
+      "grade": "basic",
+      "displayName": "Basic Apparatus",
+      "icon": "🔧",
+      "use": "Tools, devices, professional equipment",
+      "inputs": [
+        {
+          "materialId": "mat_mechanism_basic",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_metal_basic",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_apparatus_improved",
+      "family": "apparatus",
+      "grade": "improved",
+      "displayName": "Improved Apparatus",
+      "icon": "🔧",
+      "use": "Tools, devices, professional equipment",
+      "inputs": [
+        {
+          "materialId": "mat_mechanism_improved",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_metal_improved",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_apparatus_advanced",
+      "family": "apparatus",
+      "grade": "advanced",
+      "displayName": "Advanced Apparatus",
+      "icon": "🔧",
+      "use": "Tools, devices, professional equipment",
+      "inputs": [
+        {
+          "materialId": "mat_mechanism_advanced",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_metal_advanced",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_apparatus_superior",
+      "family": "apparatus",
+      "grade": "superior",
+      "displayName": "Superior Apparatus",
+      "icon": "🔧",
+      "use": "Tools, devices, professional equipment",
+      "inputs": [
+        {
+          "materialId": "mat_mechanism_superior",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_metal_superior",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_apparatus_masterwork",
+      "family": "apparatus",
+      "grade": "masterwork",
+      "displayName": "Masterwork Apparatus",
+      "icon": "🔧",
+      "use": "Tools, devices, professional equipment",
+      "inputs": [
+        {
+          "materialId": "mat_mechanism_masterwork",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_metal_masterwork",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_binding_basic",
+      "family": "binding",
+      "grade": "basic",
+      "displayName": "Basic Binding",
+      "icon": "🎀",
+      "use": "Personal accessories, seals, social or emotional objects",
+      "inputs": [
+        {
+          "materialId": "mat_fiber_basic",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_essence_basic",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_binding_improved",
+      "family": "binding",
+      "grade": "improved",
+      "displayName": "Improved Binding",
+      "icon": "🎀",
+      "use": "Personal accessories, seals, social or emotional objects",
+      "inputs": [
+        {
+          "materialId": "mat_fiber_improved",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_essence_improved",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_binding_advanced",
+      "family": "binding",
+      "grade": "advanced",
+      "displayName": "Advanced Binding",
+      "icon": "🎀",
+      "use": "Personal accessories, seals, social or emotional objects",
+      "inputs": [
+        {
+          "materialId": "mat_fiber_advanced",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_essence_advanced",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_binding_superior",
+      "family": "binding",
+      "grade": "superior",
+      "displayName": "Superior Binding",
+      "icon": "🎀",
+      "use": "Personal accessories, seals, social or emotional objects",
+      "inputs": [
+        {
+          "materialId": "mat_fiber_superior",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_essence_superior",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_binding_masterwork",
+      "family": "binding",
+      "grade": "masterwork",
+      "displayName": "Masterwork Binding",
+      "icon": "🎀",
+      "use": "Personal accessories, seals, social or emotional objects",
+      "inputs": [
+        {
+          "materialId": "mat_fiber_masterwork",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_essence_masterwork",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_matrix_basic",
+      "family": "matrix",
+      "grade": "basic",
+      "displayName": "Basic Matrix",
+      "icon": "🧬",
+      "use": "Complex signature items and transformative assemblies",
+      "inputs": [
+        {
+          "materialId": "mat_compound_basic",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_mechanism_basic",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_matrix_improved",
+      "family": "matrix",
+      "grade": "improved",
+      "displayName": "Improved Matrix",
+      "icon": "🧬",
+      "use": "Complex signature items and transformative assemblies",
+      "inputs": [
+        {
+          "materialId": "mat_compound_improved",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_mechanism_improved",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_matrix_advanced",
+      "family": "matrix",
+      "grade": "advanced",
+      "displayName": "Advanced Matrix",
+      "icon": "🧬",
+      "use": "Complex signature items and transformative assemblies",
+      "inputs": [
+        {
+          "materialId": "mat_compound_advanced",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_mechanism_advanced",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_matrix_superior",
+      "family": "matrix",
+      "grade": "superior",
+      "displayName": "Superior Matrix",
+      "icon": "🧬",
+      "use": "Complex signature items and transformative assemblies",
+      "inputs": [
+        {
+          "materialId": "mat_compound_superior",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_mechanism_superior",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "comp_matrix_masterwork",
+      "family": "matrix",
+      "grade": "masterwork",
+      "displayName": "Masterwork Matrix",
+      "icon": "🧬",
+      "use": "Complex signature items and transformative assemblies",
+      "inputs": [
+        {
+          "materialId": "mat_compound_masterwork",
+          "qty": 3
+        },
+        {
+          "materialId": "mat_mechanism_masterwork",
+          "qty": 2
+        }
+      ]
+    }
+  ]
+}

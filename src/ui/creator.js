@@ -1,0 +1,582 @@
+// Content Creator: the game's entire playable content — worlds, characters,
+// the Main Campaign, archives, and all art — is authored here and stored in
+// the creator database. Worlds stay drafts until they meet the publish
+// requirements; the game itself stays in setup mode until the content meets
+// the minimum prerequisites for a playable save.
+import { h, fmt } from './dom.js';
+import { openModal, toast, render } from '../app.js';
+import { imageWell } from './images.js';
+import { exportJson, importJson, loadSamplePack } from '../platform.js';
+import {
+  emptyCustomDB, upgradeCustomDB, newCustomWorld, newCustomCharacter,
+  newCustomFaction, addCampaignChapter, canPublishWorld, characterShardAssignments
+} from '../core/custom.js';
+
+export function renderCreator(store, root, arg) {
+  const parts = (arg ?? '').split('/').filter(Boolean);
+  if (parts[0] === 'world' && parts[1]) return worldEditor(store, root, parts[1]);
+  if (parts[0] === 'char' && parts[1]) return charEditor(store, root, parts[1]);
+  if (parts[0] === 'main-chapter' && parts[1] !== undefined) return chapterEditor(store, root, 'main', Number(parts[1]));
+  if (parts[0] === 'shadow-chapter' && parts[1] !== undefined) return chapterEditor(store, root, 'shadow', Number(parts[1]));
+  // Compatibility with old creator hashes.
+  if (parts[0] === 'chapter' && parts[1] !== undefined) return chapterEditor(store, root, 'main', Number(parts[1]));
+  return overview(store, root);
+}
+
+// Persist the DB and re-merge content. Structural changes re-render the screen;
+// text edits do not (so typing keeps focus).
+async function commit(store, structural = false) {
+  await store.saveCustom();
+  const res = await store.applyCustom();
+  if (structural) render();
+  return res;
+}
+
+// ------------------------------------------------------------- field helpers
+function field(label, control) {
+  return [h('label', label), control];
+}
+function textInput(obj, key, store, { placeholder = '', maxlength = 60 } = {}) {
+  const input = h('input', { type: 'text', value: obj[key] ?? '', placeholder, maxlength });
+  input.addEventListener('change', () => { obj[key] = input.value; commit(store); });
+  return input;
+}
+function textArea(obj, key, store) {
+  const input = h('textarea', obj[key] ?? '');
+  input.addEventListener('change', () => { obj[key] = input.value; commit(store); });
+  return input;
+}
+function numInput(obj, key, store, { min = 0, step = 50 } = {}) {
+  const input = h('input', { type: 'number', value: obj[key], min, step });
+  input.addEventListener('change', () => { obj[key] = Math.max(min, Number(input.value) || 0); commit(store); });
+  return input;
+}
+function selectInput(obj, key, store, options, { structural = false } = {}) {
+  const sel = h('select');
+  for (const [value, label] of options) {
+    sel.appendChild(h('option', { value, selected: String(obj[key]) === String(value) }, label));
+  }
+  sel.addEventListener('change', () => {
+    obj[key] = sel.value === '' ? null : sel.value;
+    commit(store, structural);
+  });
+  return sel;
+}
+function colorInput(obj, key, store) {
+  const input = h('input', { type: 'color', value: obj[key] ?? '#777777' });
+  input.addEventListener('change', () => { obj[key] = input.value; commit(store); });
+  return input;
+}
+function backLink(store, hash, label) {
+  return h('button.link', { onclick: () => store.go(hash) }, `← ${label}`);
+}
+function familyGradeSelects(nd, store, content) {
+  return [
+    selectInput(nd, 'family', store, content.materialMeta.familyOrder.map(f => [f, content.materialMeta.families[f].name])),
+    selectInput(nd, 'grade', store, content.materialMeta.gradeOrder.map(g => [g, content.materialMeta.grades[g].name]))
+  ];
+}
+
+// ------------------------------------------------------------- overview
+function overview(store, root) {
+  const { customDB: db } = store;
+
+  root.appendChild(h('p.muted.small', 'The whole game is yours to author: worlds, characters, the Main Campaign, archives, and all art live in the creator database. A world needs at least 5 characters to be published; the game starts once the readiness checklist below is complete.'));
+
+  // ---- game readiness
+  const rp = h('div.panel');
+  rp.appendChild(h('h2', store.gameReady.ready ? '✅ Game ready to play' : '◻️ Game readiness'));
+  for (const c of store.gameReady.checks) {
+    rp.appendChild(h('div.health-item' + (c.ok ? '.good' : '.warn'), `${c.ok ? '✅' : '◻️'} ${c.text}`));
+  }
+  root.appendChild(rp);
+
+  // ---- health
+  const hp = h('div.panel');
+  hp.appendChild(h('h2', 'Content health'));
+  if (store.contentHealth.length === 0) hp.appendChild(h('p.good.small', '✅ Everything in the creator database is live in the game.'));
+  for (const item of store.contentHealth) {
+    hp.appendChild(h('div.health-item' + ({ error: '.bad', warn: '.warn', info: '.muted' }[item.level] ?? ''), item.text));
+  }
+  root.appendChild(hp);
+
+  // ---- worlds
+  const wp = h('div.panel');
+  wp.appendChild(h('h2', 'Worlds'));
+  if (db.worlds.length === 0) {
+    wp.appendChild(h('p.muted.small', 'No worlds yet. Create one from scratch, or import the sample worlds below as an editable starting point.'));
+  }
+  for (const w of db.worlds) {
+    const gate = canPublishWorld(db, w.id);
+    const row = h('div.creator-list-row');
+    row.appendChild(h('span', { style: { fontSize: '1.4rem' } }, w.icon));
+    row.appendChild(h('div.grow',
+      h('div', h('b', w.displayName), ' ', h('span.badge.' + w.status, w.status.toUpperCase())),
+      h('div.small.muted', `${db.characters.filter(c => c.worldId === w.id).length} characters` + (w.status === 'draft' && !gate.ok ? ` — ${gate.reasons[0]}` : ''))));
+    row.appendChild(h('button.btn.tiny.primary', { onclick: () => store.go(`#/creator/world/${w.id}`) }, 'Edit'));
+    wp.appendChild(row);
+  }
+  wp.appendChild(h('button.btn.primary', {
+    style: { marginTop: '10px' },
+    onclick: () => promptName('New world name', name => {
+      const w = newCustomWorld(name);
+      db.worlds.push(w);
+      commit(store, false).then(() => store.go(`#/creator/world/${w.id}`));
+    })
+  }, '+ New World'));
+  root.appendChild(wp);
+
+  // ---- paired campaigns
+  const cp = h('div.panel');
+  cp.appendChild(h('h2', 'Main & Shadow Campaigns'));
+  cp.appendChild(h('p.small.muted', 'Chapters are added in pairs of 10 corresponding nodes. Main is material-focused; every Shadow node needs a character and unlocks when its matching Main node is cleared.'));
+  if (db.mainChapters.length === 0) {
+    cp.appendChild(h('p.warn.small', 'No campaign chapters yet — the game needs at least one complete pair to start.'));
+  }
+  db.mainChapters.forEach((ch, i) => {
+    const shadow = db.shadowChapters[i];
+    const shardChars = (shadow?.nodes ?? []).map(nd => {
+      const c = db.characters.find(x => x.id === nd.shardCharacterId);
+      return c ? c.displayName : '—';
+    });
+    const row = h('div.creator-list-row');
+    row.appendChild(h('div.grow',
+      h('div', h('b', `Chapter ${i + 1}`), h('span.small.muted', ` — nodes ${i * 10 + 1}–${i * 10 + 10}`)),
+      h('div.small.muted', `Shadow assignments: ${shardChars.filter(x => x !== '—').length}/10`)));
+    row.appendChild(h('button.btn.tiny.primary', { onclick: () => store.go(`#/creator/main-chapter/${i}`) }, 'Edit Main'));
+    row.appendChild(h('button.btn.tiny.primary', { onclick: () => store.go(`#/creator/shadow-chapter/${i}`) }, 'Edit Shadow'));
+    if (i === db.mainChapters.length - 1) {
+      row.appendChild(h('button.btn.tiny.danger', {
+        onclick: () => confirmModal(store, `Delete Main & Shadow Chapter ${i + 1}?`, 'Both paired chapters are removed. Characters whose only shard source is this Shadow chapter become unacquirable.', () => {
+          db.mainChapters.pop();
+          db.shadowChapters.pop();
+          commit(store, true);
+        })
+      }, 'Delete'));
+    }
+    cp.appendChild(row);
+  });
+  cp.appendChild(h('button.btn.primary', {
+    style: { marginTop: '10px' },
+    onclick: () => {
+      const idx = addCampaignChapter(db);
+      commit(store, false).then(() => store.go(`#/creator/main-chapter/${idx}`));
+    }
+  }, '+ New Paired Chapter'));
+  root.appendChild(cp);
+
+  // ---- database tools
+  const tp = h('div.panel');
+  tp.appendChild(h('h2', 'Creator database'));
+  tp.appendChild(h('div', { style: { display: 'flex', gap: '10px', flexWrap: 'wrap' } },
+    h('button.btn', {
+      onclick: async () => {
+        const pack = upgradeCustomDB(await loadSamplePack());
+        const doImport = async () => {
+          store.customDB = pack;
+          const res = await commit(store, true);
+          toast(res.ok ? 'Sample worlds imported — everything in them is yours to edit.' : 'Imported, but see Content health.', res.ok ? 'info' : 'error');
+        };
+        if (db.worlds.length > 0 || db.mainChapters.length > 0) {
+          confirmModal(store, 'Replace your content with the sample worlds?', 'Your current creator database is replaced. Export it first if you want a backup.', doImport);
+        } else {
+          doImport();
+        }
+      }
+    }, 'Import sample worlds…'),
+    h('button.btn', { onclick: () => exportJson(store.customDB, 'hero-collector-content-pack.json').then(ok => ok && toast('Content pack exported.')) }, 'Export content pack…'),
+    h('button.btn', {
+      onclick: async () => {
+        const imported = await importJson();
+        if (!imported) { toast('Import canceled or unreadable.', 'error'); return; }
+        confirmModal(store, 'Replace creator database?', 'Your current creations are replaced by the imported content pack. Export first if you want a backup.', async () => {
+          store.customDB = upgradeCustomDB(imported);
+          const res = await commit(store, true);
+          toast(res.ok ? 'Content pack imported.' : 'Imported, but it could not be fully applied — see Content health.', res.ok ? 'info' : 'error');
+        });
+      }
+    }, 'Import content pack…'),
+    h('button.btn.danger', {
+      onclick: () => confirmModal(store, 'Delete ALL creator content?', 'Every world, character, chapter, and imported image is removed and the game returns to setup mode. This cannot be undone.', async () => {
+        store.customDB = emptyCustomDB();
+        await commit(store, true);
+        toast('Creator database reset.');
+      })
+    }, 'Reset creator data…')));
+  root.appendChild(tp);
+}
+
+function promptName(title, onDone) {
+  openModal((modal, close) => {
+    modal.appendChild(h('h2', title));
+    const input = h('input', { type: 'text', maxlength: 40, style: { width: '100%' } });
+    modal.appendChild(input);
+    const go = () => { const v = input.value.trim(); if (v) { close(); onDone(v); } };
+    input.addEventListener('keydown', ev => { if (ev.key === 'Enter') go(); });
+    modal.appendChild(h('div', { style: { display: 'flex', gap: '8px', marginTop: '12px' } },
+      h('button.btn.primary', { onclick: go }, 'Create'),
+      h('button.btn', { onclick: close }, 'Cancel')));
+    setTimeout(() => input.focus(), 50);
+  });
+}
+
+function confirmModal(store, title, warning, onConfirm) {
+  openModal((modal, close) => {
+    modal.appendChild(h('h2', title));
+    modal.appendChild(h('p.warn', warning));
+    modal.appendChild(h('div', { style: { display: 'flex', gap: '8px' } },
+      h('button.btn.danger', { onclick: () => { close(); onConfirm(); } }, 'Yes, do it'),
+      h('button.btn.primary', { onclick: close }, 'Cancel')));
+  });
+}
+
+// ------------------------------------------------------------- world editor
+function worldEditor(store, root, worldId) {
+  const { customDB: db } = store;
+  const w = db.worlds.find(x => x.id === worldId);
+  if (!w) { root.appendChild(h('p.bad', 'Unknown world.')); return; }
+  root.appendChild(backLink(store, '#/creator', 'Content Creator'));
+
+  // ---- identity & status
+  const idp = h('div.panel');
+  idp.appendChild(h('h2', w.displayName, ' ', h('span.badge.' + w.status, w.status.toUpperCase())));
+  const grid = h('div.form-grid');
+  grid.append(...field('Name', textInput(w, 'displayName', store)));
+  grid.append(...field('Tagline', textInput(w, 'tagline', store, { maxlength: 120 })));
+  grid.append(...field('Icon (emoji)', textInput(w, 'icon', store, { maxlength: 4 })));
+  grid.append(...field('Primary color', colorInput(w.palette, 'primary', store)));
+  grid.append(...field('Accent color', colorInput(w.palette, 'accent', store)));
+  grid.append(...field('Dark color', colorInput(w.palette, 'dark', store)));
+  idp.appendChild(grid);
+  idp.appendChild(h('div.wells', { style: { marginTop: '12px' } },
+    imageWell('world', 'World banner (16:9)', () => w.image, v => { w.image = v; }, () => commit(store, true))));
+
+  const gate = canPublishWorld(db, w.id);
+  const statusRow = h('div', { style: { marginTop: '14px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' } });
+  if (w.status === 'draft') {
+    statusRow.appendChild(h('button.btn.primary', {
+      disabled: !gate.ok,
+      onclick: async () => {
+        w.status = 'published';
+        const res = await commit(store, true);
+        toast(res.ok ? `${w.displayName} is now in the game!` : 'Published, but held back — see Content health.', res.ok ? 'info' : 'error');
+      }
+    }, 'Publish into the game'));
+    if (!gate.ok) statusRow.appendChild(h('div.small.warn', gate.reasons.map(r => h('div', r))));
+  } else {
+    statusRow.appendChild(h('button.btn', {
+      onclick: () => confirmModal(store, `Unpublish “${w.displayName}”?`,
+        'The world leaves the game while you edit it. Owned characters and progress go dormant and return when you republish.',
+        async () => { w.status = 'draft'; await commit(store, true); })
+    }, 'Unpublish (back to draft)'));
+  }
+  statusRow.appendChild(h('button.btn.danger', {
+    onclick: () => confirmModal(store, `Delete “${w.displayName}” permanently?`,
+      'The world, its characters, campaign, archive, and imported images are removed from the creator database. This cannot be undone.',
+      async () => {
+        db.worlds = db.worlds.filter(x => x.id !== w.id);
+        const removedChars = new Set(db.characters.filter(c => c.worldId === w.id).map(c => c.id));
+        db.characters = db.characters.filter(c => c.worldId !== w.id);
+        for (const ch of db.shadowChapters) for (const nd of ch.nodes) if (removedChars.has(nd.shardCharacterId)) nd.shardCharacterId = null;
+        for (const wx of db.worlds) for (const nd of wx.campaignNodes) if (removedChars.has(nd.shardCharacterId)) nd.shardCharacterId = null;
+        await commit(store, false);
+        store.go('#/creator');
+      })
+  }, 'Delete world'));
+  idp.appendChild(statusRow);
+  root.appendChild(idp);
+
+  // ---- characters
+  root.appendChild(characterListPanel(store, w.id));
+
+  // ---- world campaign nodes
+  const np = h('div.panel');
+  np.appendChild(h('h2', 'World Campaign — 3 chapters × 10 nodes'));
+  np.appendChild(h('p.small.muted', 'All nodes require a full party from this world. Optionally assign one of this world’s characters as a shard drop; that node then allows five runs per day. First clears still award Archive fragments.'));
+  const worldShardOptions = [
+    ['', '— material only —'],
+    ...db.characters.filter(c => c.worldId === w.id).map(c => [c.id, `${c.displayName} shards`])
+  ];
+  for (let ch = 0; ch < 3; ch++) {
+    np.appendChild(h('h3', `Chapter ${ch + 1}`));
+    for (let i = 0; i < 10; i++) {
+      const nd = w.campaignNodes[ch * 10 + i];
+      const row = h('div.node-edit-row.world');
+      row.appendChild(h('span.muted.small', String(ch * 10 + i + 1)));
+      row.appendChild(textInput(nd, 'name', store));
+      row.appendChild(numInput(nd, 'threshold', store, { min: 0 }));
+      row.append(...familyGradeSelects(nd, store, store.content));
+      row.appendChild(selectInput(nd, 'shardCharacterId', store, worldShardOptions, { structural: true }));
+      row.appendChild(h('span.small.muted', `relic ${Math.floor((ch * 10 + i) / 2) + 1}`));
+      np.appendChild(row);
+    }
+  }
+  root.appendChild(np);
+
+  // ---- archive
+  const ap = h('div.panel');
+  ap.appendChild(h('h2', 'World Archive — 3 collections × 5 relics'));
+  const chars = db.characters.filter(c => c.worldId === w.id);
+  const skinCharOptions = [['', '— choose character —'], ...chars.map(c => [c.id, c.displayName])];
+  w.archive.collections.forEach((col, c) => {
+    ap.appendChild(h('h3', `Collection ${c + 1}`));
+    const cg = h('div.form-grid');
+    cg.append(...field('Collection name', textInput(col, 'name', store)));
+    col.rewardSkin ??= { characterId: null, name: '', portrait: null, fullBody: null };
+    cg.append(...field('Reward skin character', selectInput(col.rewardSkin, 'characterId', store, skinCharOptions, { structural: true })));
+    cg.append(...field('Reward skin name', textInput(col.rewardSkin, 'name', store, { maxlength: 80 })));
+    ap.appendChild(cg);
+    ap.appendChild(h('div.wells', { style: { marginTop: '10px' } },
+      imageWell('portrait', 'Reward skin portrait (square)', () => col.rewardSkin.portrait, v => { col.rewardSkin.portrait = v; }, () => commit(store, true)),
+      imageWell('fullBody', 'Reward skin full body (9:16)', () => col.rewardSkin.fullBody, v => { col.rewardSkin.fullBody = v; }, () => commit(store, true))));
+    const shelf = h('div.wells', { style: { marginTop: '8px' } });
+    col.relics.forEach((relic, r) => {
+      const cell = h('div', { style: { width: '200px' } });
+      cell.appendChild(textInput(relic, 'name', store));
+      cell.appendChild(imageWell('relic', `Relic ${c * 5 + r + 1} art (16:9)`, () => relic.image, v => { relic.image = v; }, () => commit(store, true)));
+      const loreArea = textArea(relic, 'lore', store);
+      loreArea.placeholder = 'Lore entry…';
+      cell.appendChild(loreArea);
+      shelf.appendChild(cell);
+    });
+    ap.appendChild(shelf);
+  });
+  ap.appendChild(h('h3', 'Full-Archive skin'));
+  w.archive.fullSkin ??= { characterId: null, name: '', portrait: null, fullBody: null };
+  const sg = h('div.form-grid');
+  sg.append(...field('Skin character', selectInput(w.archive.fullSkin, 'characterId', store, skinCharOptions, { structural: true })));
+  sg.append(...field('Skin name', textInput(w.archive.fullSkin, 'name', store, { maxlength: 80 })));
+  ap.appendChild(sg);
+  ap.appendChild(h('div.wells', { style: { marginTop: '10px' } },
+    imageWell('portrait', 'Skin portrait (square)', () => w.archive.fullSkin.portrait, v => { w.archive.fullSkin.portrait = v; }, () => commit(store, true)),
+    imageWell('fullBody', 'Skin full body (9:16)', () => w.archive.fullSkin.fullBody, v => { w.archive.fullSkin.fullBody = v; }, () => commit(store, true))));
+  root.appendChild(ap);
+}
+
+function characterListPanel(store, worldId) {
+  const { customDB: db } = store;
+  const chars = db.characters.filter(c => c.worldId === worldId);
+  const panel = h('div.panel');
+  panel.appendChild(h('h2', `Characters (${chars.length})`));
+  panel.appendChild(h('p.small.muted', 'A world needs at least 5 characters to be published, and each character needs a live shard source in a complete Shadow chapter or this World Campaign. Mark 5 Minor characters as “starting” somewhere in your game so a new save can begin.'));
+  for (const c of chars) {
+    const sources = characterShardAssignments(db, c.id);
+    const row = h('div.creator-list-row');
+    row.appendChild(c.portrait
+      ? h('img', { src: c.portrait, style: { width: '44px', height: '44px', borderRadius: '10px', objectFit: 'cover' }, alt: '' })
+      : h('div.portrait.sm', { style: { '--pc': c.color } }, h('span', c.glyph)));
+    row.appendChild(h('div.grow',
+      h('div', h('b', c.displayName),
+        h('span.small.muted', ` · ${store.content.archetypes[c.archetype]?.name ?? c.archetype} · ${c.tier}`),
+        c.starting ? h('span.chip', '⭐ starting') : null),
+      sources.length > 0
+        ? h('div.small.good', `Shard sources: ${sources.map(s => `Ch.${s.chapter} node ${s.position}`).join(', ')}`)
+        : h('div.small.warn', 'No shard source yet — assign one in Shadow or this World Campaign')));
+    row.appendChild(h('button.btn.tiny.primary', { onclick: () => store.go(`#/creator/char/${c.id}`) }, 'Edit'));
+    row.appendChild(h('button.btn.tiny.danger', {
+      onclick: () => confirmModal(store, `Delete ${c.displayName}?`,
+        'The character and their imported images are removed from the creator database. Their shard nodes revert to unassigned.',
+        async () => {
+          db.characters = db.characters.filter(x => x.id !== c.id);
+          for (const ch of db.shadowChapters) for (const nd of ch.nodes) if (nd.shardCharacterId === c.id) nd.shardCharacterId = null;
+          for (const wx of db.worlds) for (const nd of wx.campaignNodes) if (nd.shardCharacterId === c.id) nd.shardCharacterId = null;
+          const world = db.worlds.find(x => x.id === worldId);
+          if (world && world.status === 'published' && db.characters.filter(x => x.worldId === worldId).length < 5) {
+            world.status = 'draft';
+            toast(`${world.displayName} dropped below 5 characters and went back to draft.`, 'error');
+          }
+          await commit(store, true);
+        })
+    }, 'Delete'));
+    panel.appendChild(row);
+  }
+  panel.appendChild(h('button.btn.primary', {
+    style: { marginTop: '10px' },
+    onclick: () => promptName('New character name', name => {
+      const c = newCustomCharacter(worldId, name, store.content.characterMeta.slotOrder, store.content.characterMeta.slots);
+      db.characters.push(c);
+      commit(store, false).then(() => store.go(`#/creator/char/${c.id}`));
+    })
+  }, '+ New Character'));
+  return panel;
+}
+
+// ------------------------------------------------------------- character editor
+function charEditor(store, root, charId) {
+  const { customDB: db, content } = store;
+  const c = db.characters.find(x => x.id === charId);
+  if (!c) { root.appendChild(h('p.bad', 'Unknown character.')); return; }
+  root.appendChild(backLink(store, `#/creator/world/${c.worldId}`, 'world'));
+
+  const idp = h('div.panel');
+  idp.appendChild(h('h2', c.displayName, c.starting ? h('span.chip', '⭐ starting') : null));
+  const grid = h('div.form-grid');
+  grid.append(...field('Name', textInput(c, 'displayName', store)));
+  grid.append(...field('Glyph (fallback letter)', textInput(c, 'glyph', store, { maxlength: 2 })));
+  grid.append(...field('Color', colorInput(c, 'color', store)));
+  grid.append(...field('Archetype', selectInput(c, 'archetype', store,
+    Object.entries(content.archetypes).map(([id, a]) => [id, `${a.icon} ${a.name}`]))));
+  const tierSel = h('select');
+  for (const [value, label] of [['minor', 'Minor — unlock at 1★ (10 shards)'], ['medium', 'Medium — unlock at 4★ (110 shards)'], ['major', 'Major — unlock at 7★ (450 shards)']]) {
+    tierSel.appendChild(h('option', { value, selected: c.tier === value }, label));
+  }
+  tierSel.addEventListener('change', () => {
+    c.tier = tierSel.value;
+    if (c.tier !== 'minor' && c.starting) {
+      c.starting = false;
+      toast('Only Minor characters can be starting characters — flag cleared.');
+    }
+    commit(store, true);
+  });
+  grid.append(...field('Acquisition tier', tierSel));
+
+  const startCb = h('input', { type: 'checkbox', checked: !!c.starting, disabled: c.tier !== 'minor' });
+  startCb.addEventListener('change', () => { c.starting = startCb.checked; commit(store, true); });
+  grid.append(...field('Starting character', h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+    startCb, h('span.small.muted', c.tier === 'minor' ? 'Granted at 1★ when a new game starts (needs 5 total).' : 'Only Minor characters can start owned.'))));
+
+  const factionOptions = [
+    ['', '— no faction —'],
+    ...db.factions.map(f => [f.id, f.displayName])
+  ];
+  const factionSel = selectInput(c, 'faction', store, factionOptions);
+  const factionRow = h('div', { style: { display: 'flex', gap: '6px' } }, factionSel,
+    h('button.btn.tiny', {
+      onclick: () => promptName('New faction name', name => {
+        const f = newCustomFaction(name);
+        db.factions.push(f);
+        c.faction = f.id;
+        commit(store, true);
+      })
+    }, '+ New'));
+  grid.append(...field('Faction (party bonus)', factionRow));
+  grid.append(...field('Description', textArea(c, 'description', store)));
+  grid.append(...field('Lore', textArea(c, 'lore', store)));
+  idp.appendChild(grid);
+
+  // extra profession tags (universal system tags)
+  idp.appendChild(h('h3', 'Extra tags'));
+  const tagRow = h('div');
+  for (const t of store.baseRaw.tags.filter(x => x.category === 'profession')) {
+    const cb = h('input', { type: 'checkbox', checked: (c.extraTags ?? []).includes(t.id) });
+    cb.addEventListener('change', () => {
+      c.extraTags = cb.checked
+        ? [...(c.extraTags ?? []), t.id]
+        : (c.extraTags ?? []).filter(x => x !== t.id);
+      commit(store);
+    });
+    tagRow.appendChild(h('label.chip', cb, ` ${t.displayName}`));
+  }
+  idp.appendChild(tagRow);
+  root.appendChild(idp);
+
+  // ---- images
+  const imp = h('div.panel');
+  imp.appendChild(h('h2', 'Character art'));
+  imp.appendChild(h('div.wells',
+    imageWell('portrait', 'Portrait (square)', () => c.portrait, v => { c.portrait = v; }, () => commit(store, true)),
+    imageWell('fullBody', 'Full body (9:16, taller than wide)', () => c.fullBody, v => { c.fullBody = v; }, () => commit(store, true))));
+  root.appendChild(imp);
+
+  // ---- equipment lines
+  const eqp = h('div.panel');
+  eqp.appendChild(h('h2', 'Six equipment lines'));
+  eqp.appendChild(h('p.small.muted', 'Each line keeps its core art through all ten Gear Tiers; only the name prefix evolves.'));
+  const wells = h('div.wells');
+  for (const slot of content.characterMeta.slotOrder) {
+    const eq = c.equipment[slot];
+    const cell = h('div', { style: { width: '170px' } });
+    cell.appendChild(h('div.small.muted', content.characterMeta.slots[slot].name));
+    cell.appendChild(textInput(eq, 'name', store, { maxlength: 60 }));
+    cell.appendChild(imageWell('equipment', '', () => eq.image, v => { eq.image = v; }, () => commit(store, true)));
+    wells.appendChild(cell);
+  }
+  eqp.appendChild(wells);
+  root.appendChild(eqp);
+
+  // ---- shard sources
+  const sp = h('div.panel');
+  sp.appendChild(h('h2', 'Shard sources'));
+  const sources = characterShardAssignments(db, c.id);
+  if (sources.length === 0) {
+    sp.appendChild(h('p.warn.small', 'No shard source yet — this character cannot be acquired and is held out of the game. Assign them in a complete Shadow chapter or their World Campaign.'));
+  } else {
+    sp.appendChild(h('p.good.small', `Authored at: ${sources.map(s =>
+      s.campaign === 'shadow'
+        ? `Shadow ${s.chapter}-${s.position}`
+        : `${s.worldName} ${s.chapter}-${s.position}`).join(' · ')}`));
+  }
+  if (db.mainChapters.length === 0) {
+    sp.appendChild(h('button.btn.tiny.primary', {
+      onclick: () => { addCampaignChapter(db); commit(store, false).then(() => store.go('#/creator/shadow-chapter/0')); }
+    }, 'Create Campaign Chapter 1'));
+  } else {
+    sp.appendChild(h('div', db.shadowChapters.map((_, i) =>
+      h('button.btn.tiny', { style: { marginRight: '6px' }, onclick: () => store.go(`#/creator/shadow-chapter/${i}`) }, `Edit Shadow ${i + 1}`))));
+  }
+  root.appendChild(sp);
+}
+
+// ------------------------------------------------------------- chapter editor
+function chapterEditor(store, root, campaign, idx) {
+  const { customDB: db, content } = store;
+  const isShadow = campaign === 'shadow';
+  const ch = (isShadow ? db.shadowChapters : db.mainChapters)[idx];
+  if (!ch) { root.appendChild(h('p.bad', 'Unknown chapter.')); return; }
+  const chapterNum = idx + 1;
+  root.appendChild(backLink(store, '#/creator', 'Content Creator'));
+
+  const panel = h('div.panel');
+  panel.appendChild(h('h2', `${isShadow ? 'Shadow' : 'Main'} Campaign — Chapter ${chapterNum} (nodes ${idx * 10 + 1}–${idx * 10 + 10})`));
+  panel.appendChild(h('p.small.muted', isShadow
+    ? 'Every node requires a shard character and allows five runs per day. Each unlocks when the corresponding Main node is cleared; Shadow nodes do not gate one another.'
+    : 'All nodes are freely repeatable material sources. Thresholds never decrease along the campaign; positions 5 and 10 are checkpoints with larger first-clear rewards.'));
+
+  const charOptions = [
+    ['', '— choose character —'],
+    ...db.characters.map(x => {
+      const w = db.worlds.find(y => y.id === x.worldId);
+      return [x.id, `${x.displayName} (${w?.displayName ?? '?'})`];
+    })
+  ];
+
+  ch.nodes.forEach((nd, i) => {
+    const pos = i + 1;
+    const row = h('div.node-edit-row');
+    row.appendChild(h('span.muted.small', String(idx * 10 + pos)));
+    row.appendChild(textInput(nd, 'name', store));
+    row.appendChild(numInput(nd, 'threshold', store, { min: 0 }));
+    row.append(...familyGradeSelects(nd, store, content));
+    if (isShadow) {
+      row.appendChild(selectInput(nd, 'shardCharacterId', store, charOptions, { structural: true }));
+    } else {
+      row.appendChild(h('span.small.muted', pos % 5 === 0 ? '🏁 checkpoint' : (pos >= 7 ? 'advanced node' : 'ordinary node')));
+    }
+    panel.appendChild(row);
+  });
+
+  const actions = h('div', { style: { marginTop: '12px', display: 'flex', gap: '10px' } });
+  actions.appendChild(h('button.btn', {
+    onclick: () => store.go(`#/creator/${isShadow ? 'main' : 'shadow'}-chapter/${idx}`)
+  }, `Edit matching ${isShadow ? 'Main' : 'Shadow'} chapter`));
+  if (isShadow) {
+    actions.appendChild(h('button.btn', {
+      onclick: () => {
+        const assigned = new Set();
+        for (const chx of db.shadowChapters) for (const nd of chx.nodes) if (nd.shardCharacterId) assigned.add(nd.shardCharacterId);
+        for (const w of db.worlds) for (const nd of w.campaignNodes) if (nd.shardCharacterId) assigned.add(nd.shardCharacterId);
+        const needy = db.characters.filter(x => !assigned.has(x.id));
+        const fallback = db.characters;
+        let n = 0;
+        for (const nd of ch.nodes) {
+          if (nd.shardCharacterId) continue;
+          const pick = needy.shift() ?? fallback[n % Math.max(1, fallback.length)];
+          if (pick) { nd.shardCharacterId = pick.id; n++; }
+        }
+        commit(store, true).then(() => toast(n > 0 ? `Assigned ${n} Shadow node(s).` : 'No empty Shadow nodes, or no characters are available.'));
+      }
+    }, 'Auto-fill empty shard nodes'));
+  }
+  panel.appendChild(actions);
+  root.appendChild(panel);
+}

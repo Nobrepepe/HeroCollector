@@ -1,0 +1,343 @@
+{
+  "families": {
+    "metal": {
+      "name": "Metal",
+      "icon": "⚙️",
+      "blurb": "Frames, fasteners, structural or prestigious hardware"
+    },
+    "fiber": {
+      "name": "Fiber",
+      "icon": "🧵",
+      "blurb": "Cloth, paper, leather-like and flexible materials"
+    },
+    "mineral": {
+      "name": "Mineral",
+      "icon": "💎",
+      "blurb": "Stone, crystal, glass, gems, ceramics"
+    },
+    "compound": {
+      "name": "Compound",
+      "icon": "⚗️",
+      "blurb": "Chemicals, inks, medicines, fuels, prepared mixtures"
+    },
+    "mechanism": {
+      "name": "Mechanism",
+      "icon": "🛠️",
+      "blurb": "Tools, clockwork, electronics, engineered assemblies"
+    },
+    "essence": {
+      "name": "Essence",
+      "icon": "✨",
+      "blurb": "Abstract, magical, emotional, artistic, or symbolic energy"
+    }
+  },
+  "grades": {
+    "basic": {
+      "name": "Basic",
+      "rank": 0
+    },
+    "improved": {
+      "name": "Improved",
+      "rank": 1
+    },
+    "advanced": {
+      "name": "Advanced",
+      "rank": 2
+    },
+    "superior": {
+      "name": "Superior",
+      "rank": 3
+    },
+    "masterwork": {
+      "name": "Masterwork",
+      "rank": 4
+    }
+  },
+  "gradeOrder": [
+    "basic",
+    "improved",
+    "advanced",
+    "superior",
+    "masterwork"
+  ],
+  "familyOrder": [
+    "metal",
+    "fiber",
+    "mineral",
+    "compound",
+    "mechanism",
+    "essence"
+  ],
+  "materials": [
+    {
+      "id": "mat_metal_basic",
+      "family": "metal",
+      "grade": "basic",
+      "displayName": "Basic Metal",
+      "icon": "⚙️",
+      "conversionTarget": "mat_metal_improved",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_metal_improved",
+      "family": "metal",
+      "grade": "improved",
+      "displayName": "Improved Metal",
+      "icon": "⚙️",
+      "conversionTarget": "mat_metal_advanced",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_metal_advanced",
+      "family": "metal",
+      "grade": "advanced",
+      "displayName": "Advanced Metal",
+      "icon": "⚙️",
+      "conversionTarget": "mat_metal_superior",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_metal_superior",
+      "family": "metal",
+      "grade": "superior",
+      "displayName": "Superior Metal",
+      "icon": "⚙️",
+      "conversionTarget": "mat_metal_masterwork",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_metal_masterwork",
+      "family": "metal",
+      "grade": "masterwork",
+      "displayName": "Masterwork Metal",
+      "icon": "⚙️",
+      "conversionTarget": null,
+      "conversionCost": null
+    },
+    {
+      "id": "mat_fiber_basic",
+      "family": "fiber",
+      "grade": "basic",
+      "displayName": "Basic Fiber",
+      "icon": "🧵",
+      "conversionTarget": "mat_fiber_improved",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_fiber_improved",
+      "family": "fiber",
+      "grade": "improved",
+      "displayName": "Improved Fiber",
+      "icon": "🧵",
+      "conversionTarget": "mat_fiber_advanced",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_fiber_advanced",
+      "family": "fiber",
+      "grade": "advanced",
+      "displayName": "Advanced Fiber",
+      "icon": "🧵",
+      "conversionTarget": "mat_fiber_superior",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_fiber_superior",
+      "family": "fiber",
+      "grade": "superior",
+      "displayName": "Superior Fiber",
+      "icon": "🧵",
+      "conversionTarget": "mat_fiber_masterwork",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_fiber_masterwork",
+      "family": "fiber",
+      "grade": "masterwork",
+      "displayName": "Masterwork Fiber",
+      "icon": "🧵",
+      "conversionTarget": null,
+      "conversionCost": null
+    },
+    {
+      "id": "mat_mineral_basic",
+      "family": "mineral",
+      "grade": "basic",
+      "displayName": "Basic Mineral",
+      "icon": "💎",
+      "conversionTarget": "mat_mineral_improved",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_mineral_improved",
+      "family": "mineral",
+      "grade": "improved",
+      "displayName": "Improved Mineral",
+      "icon": "💎",
+      "conversionTarget": "mat_mineral_advanced",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_mineral_advanced",
+      "family": "mineral",
+      "grade": "advanced",
+      "displayName": "Advanced Mineral",
+      "icon": "💎",
+      "conversionTarget": "mat_mineral_superior",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_mineral_superior",
+      "family": "mineral",
+      "grade": "superior",
+      "displayName": "Superior Mineral",
+      "icon": "💎",
+      "conversionTarget": "mat_mineral_masterwork",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_mineral_masterwork",
+      "family": "mineral",
+      "grade": "masterwork",
+      "displayName": "Masterwork Mineral",
+      "icon": "💎",
+      "conversionTarget": null,
+      "conversionCost": null
+    },
+    {
+      "id": "mat_compound_basic",
+      "family": "compound",
+      "grade": "basic",
+      "displayName": "Basic Compound",
+      "icon": "⚗️",
+      "conversionTarget": "mat_compound_improved",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_compound_improved",
+      "family": "compound",
+      "grade": "improved",
+      "displayName": "Improved Compound",
+      "icon": "⚗️",
+      "conversionTarget": "mat_compound_advanced",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_compound_advanced",
+      "family": "compound",
+      "grade": "advanced",
+      "displayName": "Advanced Compound",
+      "icon": "⚗️",
+      "conversionTarget": "mat_compound_superior",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_compound_superior",
+      "family": "compound",
+      "grade": "superior",
+      "displayName": "Superior Compound",
+      "icon": "⚗️",
+      "conversionTarget": "mat_compound_masterwork",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_compound_masterwork",
+      "family": "compound",
+      "grade": "masterwork",
+      "displayName": "Masterwork Compound",
+      "icon": "⚗️",
+      "conversionTarget": null,
+      "conversionCost": null
+    },
+    {
+      "id": "mat_mechanism_basic",
+      "family": "mechanism",
+      "grade": "basic",
+      "displayName": "Basic Mechanism",
+      "icon": "🛠️",
+      "conversionTarget": "mat_mechanism_improved",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_mechanism_improved",
+      "family": "mechanism",
+      "grade": "improved",
+      "displayName": "Improved Mechanism",
+      "icon": "🛠️",
+      "conversionTarget": "mat_mechanism_advanced",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_mechanism_advanced",
+      "family": "mechanism",
+      "grade": "advanced",
+      "displayName": "Advanced Mechanism",
+      "icon": "🛠️",
+      "conversionTarget": "mat_mechanism_superior",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_mechanism_superior",
+      "family": "mechanism",
+      "grade": "superior",
+      "displayName": "Superior Mechanism",
+      "icon": "🛠️",
+      "conversionTarget": "mat_mechanism_masterwork",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_mechanism_masterwork",
+      "family": "mechanism",
+      "grade": "masterwork",
+      "displayName": "Masterwork Mechanism",
+      "icon": "🛠️",
+      "conversionTarget": null,
+      "conversionCost": null
+    },
+    {
+      "id": "mat_essence_basic",
+      "family": "essence",
+      "grade": "basic",
+      "displayName": "Basic Essence",
+      "icon": "✨",
+      "conversionTarget": "mat_essence_improved",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_essence_improved",
+      "family": "essence",
+      "grade": "improved",
+      "displayName": "Improved Essence",
+      "icon": "✨",
+      "conversionTarget": "mat_essence_advanced",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_essence_advanced",
+      "family": "essence",
+      "grade": "advanced",
+      "displayName": "Advanced Essence",
+      "icon": "✨",
+      "conversionTarget": "mat_essence_superior",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_essence_superior",
+      "family": "essence",
+      "grade": "superior",
+      "displayName": "Superior Essence",
+      "icon": "✨",
+      "conversionTarget": "mat_essence_masterwork",
+      "conversionCost": 5
+    },
+    {
+      "id": "mat_essence_masterwork",
+      "family": "essence",
+      "grade": "masterwork",
+      "displayName": "Masterwork Essence",
+      "icon": "✨",
+      "conversionTarget": null,
+      "conversionCost": null
+    }
+  ]
+}

@@ -1,0 +1,328 @@
+{
+  "tierProfiles": [
+    {
+      "tier": 1,
+      "grade": "basic",
+      "primaryQty": 2,
+      "secondaryQty": 0,
+      "stage": "Basic; simple components"
+    },
+    {
+      "tier": 2,
+      "grade": "basic",
+      "primaryQty": 3,
+      "secondaryQty": 0,
+      "stage": "Basic; increased quantities"
+    },
+    {
+      "tier": 3,
+      "grade": "improved",
+      "primaryQty": 2,
+      "secondaryQty": 1,
+      "stage": "Improved"
+    },
+    {
+      "tier": 4,
+      "grade": "improved",
+      "primaryQty": 3,
+      "secondaryQty": 1,
+      "stage": "Improved; multiple components"
+    },
+    {
+      "tier": 5,
+      "grade": "advanced",
+      "primaryQty": 2,
+      "secondaryQty": 1,
+      "stage": "Advanced"
+    },
+    {
+      "tier": 6,
+      "grade": "advanced",
+      "primaryQty": 3,
+      "secondaryQty": 2,
+      "stage": "Advanced; increased quantities"
+    },
+    {
+      "tier": 7,
+      "grade": "superior",
+      "primaryQty": 2,
+      "secondaryQty": 1,
+      "stage": "Superior"
+    },
+    {
+      "tier": 8,
+      "grade": "superior",
+      "primaryQty": 3,
+      "secondaryQty": 2,
+      "stage": "Superior; complex mixes"
+    },
+    {
+      "tier": 9,
+      "grade": "masterwork",
+      "primaryQty": 2,
+      "secondaryQty": 1,
+      "stage": "Masterwork"
+    },
+    {
+      "tier": 10,
+      "grade": "masterwork",
+      "primaryQty": 3,
+      "secondaryQty": 2,
+      "stage": "Masterwork; final recipes"
+    }
+  ],
+  "templates": [
+    {
+      "id": "tpl_leader_attire",
+      "archetype": "leader",
+      "slot": "attire",
+      "primaryComponent": "weave",
+      "secondaryComponent": "apparatus"
+    },
+    {
+      "id": "tpl_leader_tool",
+      "archetype": "leader",
+      "slot": "tool",
+      "primaryComponent": "apparatus",
+      "secondaryComponent": "framework"
+    },
+    {
+      "id": "tpl_leader_accessory",
+      "archetype": "leader",
+      "slot": "accessory",
+      "primaryComponent": "binding",
+      "secondaryComponent": "apparatus"
+    },
+    {
+      "id": "tpl_leader_keepsake",
+      "archetype": "leader",
+      "slot": "keepsake",
+      "primaryComponent": "focus",
+      "secondaryComponent": "apparatus"
+    },
+    {
+      "id": "tpl_leader_emblem",
+      "archetype": "leader",
+      "slot": "emblem",
+      "primaryComponent": "framework",
+      "secondaryComponent": "apparatus"
+    },
+    {
+      "id": "tpl_leader_signature",
+      "archetype": "leader",
+      "slot": "signature",
+      "primaryComponent": "matrix",
+      "secondaryComponent": "apparatus"
+    },
+    {
+      "id": "tpl_caretaker_attire",
+      "archetype": "caretaker",
+      "slot": "attire",
+      "primaryComponent": "weave",
+      "secondaryComponent": "binding"
+    },
+    {
+      "id": "tpl_caretaker_tool",
+      "archetype": "caretaker",
+      "slot": "tool",
+      "primaryComponent": "apparatus",
+      "secondaryComponent": "binding"
+    },
+    {
+      "id": "tpl_caretaker_accessory",
+      "archetype": "caretaker",
+      "slot": "accessory",
+      "primaryComponent": "binding",
+      "secondaryComponent": "weave"
+    },
+    {
+      "id": "tpl_caretaker_keepsake",
+      "archetype": "caretaker",
+      "slot": "keepsake",
+      "primaryComponent": "focus",
+      "secondaryComponent": "binding"
+    },
+    {
+      "id": "tpl_caretaker_emblem",
+      "archetype": "caretaker",
+      "slot": "emblem",
+      "primaryComponent": "framework",
+      "secondaryComponent": "binding"
+    },
+    {
+      "id": "tpl_caretaker_signature",
+      "archetype": "caretaker",
+      "slot": "signature",
+      "primaryComponent": "matrix",
+      "secondaryComponent": "binding"
+    },
+    {
+      "id": "tpl_achiever_attire",
+      "archetype": "achiever",
+      "slot": "attire",
+      "primaryComponent": "weave",
+      "secondaryComponent": "apparatus"
+    },
+    {
+      "id": "tpl_achiever_tool",
+      "archetype": "achiever",
+      "slot": "tool",
+      "primaryComponent": "apparatus",
+      "secondaryComponent": "framework"
+    },
+    {
+      "id": "tpl_achiever_accessory",
+      "archetype": "achiever",
+      "slot": "accessory",
+      "primaryComponent": "binding",
+      "secondaryComponent": "apparatus"
+    },
+    {
+      "id": "tpl_achiever_keepsake",
+      "archetype": "achiever",
+      "slot": "keepsake",
+      "primaryComponent": "focus",
+      "secondaryComponent": "apparatus"
+    },
+    {
+      "id": "tpl_achiever_emblem",
+      "archetype": "achiever",
+      "slot": "emblem",
+      "primaryComponent": "framework",
+      "secondaryComponent": "apparatus"
+    },
+    {
+      "id": "tpl_achiever_signature",
+      "archetype": "achiever",
+      "slot": "signature",
+      "primaryComponent": "matrix",
+      "secondaryComponent": "apparatus"
+    },
+    {
+      "id": "tpl_rebel_attire",
+      "archetype": "rebel",
+      "slot": "attire",
+      "primaryComponent": "weave",
+      "secondaryComponent": "matrix"
+    },
+    {
+      "id": "tpl_rebel_tool",
+      "archetype": "rebel",
+      "slot": "tool",
+      "primaryComponent": "apparatus",
+      "secondaryComponent": "matrix"
+    },
+    {
+      "id": "tpl_rebel_accessory",
+      "archetype": "rebel",
+      "slot": "accessory",
+      "primaryComponent": "binding",
+      "secondaryComponent": "matrix"
+    },
+    {
+      "id": "tpl_rebel_keepsake",
+      "archetype": "rebel",
+      "slot": "keepsake",
+      "primaryComponent": "focus",
+      "secondaryComponent": "matrix"
+    },
+    {
+      "id": "tpl_rebel_emblem",
+      "archetype": "rebel",
+      "slot": "emblem",
+      "primaryComponent": "framework",
+      "secondaryComponent": "matrix"
+    },
+    {
+      "id": "tpl_rebel_signature",
+      "archetype": "rebel",
+      "slot": "signature",
+      "primaryComponent": "matrix",
+      "secondaryComponent": "weave"
+    },
+    {
+      "id": "tpl_dreamer_attire",
+      "archetype": "dreamer",
+      "slot": "attire",
+      "primaryComponent": "weave",
+      "secondaryComponent": "focus"
+    },
+    {
+      "id": "tpl_dreamer_tool",
+      "archetype": "dreamer",
+      "slot": "tool",
+      "primaryComponent": "apparatus",
+      "secondaryComponent": "focus"
+    },
+    {
+      "id": "tpl_dreamer_accessory",
+      "archetype": "dreamer",
+      "slot": "accessory",
+      "primaryComponent": "binding",
+      "secondaryComponent": "focus"
+    },
+    {
+      "id": "tpl_dreamer_keepsake",
+      "archetype": "dreamer",
+      "slot": "keepsake",
+      "primaryComponent": "focus",
+      "secondaryComponent": "framework"
+    },
+    {
+      "id": "tpl_dreamer_emblem",
+      "archetype": "dreamer",
+      "slot": "emblem",
+      "primaryComponent": "framework",
+      "secondaryComponent": "focus"
+    },
+    {
+      "id": "tpl_dreamer_signature",
+      "archetype": "dreamer",
+      "slot": "signature",
+      "primaryComponent": "matrix",
+      "secondaryComponent": "focus"
+    },
+    {
+      "id": "tpl_freespirit_attire",
+      "archetype": "freespirit",
+      "slot": "attire",
+      "primaryComponent": "weave",
+      "secondaryComponent": "binding"
+    },
+    {
+      "id": "tpl_freespirit_tool",
+      "archetype": "freespirit",
+      "slot": "tool",
+      "primaryComponent": "apparatus",
+      "secondaryComponent": "binding"
+    },
+    {
+      "id": "tpl_freespirit_accessory",
+      "archetype": "freespirit",
+      "slot": "accessory",
+      "primaryComponent": "binding",
+      "secondaryComponent": "weave"
+    },
+    {
+      "id": "tpl_freespirit_keepsake",
+      "archetype": "freespirit",
+      "slot": "keepsake",
+      "primaryComponent": "focus",
+      "secondaryComponent": "binding"
+    },
+    {
+      "id": "tpl_freespirit_emblem",
+      "archetype": "freespirit",
+      "slot": "emblem",
+      "primaryComponent": "framework",
+      "secondaryComponent": "binding"
+    },
+    {
+      "id": "tpl_freespirit_signature",
+      "archetype": "freespirit",
+      "slot": "signature",
+      "primaryComponent": "matrix",
+      "secondaryComponent": "binding"
+    }
+  ]
+}

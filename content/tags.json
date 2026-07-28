@@ -1,0 +1,241 @@
+[
+  {
+    "id": "tag_world_cohesion",
+    "displayName": "World Cohesion",
+    "category": "world",
+    "activationRule": "same_world_count",
+    "stackingGroup": "world_cohesion",
+    "thresholds": [
+      {
+        "count": 3,
+        "bonusBp": 400
+      },
+      {
+        "count": 4,
+        "bonusBp": 800
+      },
+      {
+        "count": 5,
+        "bonusBp": 1200
+      }
+    ],
+    "explanation": "Characters who share a home world resonate together."
+  },
+  {
+    "id": "tag_world_diversity",
+    "displayName": "World Diversity",
+    "category": "world",
+    "activationRule": "distinct_world_count",
+    "stackingGroup": "world_diversity",
+    "thresholds": [
+      {
+        "count": 2,
+        "bonusBp": 400
+      },
+      {
+        "count": 3,
+        "bonusBp": 600
+      },
+      {
+        "count": 4,
+        "bonusBp": 900
+      },
+      {
+        "count": 5,
+        "bonusBp": 1200
+      }
+    ],
+    "explanation": "A party drawn from many worlds broadens its perspective."
+  },
+  {
+    "id": "tag_ring_leader_achiever",
+    "displayName": "Leader + Achiever",
+    "category": "archetype",
+    "activationRule": "archetype_pair",
+    "pair": [
+      "leader",
+      "achiever"
+    ],
+    "stackingGroup": "ring_leader_achiever",
+    "thresholds": [
+      {
+        "count": 1,
+        "bonusBp": 300
+      }
+    ],
+    "explanation": "Leader and Achiever complement one another."
+  },
+  {
+    "id": "tag_ring_achiever_rebel",
+    "displayName": "Achiever + Rebel",
+    "category": "archetype",
+    "activationRule": "archetype_pair",
+    "pair": [
+      "achiever",
+      "rebel"
+    ],
+    "stackingGroup": "ring_achiever_rebel",
+    "thresholds": [
+      {
+        "count": 1,
+        "bonusBp": 300
+      }
+    ],
+    "explanation": "Achiever and Rebel complement one another."
+  },
+  {
+    "id": "tag_ring_rebel_freespirit",
+    "displayName": "Rebel + Free Spirit",
+    "category": "archetype",
+    "activationRule": "archetype_pair",
+    "pair": [
+      "rebel",
+      "freespirit"
+    ],
+    "stackingGroup": "ring_rebel_freespirit",
+    "thresholds": [
+      {
+        "count": 1,
+        "bonusBp": 300
+      }
+    ],
+    "explanation": "Rebel and Free Spirit complement one another."
+  },
+  {
+    "id": "tag_ring_freespirit_dreamer",
+    "displayName": "Free Spirit + Dreamer",
+    "category": "archetype",
+    "activationRule": "archetype_pair",
+    "pair": [
+      "freespirit",
+      "dreamer"
+    ],
+    "stackingGroup": "ring_freespirit_dreamer",
+    "thresholds": [
+      {
+        "count": 1,
+        "bonusBp": 300
+      }
+    ],
+    "explanation": "Free Spirit and Dreamer complement one another."
+  },
+  {
+    "id": "tag_ring_dreamer_caretaker",
+    "displayName": "Dreamer + Caretaker",
+    "category": "archetype",
+    "activationRule": "archetype_pair",
+    "pair": [
+      "dreamer",
+      "caretaker"
+    ],
+    "stackingGroup": "ring_dreamer_caretaker",
+    "thresholds": [
+      {
+        "count": 1,
+        "bonusBp": 300
+      }
+    ],
+    "explanation": "Dreamer and Caretaker complement one another."
+  },
+  {
+    "id": "tag_ring_caretaker_leader",
+    "displayName": "Caretaker + Leader",
+    "category": "archetype",
+    "activationRule": "archetype_pair",
+    "pair": [
+      "caretaker",
+      "leader"
+    ],
+    "stackingGroup": "ring_caretaker_leader",
+    "thresholds": [
+      {
+        "count": 1,
+        "bonusBp": 300
+      }
+    ],
+    "explanation": "Caretaker and Leader complement one another."
+  },
+  {
+    "id": "tag_scholar",
+    "displayName": "Scholars",
+    "category": "profession",
+    "activationRule": "tag_count",
+    "stackingGroup": "tag_scholar",
+    "thresholds": [
+      {
+        "count": 2,
+        "bonusBp": 200
+      }
+    ],
+    "explanation": "Two scholars in one party never run out of theories."
+  },
+  {
+    "id": "tag_artisan",
+    "displayName": "Artisans",
+    "category": "profession",
+    "activationRule": "tag_count",
+    "stackingGroup": "tag_artisan",
+    "thresholds": [
+      {
+        "count": 2,
+        "bonusBp": 200
+      }
+    ],
+    "explanation": "Makers respect makers, whatever the workshop."
+  },
+  {
+    "id": "tag_musician",
+    "displayName": "Musicians",
+    "category": "profession",
+    "activationRule": "tag_count",
+    "stackingGroup": "tag_musician",
+    "thresholds": [
+      {
+        "count": 2,
+        "bonusBp": 200
+      }
+    ],
+    "explanation": "Two musicians will always find a duet."
+  },
+  {
+    "id": "tag_pilot",
+    "displayName": "Pilots",
+    "category": "profession",
+    "activationRule": "tag_count",
+    "stackingGroup": "tag_pilot",
+    "thresholds": [
+      {
+        "count": 2,
+        "bonusBp": 200
+      }
+    ],
+    "explanation": "Flyers trust flyers with the difficult routes."
+  },
+  {
+    "id": "tag_herbalist",
+    "displayName": "Herbalist",
+    "category": "profession",
+    "activationRule": "tag_count",
+    "stackingGroup": "tag_herbalist",
+    "thresholds": [],
+    "explanation": "A flavor tag with no party bonus in the MVP."
+  },
+  {
+    "id": "tag_hunter",
+    "displayName": "Hunter",
+    "category": "profession",
+    "activationRule": "tag_count",
+    "stackingGroup": "tag_hunter",
+    "thresholds": [],
+    "explanation": "A flavor tag with no party bonus in the MVP."
+  },
+  {
+    "id": "tag_medic",
+    "displayName": "Medic",
+    "category": "profession",
+    "activationRule": "tag_count",
+    "stackingGroup": "tag_medic",
+    "thresholds": [],
+    "explanation": "A flavor tag with no party bonus in the MVP."
+  }
+]

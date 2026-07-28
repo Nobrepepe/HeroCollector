@@ -1,0 +1,49 @@
+{
+  "slots": {
+    "attire": {
+      "name": "Attire",
+      "icon": "🧥"
+    },
+    "tool": {
+      "name": "Tool",
+      "icon": "🛠️"
+    },
+    "accessory": {
+      "name": "Accessory",
+      "icon": "📿"
+    },
+    "keepsake": {
+      "name": "Keepsake",
+      "icon": "🎁"
+    },
+    "emblem": {
+      "name": "Emblem",
+      "icon": "🛡️"
+    },
+    "signature": {
+      "name": "Signature Item",
+      "icon": "🌟"
+    }
+  },
+  "slotOrder": [
+    "attire",
+    "tool",
+    "accessory",
+    "keepsake",
+    "emblem",
+    "signature"
+  ],
+  "tierPrefixes": [
+    "",
+    "Sturdy ",
+    "Refined ",
+    "Tempered ",
+    "Gleaming ",
+    "Exquisite ",
+    "Superior ",
+    "Ornate ",
+    "Masterwork ",
+    "Mythic "
+  ],
+  "characters": []
+}

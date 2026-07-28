@@ -1,0 +1,12 @@
+node_modules/
+.claude/settings.local.json
+
+# Local runtime data
+custom-content.json
+custom-content.json.bak
+save.json
+save.json.bak
+
+# Logs and platform noise
+*.log
+.DS_Store
