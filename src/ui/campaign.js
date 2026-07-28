@@ -1,99 +1,77 @@
-// Campaign Map (GDD 11.2): world/chapter selector, sequential nodes, reward
-// icons, thresholds, objective and first-clear state, sweep availability.
-import { h, fmt } from './dom.js';
-import { nodeState, nodeUnlocked, worldCampaignUnlocked } from '../core/state.js';
-import { evaluateParty } from '../core/synergy.js';
-import { nodeTypeMeta } from './shared.js';
-
-let currentTab = 'main';
+import { h } from './dom.js';
+import { nodeState, worldCampaignUnlocked } from '../core/state.js';
+import { rankMaterialSources } from '../core/sources.js';
+import { sourceRow } from './find-sources.js';
+import { compactResult } from './results.js';
 
 export function renderCampaign(store, root, arg) {
   const { content, state } = store;
-  if (arg) currentTab = arg;
-
-  const tabs = h('div.tab-bar');
-  const tabDefs = [
+  const tabs = [
     ['main', '🗺️ Main Campaign'],
     ['shadow', '🌑 Shadow Campaign'],
-    ...content.worlds.map(w => [w.campaignId, `${w.icon} ${w.displayName}`])
+    ...content.worlds.map(world => [world.campaignId, `${world.icon} ${world.displayName}`])
   ];
-  if (!tabDefs.some(([id]) => id === currentTab)) currentTab = 'main';
-  for (const [id, label] of tabDefs) {
-    tabs.appendChild(h('button.tab-btn' + (currentTab === id ? '.active' : ''), {
-      onclick: () => { currentTab = id; root.replaceChildren(); renderCampaign(store, root, null); }
+  const allowed = new Set(tabs.map(([id]) => id));
+  if (arg && allowed.has(arg) && state.ui.campaignId !== arg) {
+    state.ui.campaignId = arg;
+    store.save();
+  }
+  if (!allowed.has(state.ui.campaignId)) state.ui.campaignId = 'main';
+  const current = state.ui.campaignId;
+  const tabBar = h('div.tab-bar');
+  for (const [id, label] of tabs) {
+    tabBar.appendChild(h('button.tab-btn' + (id === current ? '.active' : ''), {
+      onclick: async () => {
+        state.ui.campaignId = id;
+        await store.save();
+        root.replaceChildren();
+        renderCampaign(store, root, null);
+      }
     }, label));
   }
-  root.appendChild(tabs);
+  root.appendChild(tabBar);
+  if (store.ui.lastSourceResult) root.appendChild(compactResult(store, store.ui.lastSourceResult));
 
-  const nodes = content.nodesByCampaign[currentTab] ?? [];
-  if (currentTab === 'shadow') {
-    root.appendChild(h('div.panel',
-      h('p.small', 'Shadow nodes unlock when their matching Main Campaign node is cleared. Each shard source allows five total clears or sweeps per daily reset.')));
-  }
-  if (currentTab.startsWith('wc_') && nodes.length > 0) {
+  const nodes = content.nodesByCampaign[current] ?? [];
+  if (current === 'shadow') root.appendChild(h('div.panel',
+    h('p.small', 'Shadow nodes unlock with their matching Main node and have limited daily shard attempts.')));
+  if (current.startsWith('wc_') && nodes.length) {
     const worldId = nodes[0].world;
-    const wc = worldCampaignUnlocked(content, state, worldId);
-    const w = content.worldById[worldId];
-    const banner = content.images.world[worldId];
+    const world = content.worldById[worldId];
+    const availability = worldCampaignUnlocked(content, state, worldId);
     root.appendChild(h('div.panel',
-      banner ? h('div.world-banner', h('img', { src: banner, alt: `${w.displayName} banner` })) : null,
-      h('p.small', w.tagline),
-      wc.unlocked
-        ? h('p.small.good', `Unlocked — every node requires five ${w.displayName} characters. First clears award Archive fragments.`)
-        : h('p.small.warn', `Locked: own ${wc.needed} ${w.displayName} characters to unlock (currently ${wc.owned}). World campaigns are optional and never gate ordinary progression.`)));
+      content.images.world[worldId]
+        ? h('div.world-banner', h('img', { src: content.images.world[worldId], alt: `${world.displayName} banner` })) : null,
+      h('p.small', world.tagline),
+      h('p.small' + (availability.unlocked ? '.good' : '.warn'),
+        availability.unlocked
+          ? `Unlocked — every node requires five ${world.displayName} characters.`
+          : `Locked: own ${availability.needed} ${world.displayName} characters (${availability.owned}/${availability.needed}).`)));
   }
-
-  // Party effective power for the at-a-glance threshold comparison.
-  const party = state.parties[state.activePartyIndex].members.filter(Boolean);
-  const ev = party.length === 5 ? evaluateParty(content, state, party) : null;
 
   const byChapter = {};
-  for (const n of nodes) (byChapter[n.chapter] ??= []).push(n);
-
-  for (const [chapter, chNodes] of Object.entries(byChapter)) {
-    const cleared = chNodes.filter(n => nodeState(state, n.id).cleared).length;
+  for (const node of nodes) (byChapter[node.chapter] ??= []).push(node);
+  for (const [chapter, chapterNodes] of Object.entries(byChapter)) {
     const panel = h('div.panel');
-    panel.appendChild(h('h2', `Chapter ${chapter} `, h('span.small.muted', `— ${cleared}/${chNodes.length} cleared`)));
-    for (const node of chNodes) {
-      panel.appendChild(nodeRow(store, node, ev));
+    const cleared = chapterNodes.filter(node => nodeState(state, node.id).cleared).length;
+    panel.appendChild(h('h2', `Chapter ${chapter} `, h('span.small.muted', `— ${cleared}/${chapterNodes.length} cleared`)));
+    for (const node of chapterNodes) {
+      const projection = rankMaterialSources(content, state, node.material).find(row => row.node.id === node.id);
+      if (!projection) continue;
+      const wrap = h('div.campaign-source');
+      const flags = [];
+      if (projection.status.cleared) flags.push('Cleared');
+      if (!projection.status.firstClearClaimed && projection.unlock.unlocked) flags.push('First clear available');
+      if (node.objective) flags.push(projection.status.objectiveClaimed ? 'Objective complete' : 'Objective available');
+      wrap.appendChild(h('div.campaign-flags.small.muted', flags.join(' · ')));
+      wrap.appendChild(sourceRow(store, projection, {
+        onUpdate: () => {
+          root.replaceChildren();
+          renderCampaign(store, root, null);
+        }
+      }));
+      panel.appendChild(wrap);
     }
     root.appendChild(panel);
   }
-}
-
-function nodeRow(store, node, ev) {
-  const { content, state } = store;
-  const ns = nodeState(state, node.id);
-  const unlock = nodeUnlocked(content, state, node);
-  const meta = nodeTypeMeta(node.type);
-
-  const row = h('button.node-row' + (unlock.unlocked ? '' : '.locked'), {
-    onclick: () => { if (unlock.unlocked) store.go(`#/node/${node.id}`); },
-    title: unlock.unlocked ? meta.label : unlock.reason,
-    'aria-disabled': !unlock.unlocked
-  });
-  row.appendChild(h('span.num', String(node.number)));
-  row.appendChild(h('span', { title: meta.label }, meta.icon));
-  const nameWrap = h('span.nname', node.displayName);
-  if (node.checkpoint) nameWrap.appendChild(h('span.small.muted', ' · checkpoint'));
-  if (node.shardCharacter) {
-    nameWrap.appendChild(h('span.small.muted', ` · ${content.characterById[node.shardCharacter].displayName} shards`));
-  }
-  if (node.objective && !ns.objectiveClaimed) nameWrap.appendChild(h('span.small.warn', ' · objective'));
-  row.appendChild(nameWrap);
-
-  const flags = [];
-  if (ns.cleared) flags.push(h('span.good', { title: 'Cleared — sweep available' }, '✓'));
-  if (!ns.firstClearClaimed && unlock.unlocked) flags.push(h('span.warn', { title: 'First-clear rewards waiting' }, '✦'));
-  row.appendChild(h('span', flags));
-
-  if (unlock.unlocked) {
-    const ok = ev && ev.effectivePower >= node.threshold;
-    row.appendChild(h('span.thr' + (ev ? (ok ? '.ok' : '.no') : ''), {
-      title: ev ? `Active party: ${fmt(ev.effectivePower)} effective Power` : 'Set a full active party to compare'
-    }, fmt(node.threshold)));
-  } else {
-    row.appendChild(h('span.small.muted', '🔒'));
-  }
-  return row;
 }

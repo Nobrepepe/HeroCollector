@@ -1,135 +1,185 @@
-// Home (GDD 11.2): Energy, reset status, pinned goals, recent progress,
-// Continue Campaign, and shortcuts to ready upgrades.
 import { h, fmt } from './dom.js';
 import {
-  readyUpgrades, nodeState, nodeUnlocked, matQty, compQty,
-  craftEquipment, completeGearTier, promoteStar, unlockCharacter, checkPromoteStar
+  readyUpgrades, nodeState, nodeUnlocked, craftAndEquipEquipment,
+  completeGearTier, promoteStar, unlockCharacter, movePin, removePin,
+  cleanupCompletedPins
 } from '../core/state.js';
-import { activeTier } from '../core/power.js';
-import { equipmentRecipe, equipmentName } from '../core/content.js';
-import { portrait, openFindSources, campaignLabel } from './shared.js';
+import { analyzePinnedGoals } from '../core/progression.js';
+import { portrait, campaignLabel } from './shared.js';
+import { openFindSources } from './find-sources.js';
+import { openGearDialog } from './gear.js';
 
 export function renderHome(store, root) {
   const { content, state } = store;
-
-  // --- reset / energy summary
-  const resetPanel = h('div.panel');
-  resetPanel.appendChild(h('h2', 'Today'));
+  const today = h('div.panel', h('h2', 'Today'));
   const resetHour = String(state.settings.resetHour).padStart(2, '0');
-  resetPanel.appendChild(h('p.muted.small', `Daily reset at ${resetHour}:00 local time adds +${content.balance.energy.dailyGrant} Energy (stored up to ${content.balance.energy.storageCap}) and refreshes shard attempts. Missing a day is fine — Energy banks for one.`));
-  if (state.lastResetSummary) {
-    const s = state.lastResetSummary;
-    resetPanel.appendChild(h('p.small.good', `Last reset applied ${s.days} day${s.days > 1 ? 's' : ''}: +${s.energyGained} Energy, attempts refreshed.`));
-  }
-  root.appendChild(resetPanel);
+  today.appendChild(h('p.muted.small',
+    `Daily reset at ${resetHour}:00 · +${content.balance.energy.dailyGrant} Energy · storage cap ${content.balance.energy.storageCap}.`));
+  if (state.lastResetSummary) today.appendChild(h('p.small.good',
+    `Last reset: +${state.lastResetSummary.energyGained} Energy; attempts refreshed.`));
+  root.appendChild(today);
 
-  // --- continue campaign
-  const frontierPanel = h('div.panel');
-  frontierPanel.appendChild(h('h2', 'Campaign'));
+  const campaigns = h('div.panel', h('h2', 'Campaign'));
   for (const campaign of ['main', ...content.worlds.map(w => w.campaignId)]) {
     const nodes = content.nodesByCampaign[campaign] ?? [];
-    if (nodes.length === 0) continue;
+    if (!nodes.length) continue;
     const frontier = nodes.find(n => !nodeState(state, n.id).cleared);
-    const clearedCount = nodes.filter(n => nodeState(state, n.id).cleared).length;
+    const cleared = nodes.filter(n => nodeState(state, n.id).cleared).length;
     const label = campaign === 'main' ? 'Main Campaign' : `${content.worldById[nodes[0].world].displayName} Campaign`;
-    const row = h('div.kv');
-    row.appendChild(h('span', `${label} — ${clearedCount}/${nodes.length} nodes cleared`));
-    if (!frontier) {
-      row.appendChild(h('b.good', 'Complete!'));
-    } else {
+    const row = h('div.kv', h('span', `${label} — ${cleared}/${nodes.length}`));
+    if (!frontier) row.appendChild(h('b.good', 'Complete!'));
+    else {
       const unlock = nodeUnlocked(content, state, frontier);
       row.appendChild(unlock.unlocked
-        ? h('button.btn.tiny.primary', { onclick: () => store.go(`#/node/${frontier.id}`) }, `Continue: ${frontier.displayName} (${fmt(frontier.threshold)})`)
+        ? h('button.btn.tiny.primary', { onclick: () => store.go(`#/node/${frontier.id}`) },
+          `Continue: ${frontier.displayName} (${fmt(frontier.threshold)})`)
         : h('span.small.muted', unlock.reason));
     }
-    frontierPanel.appendChild(row);
+    campaigns.appendChild(row);
   }
-  root.appendChild(frontierPanel);
+  root.appendChild(campaigns);
+  root.appendChild(goalCenter(store));
+  root.appendChild(readyPanel(store));
 
-  // --- pinned goals
-  const pinPanel = h('div.panel');
-  pinPanel.appendChild(h('h2', '📌 Pinned goals'));
-  if (state.pins.length === 0) {
-    pinPanel.appendChild(h('p.muted.small', 'Pin equipment recipes or character shard targets from their screens to track them here.'));
-  }
-  for (const pin of state.pins) {
-    pinPanel.appendChild(renderPin(store, pin));
-  }
-  root.appendChild(pinPanel);
-
-  // --- ready upgrades
-  const ready = readyUpgrades(content, state);
-  store._readyCache = ready;
-  const upPanel = h('div.panel');
-  upPanel.appendChild(h('h2', 'Ready now'));
-  if (ready.length === 0) upPanel.appendChild(h('p.muted.small', 'Nothing is waiting — farm materials or shards to open the next upgrade.'));
-  for (const u of ready.slice(0, 10)) {
-    const row = h('div.kv');
-    row.appendChild(h('span', u.text));
-    const act = {
-      completeTier: () => store.tx(() => completeGearTier(content, state, u.characterId)),
-      promoteStar: () => store.tx(() => promoteStar(content, state, u.characterId)),
-      craftEquipment: () => store.tx(() => craftEquipment(content, state, u.characterId, u.slot)),
-      unlock: () => store.tx(() => unlockCharacter(content, state, u.characterId))
-    }[u.type];
-    row.appendChild(h('div', { style: { display: 'flex', gap: '6px' } },
-      h('button.btn.tiny.primary', { onclick: act }, 'Do it'),
-      h('button.btn.tiny', { onclick: () => store.go(`#/character/${u.characterId}`) }, 'View')
-    ));
-    upPanel.appendChild(row);
-  }
-  root.appendChild(upPanel);
-
-  // --- recent progress
-  const logPanel = h('div.panel');
-  logPanel.appendChild(h('h2', 'Recent progress'));
-  if (state.progressLog.length === 0) logPanel.appendChild(h('p.muted.small', 'Your progress will be summarized here.'));
+  const log = h('div.panel', h('h2', 'Recent progress'));
+  if (!state.progressLog.length) log.appendChild(h('p.muted.small', 'Your progress will be summarized here.'));
   for (const entry of state.progressLog.slice(0, 8)) {
-    logPanel.appendChild(h('div.small', h('span.muted', new Date(entry.at).toLocaleDateString(), ' — '), entry.text));
+    log.appendChild(h('div.small', h('span.muted', `${new Date(entry.at).toLocaleDateString()} — `), entry.text));
   }
-  root.appendChild(logPanel);
+  root.appendChild(log);
 }
 
-function renderPin(store, pin) {
+function goalCenter(store) {
+  const { content, state } = store;
+  const analysis = analyzePinnedGoals(content, state);
+  const panel = h('div.panel.goal-center', h('h2', '📌 Goal center'));
+  if (!state.pins.length) {
+    panel.appendChild(h('p.muted.small', 'Pin equipment or a character’s current shard objective to track it here.'));
+    return panel;
+  }
+  const shortage = h('div.goal-shortages', h('h3', 'Combined shortages'));
+  const comp = Object.entries(analysis.totalComponentMissing);
+  const mats = Object.entries(analysis.totalMaterialMissing);
+  shortage.appendChild(h('p.small', h('b', 'Components: '),
+    comp.length ? comp.map(([id, n]) => `${n} ${content.componentById[id].displayName}`).join(' · ') : h('span.good', 'None')));
+  shortage.appendChild(h('p.small', h('b', 'Farmable materials: '),
+    mats.length ? mats.map(([id, n]) => `${n} ${content.materialById[id].displayName}`).join(' · ') : h('span.good', 'None')));
+  for (const warning of analysis.warnings) shortage.appendChild(h('p.warn.small', `⚠ ${warning}`));
+  panel.appendChild(shortage);
+
+  const byCharacter = new Map();
+  state.pins.forEach((pin, index) => {
+    const list = byCharacter.get(pin.characterId) ?? [];
+    list.push({ pin, index });
+    byCharacter.set(pin.characterId, list);
+  });
+  for (const [characterId, entries] of byCharacter) {
+    const def = content.characterById[characterId];
+    if (!def) continue;
+    const details = h('details.goal-character', { open: true });
+    details.appendChild(h('summary',
+      portrait(store, characterId, 'sm'),
+      h('span', h('b', def.displayName), h('span.small.muted', ` · ${entries.length} goal${entries.length === 1 ? '' : 's'}`))));
+    for (const entry of entries) details.appendChild(goalRow(store, entry.pin, entry.index));
+    panel.appendChild(details);
+  }
+  if (analysis.stale.length) {
+    panel.appendChild(h('button.btn.tiny', {
+      onclick: () => store.tx(() => cleanupCompletedPins(content, state))
+    }, 'Unpin completed/stale'));
+  }
+  return panel;
+}
+
+function goalRow(store, pin, index) {
   const { content, state } = store;
   const def = content.characterById[pin.characterId];
-  if (!def) return h('div');
-  const cs = state.characters[pin.characterId];
-  const row = h('div', { style: { display: 'flex', gap: '12px', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--line)' } });
-  row.appendChild(portrait(store, pin.characterId, 'sm'));
+  const row = h('div.goal-row');
   const body = h('div.grow');
-
   if (pin.type === 'equipment') {
-    const tier = activeTier(content.balance, cs, content.maxGearTier);
-    if (!tier || cs.slots[pin.slot]) {
-      body.appendChild(h('div', `${def.displayName} — ${content.characterMeta.slots[pin.slot].name}: `, h('span.good', tier ? 'crafted — complete the tier!' : 'gear complete')));
-    } else {
-      const recipe = equipmentRecipe(content, pin.characterId, pin.slot, tier);
-      body.appendChild(h('div', `${def.displayName} — ${equipmentName(content, pin.characterId, pin.slot, tier)} (Tier ${tier})`));
-      for (const input of recipe.inputs) {
-        const have = compQty(state, input.componentId);
-        const k = content.componentById[input.componentId];
-        const line = h('div.small' + (have >= input.qty ? '.good' : '.muted'),
-          `${k.displayName}: ${have}/${input.qty} `,
-          have < input.qty ? h('button.link.small', { onclick: () => openFindSources(store, { type: 'component', id: input.componentId }) }, 'Find Sources') : null);
-        body.appendChild(line);
-      }
-    }
+    const analysis = analyzePinnedGoals(content, state).goals.find(g =>
+      g.pin.characterId === pin.characterId && g.pin.slot === pin.slot)?.analysis;
+    body.appendChild(h('div', analysis?.equipmentName ?? content.characterMeta.slots[pin.slot].name));
+    body.appendChild(h('div.small' + (analysis?.craftable ? '.good' : '.muted'),
+      analysis?.state === 'components-ready' ? 'Components ready'
+        : analysis?.state === 'chain-ready' ? 'Crafting chain ready'
+          : 'Materials still missing'));
   } else {
-    const goal = cs.owned
-      ? (cs.stars >= 7 ? null : { label: `${cs.stars + 1}★ promotion`, need: content.balance.starShards[cs.stars] })
-      : { label: 'unlock', need: content.balance.acquisitionTiers[def.tier].cumulativeShards };
-    if (!goal) {
-      body.appendChild(h('div', `${def.displayName}: `, h('span.good', 'at maximum Stars')));
-    } else {
-      body.appendChild(h('div', `${def.displayName} — shards for ${goal.label}: ${cs.shards}/${goal.need} `,
-        h('button.link.small', { onclick: () => openFindSources(store, { type: 'shards', id: pin.characterId }) }, 'Find Sources')));
-      const bar = h('div.progressbar' + (cs.shards >= goal.need ? '.full' : ''));
-      bar.appendChild(h('div', { style: { width: `${Math.min(100, cs.shards / goal.need * 100)}%` } }));
-      body.appendChild(bar);
-    }
+    const cs = state.characters[pin.characterId];
+    const need = pin.objective === 'unlock'
+      ? content.balance.acquisitionTiers[def.tier].cumulativeShards
+      : content.balance.starShards[pin.targetStars - 1];
+    body.appendChild(h('div', pin.objective === 'unlock' ? 'Character unlock' : `${pin.targetStars}★ promotion`));
+    body.appendChild(h('div.small.muted', `${cs.shards}/${need} shards`));
   }
   row.appendChild(body);
-  row.appendChild(h('button.btn.tiny', { onclick: () => store.go(`#/character/${pin.characterId}`) }, 'View'));
+  const controls = h('div.goal-controls',
+    h('button.btn.tiny', {
+      disabled: index === 0, 'aria-label': `Move ${def.displayName} goal up`,
+      onclick: () => store.tx(() => movePin(state, index, -1))
+    }, '↑'),
+    h('button.btn.tiny', {
+      disabled: index === state.pins.length - 1, 'aria-label': `Move ${def.displayName} goal down`,
+      onclick: () => store.tx(() => movePin(state, index, 1))
+    }, '↓'));
+  if (pin.type === 'equipment') {
+    controls.append(
+      h('button.btn.tiny', { onclick: () => openGearDialog(store, pin.characterId, pin.slot) }, 'View'),
+      h('button.btn.tiny', {
+        onclick: () => {
+          const goal = analyzePinnedGoals(content, state).goals.find(g =>
+            g.pin.characterId === pin.characterId && g.pin.slot === pin.slot)?.analysis;
+          const first = Object.keys(goal?.totalMaterialMissing ?? {})[0]
+            ?? Object.keys(goal?.totalMaterialDemand ?? {})[0];
+          if (first) openFindSources(store, { type: 'material', id: first });
+        }
+      }, 'Find'));
+  } else {
+    controls.append(
+      h('button.btn.tiny', { onclick: () => store.go(`#/character/${pin.characterId}`) }, 'View'),
+      h('button.btn.tiny', { onclick: () => openFindSources(store, { type: 'shards', id: pin.characterId }) }, 'Find'));
+  }
+  controls.appendChild(h('button.btn.tiny', {
+    onclick: () => store.tx(() => removePin(state, pin))
+  }, 'Unpin'));
+  row.appendChild(controls);
   return row;
+}
+
+function readyPanel(store) {
+  const { content, state } = store;
+  const ready = readyUpgrades(content, state);
+  const panel = h('div.panel', h('h2', 'Ready now'));
+  if (!ready.length) {
+    panel.appendChild(h('p.muted.small', 'Nothing is waiting — farm materials or shards to open the next upgrade.'));
+    return panel;
+  }
+  const grouped = new Map();
+  for (const item of ready) {
+    const list = grouped.get(item.characterId) ?? [];
+    list.push(item);
+    grouped.set(item.characterId, list);
+  }
+  for (const [characterId, items] of grouped) {
+    const details = h('details.ready-character', { open: true },
+      h('summary', `${content.characterById[characterId].displayName} · ${items.length} ready`));
+    for (const item of items) {
+      const action = {
+        completeTier: () => completeGearTier(content, state, item.characterId),
+        promoteStar: () => promoteStar(content, state, item.characterId),
+        craftEquipment: () => craftAndEquipEquipment(content, state, item.characterId, item.slot),
+        unlock: () => unlockCharacter(content, state, item.characterId)
+      }[item.type];
+      details.appendChild(h('div.kv', h('span', item.text),
+        h('div.goal-controls',
+          h('button.btn.tiny.primary', { onclick: () => store.tx(action) }, 'Do it'),
+          h('button.btn.tiny', {
+            onclick: () => item.type === 'craftEquipment'
+              ? openGearDialog(store, item.characterId, item.slot)
+              : store.go(`#/character/${item.characterId}`)
+          }, 'View'))));
+    }
+    panel.appendChild(details);
+  }
+  return panel;
 }

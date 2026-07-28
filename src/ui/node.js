@@ -3,10 +3,11 @@
 import { h, fmt, pct } from './dom.js';
 import {
   nodeState, nodeUnlocked, nodeEnergyCost, shardAttemptsLeft, checkClear,
-  clearNode, maxSweepCount
+  clearNode, maxSweepCount, preferredPartyIndex, selectPartyPreset
 } from '../core/state.js';
 import { evaluateParty, objectiveSatisfied } from '../core/synergy.js';
-import { nodeTypeMeta, nodeRepeatText, rewardChips, showResults, campaignLabel } from './shared.js';
+import { nodeTypeMeta, nodeRepeatText, rewardChips, campaignLabel } from './shared.js';
+import { showResults } from './results.js';
 import { render } from '../app.js';
 
 export function renderNode(store, root, nodeId) {
@@ -18,7 +19,22 @@ export function renderNode(store, root, nodeId) {
   const unlock = nodeUnlocked(content, state, node);
   const cost = nodeEnergyCost(content, node);
 
-  root.appendChild(h('button.link', { onclick: () => store.go(`#/campaign/${node.campaign}`) }, '← Back to campaign map'));
+  const returnContext = store.ui.returnContext;
+  const returnGear = returnContext?.gear;
+  const returnName = returnGear
+    ? content.characterById[returnGear.characterId]?.equipmentLines?.[returnGear.slot]
+    : null;
+  root.appendChild(h('button.link', {
+    onclick: () => {
+      if (returnContext) {
+        store.ui.pendingReopen = returnContext;
+        store.ui.returnContext = null;
+        store.go(returnContext.route);
+      } else store.go(`#/campaign/${node.campaign}`);
+    }
+  }, returnName ? `← Back to ${returnName}`
+    : returnContext?.archive ? '← Back to World Archive'
+      : '← Back to campaign map'));
 
   // ---------- header
   const head = h('div.panel');
@@ -40,12 +56,13 @@ export function renderNode(store, root, nodeId) {
   const partyPanel = h('div.panel');
   partyPanel.appendChild(h('h2', 'Party'));
   const sel = h('select', { 'aria-label': 'Party preset' });
+  let selectedPartyIndex = preferredPartyIndex(state, node.id);
   state.parties.forEach((p, i) => {
-    sel.appendChild(h('option', { value: String(i), selected: i === state.activePartyIndex }, `${p.name} (${p.members.filter(Boolean).length}/5)`));
+    sel.appendChild(h('option', { value: String(i), selected: i === selectedPartyIndex }, `${p.name} (${p.members.filter(Boolean).length}/5)`));
   });
   sel.addEventListener('change', async () => {
-    state.activePartyIndex = Number(sel.value);
-    await store.save();
+    selectedPartyIndex = Number(sel.value);
+    await store.tx(() => selectPartyPreset(state, selectedPartyIndex, node.id), { rerender: false });
     rerenderBody();
   });
   partyPanel.appendChild(h('div', { style: { display: 'flex', gap: '10px', alignItems: 'center' } },
@@ -90,7 +107,7 @@ export function renderNode(store, root, nodeId) {
 
   function rerenderBody() {
     body.replaceChildren();
-    const members = state.parties[state.activePartyIndex].members.filter(Boolean);
+    const members = state.parties[selectedPartyIndex].members.filter(Boolean);
     const check = checkClear(content, state, node.id, members, 1);
     const ev = members.length === 5 ? evaluateParty(content, state, members) : null;
 

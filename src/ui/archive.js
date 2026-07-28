@@ -1,87 +1,118 @@
-// World Archive (GDD 11.2, §10): collection shelves, fragment progress, lore,
-// cosmetic milestone rewards, completion percentage. Cosmetic only — never
-// grants Power or anything the Main Campaign requires.
-import { h, fmt } from './dom.js';
-import { archiveStatus } from '../core/state.js';
-import { openModal } from '../app.js';
+import { h } from './dom.js';
+import { archiveStatus, selectSkin } from '../core/state.js';
+import { openModal, toast } from '../app.js';
 import { campaignLabel } from './shared.js';
 
 export function renderArchive(store, root) {
   const { content, state } = store;
-  root.appendChild(h('p.muted.small', 'The Archive celebrates a world you have invested in. Rewards are cosmetic and lore only — nothing here is required by the Main Campaign.'));
-
+  root.appendChild(h('p.muted.small',
+    'Archive rewards are cosmetic and lore-only. They never affect combat Power.'));
   for (const world of content.worlds) {
-    const st = archiveStatus(content, state, world.id);
-    const panel = h('div.panel');
-    const pctDone = Math.round(st.fragmentsOwned / st.fragmentsTotal * 100);
-    panel.appendChild(h('h2', `${world.icon} ${st.archive.displayName} `,
-      h('span.small.muted', `— ${st.relicsDone}/${st.relicsTotal} relics · ${pctDone}% complete`)));
-    const bar = h('div.progressbar' + (st.complete ? '.full' : ''));
-    bar.appendChild(h('div', { style: { width: `${pctDone}%` } }));
-    panel.appendChild(bar);
-
-    st.collections.forEach((col, ci) => {
-      panel.appendChild(h('h3', `Collection ${ci + 1}: ${col.collection.displayName}`,
-        col.complete ? h('span.good', ' ✓') : null));
-      const shelf = h('div.archive-shelf');
-      for (const { relic, owned, total, complete } of col.relics) {
-        const card = h('div.relic-card' + (complete ? '.complete' : ''));
-        const img = content.images.relic[relic.id];
-        if (complete && img) card.appendChild(h('div.relic-art', h('img', { src: img, alt: relic.displayName })));
-        else card.appendChild(h('div.r-ico', complete ? relicIcon(relic.id) : '▢'));
-        card.appendChild(h('div.small', { style: { fontWeight: 600 } }, complete ? relic.displayName : '— Undiscovered —'));
-        const pips = h('div.frag-pips');
-        relic.fragments.forEach(f => pips.appendChild(h('span' + (state.archive.fragments[f.id] ? '.owned' : ''), { title: fragTitle(store, f) })));
-        card.appendChild(pips);
-        card.appendChild(h('div.small.muted', `${owned}/${total} fragments`));
-        if (complete) {
-          card.appendChild(h('button.btn.tiny', { style: { marginTop: '6px' }, onclick: () => inspectRelic(store, relic) }, 'Inspect'));
-        } else {
-          const missing = relic.fragments.filter(f => !state.archive.fragments[f.id]);
-          card.appendChild(h('div.small.muted', missing.map(f => h('div', fragTitle(store, f)))));
-        }
-        shelf.appendChild(card);
-      }
-      panel.appendChild(shelf);
-      const reward = col.collection.rewardSkin;
-      if (reward) {
-        panel.appendChild(h('p.small' + (col.complete ? '.good' : '.muted'),
-          `${col.complete ? '🎭 Unlocked: ' : '🎭 Collection reward: '}${reward.skinName} for ${content.characterById[reward.characterId].displayName}`));
-        const rewardImgs = content.images.skin[reward.id];
-        if (col.complete && rewardImgs) {
-          panel.appendChild(h('div', { style: { display: 'flex', gap: '10px' } },
-            rewardImgs.portrait ? h('img.skin-preview-sq', { src: rewardImgs.portrait, alt: reward.skinName }) : null,
-            rewardImgs.fullBody ? h('img.skin-preview-tall', { src: rewardImgs.fullBody, alt: reward.skinName }) : null));
-        }
-      } else if (col.collection.legacyMilestoneText) {
-        panel.appendChild(h('p.small.muted', col.collection.legacyMilestoneText));
-      }
+    const status = archiveStatus(content, state, world.id);
+    const collapsed = state.ui.archiveCollapsed.worlds[world.id] ?? false;
+    const worldDetails = h('details.panel.archive-world', { open: !collapsed });
+    const percent = Math.round(status.fragmentsOwned / status.fragmentsTotal * 100);
+    worldDetails.appendChild(h('summary.archive-summary',
+      h('span', `${world.icon} ${status.archive.displayName}`),
+      h('span.small.muted', `${status.relicsDone}/${status.relicsTotal} relics · ${percent}%`)));
+    worldDetails.addEventListener('toggle', () => {
+      state.ui.archiveCollapsed.worlds[world.id] = !worldDetails.open;
+      store.save();
     });
-
-    panel.appendChild(h('h3', 'Full Archive reward'));
-    panel.appendChild(h('p.small' + (st.complete ? '.good' : '.muted'),
-      `${st.complete ? '🎭 Unlocked: ' : '🎭 '}${st.archive.fullReward.skinName}`,
-      st.complete ? '' : ` — complete all ${st.relicsTotal} relics.`));
-    const skinImgs = content.images.skin[st.archive.fullReward.id];
-    if (st.complete && skinImgs) {
-      panel.appendChild(h('div', { style: { display: 'flex', gap: '10px' } },
-        skinImgs.portrait ? h('img.skin-preview-sq', { src: skinImgs.portrait, alt: 'Skin portrait' }) : null,
-        skinImgs.fullBody ? h('img.skin-preview-tall', { src: skinImgs.fullBody, alt: 'Skin full body' }) : null));
-      panel.appendChild(h('p.small.muted', `Wear it from ${content.characterById[st.archive.fullReward.characterId]?.displayName}’s character screen.`));
-    }
-    root.appendChild(panel);
+    const bar = h('div.progressbar' + (status.complete ? '.full' : ''));
+    bar.appendChild(h('div', { style: { width: `${percent}%` } }));
+    worldDetails.appendChild(bar);
+    status.collections.forEach((collection, index) => {
+      const collectionCollapsed = state.ui.archiveCollapsed.collections[collection.collection.id] ?? false;
+      const details = h('details.archive-collection', { open: !collectionCollapsed });
+      details.appendChild(h('summary',
+        `Collection ${index + 1}: ${collection.collection.displayName}`,
+        collection.complete ? h('span.good', ' ✓') : null));
+      details.addEventListener('toggle', () => {
+        state.ui.archiveCollapsed.collections[collection.collection.id] = !details.open;
+        store.save();
+      });
+      const shelf = h('div.archive-shelf');
+      for (const relicStatus of collection.relics) {
+        shelf.appendChild(relicCard(store, relicStatus));
+      }
+      details.appendChild(shelf);
+      const reward = collection.collection.rewardSkin;
+      if (reward) details.appendChild(skinReward(store, reward, collection.complete));
+      else if (collection.collection.legacyMilestoneText) {
+        details.appendChild(h('p.small.muted', collection.collection.legacyMilestoneText));
+      }
+      worldDetails.appendChild(details);
+    });
+    worldDetails.appendChild(h('h3', 'Full Archive reward'));
+    worldDetails.appendChild(skinReward(store, status.archive.fullReward, status.complete,
+      `Complete all ${status.relicsTotal} relics.`));
+    root.appendChild(worldDetails);
   }
+}
+
+function relicCard(store, { relic, owned, total, complete }) {
+  const card = h('div.relic-card' + (complete ? '.complete' : ''));
+  const image = store.content.images.relic[relic.id];
+  if (complete && image) card.appendChild(h('div.relic-art',
+    h('img', { src: image, alt: relic.displayName })));
+  else card.appendChild(h('div.r-ico', complete ? relicIcon(relic.id) : '▢'));
+  card.appendChild(h('div.small', { style: { fontWeight: 600 } }, complete ? relic.displayName : '— Undiscovered —'));
+  const pips = h('div.frag-pips');
+  relic.fragments.forEach(fragment => pips.appendChild(h('span' + (store.state.archive.fragments[fragment.id] ? '.owned' : ''), {
+    title: fragmentTitle(store, fragment)
+  })));
+  card.append(pips, h('div.small.muted', `${owned}/${total} fragments`));
+  if (complete) {
+    card.appendChild(h('button.btn.tiny', { onclick: () => inspectRelic(store, relic) }, 'Inspect'));
+  } else {
+    const missing = relic.fragments.filter(fragment => !store.state.archive.fragments[fragment.id]);
+    for (const fragment of missing) {
+      card.appendChild(h('button.link.small', {
+        onclick: () => {
+          const node = store.content.nodeById[fragment.sourceNode];
+          store.go(`#/node/${node.id}`, {
+            returnContext: { route: '#/archive', archive: { worldId: node.world, fragmentId: fragment.id } }
+          });
+        }
+      }, `Find missing fragment — ${fragmentTitle(store, fragment)}`));
+    }
+  }
+  return card;
+}
+
+function skinReward(store, reward, unlocked, lockedText = '') {
+  if (!reward) return h('p.small.muted', 'No cosmetic reward.');
+  const def = store.content.characterById[reward.characterId];
+  const selected = store.state.characters[reward.characterId]?.selectedSkinId === reward.id;
+  const wrap = h('div.skin-reward');
+  wrap.appendChild(h('p.small' + (unlocked ? '.good' : '.muted'),
+    `${unlocked ? '🎭 Unlocked: ' : '🎭 Reward: '}${reward.skinName}${def ? ` for ${def.displayName}` : ''}`,
+    unlocked ? '' : ` — ${lockedText}`));
+  const images = store.content.images.skin[reward.id];
+  if (unlocked && images) wrap.appendChild(h('div.skin-previews',
+    images.portrait ? h('img.skin-preview-sq', { src: images.portrait, alt: reward.skinName }) : null,
+    images.fullBody ? h('img.skin-preview-tall', { src: images.fullBody, alt: reward.skinName }) : null));
+  if (unlocked && def) wrap.appendChild(h('button.btn.tiny' + (selected ? '.primary' : ''), {
+    disabled: selected,
+    onclick: () => store.tx(() => {
+      const result = selectSkin(store.content, store.state, reward.characterId, reward.id);
+      if (result.ok) toast(`${reward.skinName} equipped for ${def.displayName}.`);
+      return result;
+    })
+  }, selected ? 'Skin in use' : 'Use Skin'));
+  return wrap;
 }
 
 function relicIcon(id) {
   let hash = 0;
-  for (const c of id) hash = (hash * 31 + c.charCodeAt(0)) >>> 0;
+  for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
   const icons = ['🏺', '📜', '🕯️', '🗝️', '🔔', '🪞', '🧭', '🎖️', '💠', '🎐'];
   return icons[hash % icons.length];
 }
 
-function fragTitle(store, frag) {
-  const node = store.content.nodeById[frag.sourceNode];
+function fragmentTitle(store, fragment) {
+  const node = store.content.nodeById[fragment.sourceNode];
   return `First clear: ${campaignLabel(store, node)} ${node.number} — ${node.displayName}`;
 }
 
@@ -89,7 +120,8 @@ function inspectRelic(store, relic) {
   openModal((modal, close) => {
     modal.appendChild(h('h2', `${relicIcon(relic.id)} ${relic.displayName}`));
     modal.appendChild(h('p', relic.lore));
-    modal.appendChild(h('p.small.muted', 'Recovered from: ', relic.fragments.map(f => fragTitle(store, f)).join(' · ')));
-    modal.appendChild(h('button.btn', { onclick: close }, 'Close'));
+    modal.appendChild(h('p.small.muted',
+      `Recovered from: ${relic.fragments.map(fragment => fragmentTitle(store, fragment)).join(' · ')}`));
+    modal.appendChild(h('div.modal-actions', h('button.btn', { onclick: close }, 'Close')));
   });
 }

@@ -3,7 +3,8 @@
 // transactions and re-render.
 import { buildContent } from './core/content.js';
 import { validateContent, validateSave } from './core/validate.js';
-import { newPlayerState, applyDailyReset, syncSaveWithContent, SCHEMA_VERSION } from './core/state.js';
+import { newPlayerState, applyDailyReset, syncSaveWithContent } from './core/state.js';
+import { migratePlayerState } from './core/migrate.js';
 import { makeRng, entropySeed } from './core/rng.js';
 import { upgradeCustomDB, mergeContent, gameReadiness } from './core/custom.js';
 import { loadRawContent, loadSave, writeSave, loadCustomContent, writeCustomContent } from './platform.js';
@@ -28,6 +29,18 @@ const store = {
   customDB: null,
   contentHealth: [],
   gameReady: { ready: false, checks: [] },
+  ui: {
+    modalStack: [],
+    scrollPositions: {},
+    routeHistory: [],
+    returnContext: null,
+    activeSearchInput: null,
+    pickerPreferences: {
+      world: 'all', archetype: 'all', faction: 'all', ownership: 'owned',
+      sort: 'power', direction: 'desc'
+    },
+    compactResult: null
+  },
   // Dev-only time offset so the developer panel can advance the reset day.
   now() { return Date.now() + (this.state?.devTimeOffsetMs ?? 0); },
   async save() {
@@ -45,7 +58,17 @@ const store = {
     if (rerender) render();
     return result;
   },
-  go(hash) { location.hash = hash; },
+  go(hash, options = {}) {
+    rememberScroll();
+    if (options.returnContext) this.ui.returnContext = options.returnContext;
+    else if (!options.preserveReturnContext) this.ui.returnContext = null;
+    location.hash = hash;
+  },
+  registerSearchInput(input) { this.ui.activeSearchInput = input; },
+  clearSearchInput(input = null) {
+    if (!input || this.ui.activeSearchInput === input) this.ui.activeSearchInput = null;
+  },
+  clearReturnContext() { this.ui.returnContext = null; },
 
   async saveCustom() { await writeCustomContent(this.customDB); },
 
@@ -86,14 +109,101 @@ export function toast(text, kind = 'info') {
 
 export function openModal(build) {
   const root = document.getElementById('modal-root');
-  clear(root);
   root.className = 'open';
-  const modal = h('div.modal', { role: 'dialog', 'aria-modal': 'true' });
-  const close = () => { root.className = ''; clear(root); };
-  root.appendChild(h('div.backdrop', { onclick: close }));
-  root.appendChild(modal);
+  const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const layer = h('div.modal-layer');
+  const titleId = `modal-title-${Date.now()}-${store.ui.modalStack.length}`;
+  const modal = h('div.modal', {
+    role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId, tabindex: '-1'
+  });
+  const descriptor = { layer, modal, opener, titleId, build };
+  descriptor.openerAria = opener?.getAttribute?.('aria-label') ?? null;
+  const close = () => closeModal(descriptor);
+  descriptor.close = close;
+  const previous = store.ui.modalStack.at(-1);
+  if (previous) {
+    previous.layer.setAttribute('aria-hidden', 'true');
+    previous.modal.inert = true;
+  }
+  layer.appendChild(h('div.backdrop', { onclick: close }));
+  layer.appendChild(modal);
+  root.appendChild(layer);
+  store.ui.modalStack.push(descriptor);
   build(modal, close);
+  const associateTitle = () => {
+    const heading = modal.querySelector('h1,h2,h3');
+    if (heading) {
+      heading.id = titleId;
+      modal.removeAttribute('aria-label');
+    } else modal.setAttribute('aria-label', 'Dialog');
+  };
+  associateTitle();
+  descriptor.observer = new MutationObserver(associateTitle);
+  descriptor.observer.observe(modal, { childList: true });
+  modal.addEventListener('keydown', trapModalFocus);
+  queueMicrotask(() => {
+    const focusable = modal.querySelector(focusableSelector());
+    (focusable ?? modal).focus();
+  });
   return close;
+}
+
+function focusableSelector() {
+  return 'button:not(:disabled),[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex]:not([tabindex="-1"])';
+}
+
+function trapModalFocus(event) {
+  if (event.key !== 'Tab') return;
+  const modal = event.currentTarget;
+  const items = [...modal.querySelectorAll(focusableSelector())].filter(el => !el.hidden);
+  if (!items.length) { event.preventDefault(); modal.focus(); return; }
+  const first = items[0], last = items.at(-1);
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault(); last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault(); first.focus();
+  }
+}
+
+function closeModal(descriptor) {
+  const index = store.ui.modalStack.indexOf(descriptor);
+  if (index < 0) return;
+  // Closing a lower descriptor also closes any layers above it.
+  const removed = store.ui.modalStack.splice(index);
+  for (const item of removed) {
+    item.observer?.disconnect();
+    item.layer.remove();
+  }
+  const top = store.ui.modalStack.at(-1);
+  if (top) {
+    top.layer.removeAttribute('aria-hidden');
+    top.modal.inert = false;
+    const opener = descriptor.opener?.isConnected
+      ? descriptor.opener
+      : descriptor.openerAria
+        ? [...top.modal.querySelectorAll('[aria-label]')].find(el => el.getAttribute('aria-label') === descriptor.openerAria)
+        : null;
+    (opener ?? top.modal).focus();
+  } else {
+    document.getElementById('modal-root').className = '';
+    const fallback = descriptor.openerAria
+      ? [...document.querySelectorAll('[aria-label]')].find(el => el.getAttribute('aria-label') === descriptor.openerAria)
+      : null;
+    (descriptor.opener?.isConnected ? descriptor.opener : fallback)?.focus();
+  }
+}
+
+export function closeTopModal() {
+  store.ui.modalStack.at(-1)?.close();
+}
+
+export function clearModals({ restoreFocus = false } = {}) {
+  const descriptors = store.ui.modalStack.splice(0);
+  const opener = descriptors[0]?.opener;
+  descriptors.forEach(descriptor => descriptor.observer?.disconnect());
+  clear(document.getElementById('modal-root'));
+  document.getElementById('modal-root').className = '';
+  if (restoreFocus && opener?.isConnected) opener.focus();
 }
 
 // ------------------------------------------------------------- routing
@@ -121,10 +231,14 @@ const GAME_ROUTES = new Set(['home', 'roster', 'party', 'campaign', 'inventory',
 export function render() {
   const { name, arg } = parseRoute();
   const route = routes[name];
-  // Route changes dismiss any open dialog.
-  const modalRoot = document.getElementById('modal-root');
-  modalRoot.className = '';
-  clear(modalRoot);
+  const routeKey = `${name}:${arg ?? ''}`;
+  if (store.ui.currentRouteKey && store.ui.currentRouteKey !== routeKey) {
+    store.ui.routeHistory.push(store.ui.currentRouteKey);
+    if (store.ui.routeHistory.length > 50) store.ui.routeHistory.shift();
+    clearModals();
+  }
+  store.ui.currentRouteKey = routeKey;
+  store.ui.activeSearchInput = null;
   document.documentElement.className = store.state.settings.reducedMotion ? 'reduced-motion' : '';
   document.documentElement.style.setProperty('--scale', store.state.settings.textScale);
   renderSidebar(name);
@@ -139,6 +253,32 @@ export function render() {
   }
   renderTopbar(route.title);
   route.render(store, screen, arg);
+  restoreScroll(routeKey);
+}
+
+function rememberScroll() {
+  if (!store.ui.currentRouteKey) return;
+  const main = document.getElementById('main');
+  store.ui.scrollPositions[store.ui.currentRouteKey] = main.scrollTop;
+}
+
+function restoreScroll(routeKey) {
+  const main = document.getElementById('main');
+  const saved = store.ui.scrollPositions[routeKey];
+  requestAnimationFrame(() => { main.scrollTop = Number.isFinite(saved) ? saved : 0; });
+}
+
+function goBack() {
+  const context = store.ui.returnContext;
+  const route = parseRoute();
+  if (context && route.name === 'node') {
+    const saved = context;
+    store.ui.returnContext = null;
+    store.ui.pendingReopen = saved;
+    store.go(saved.route);
+    return;
+  }
+  history.back();
 }
 
 function renderSetup(screen) {
@@ -224,18 +364,37 @@ async function boot() {
   store.content = content;
   store.gameReady = gameReadiness(content);
 
-  let state = await loadSave();
-  if (state && state.schemaVersion !== SCHEMA_VERSION) {
-    // Single-schema MVP: future migrations chain here.
-    toast(`Save schema ${state.schemaVersion} unsupported; starting fresh. The old file was backed up.`, 'error');
-    state = null;
+  const loadedState = await loadSave();
+  let state = null;
+  if (loadedState) {
+    try {
+      state = migratePlayerState(store.content, loadedState);
+    } catch (error) {
+      const screen = document.getElementById('screen');
+      clear(screen);
+      screen.appendChild(h('div.panel',
+        h('h2', 'Save migration failed'),
+        h('p.bad', error instanceof Error ? error.message : String(error)),
+        h('p.muted', 'The existing save and rolling backup were left unchanged. Export or restore the save before trying again.')));
+      return;
+    }
   }
   store.state = state ?? newPlayerState(store.content, Date.now());
-  if (state) {
+  if (loadedState) {
     const scrubbed = syncSaveWithContent(store.content, store.state);
     if (scrubbed.length > 0) {
       toast(`Save updated for changed content (${scrubbed.length} stale reference${scrubbed.length > 1 ? 's' : ''} cleaned).`);
     }
+  }
+  const saveCheck = validateSave(store.content, store.state);
+  if (!saveCheck.ok) {
+    const screen = document.getElementById('screen');
+    clear(screen);
+    screen.appendChild(h('div.panel',
+      h('h2', 'Save validation failed'),
+      h('p.bad', 'The migrated save was not written. Resolve these problems or restore the rolling backup:'),
+      h('ul.reasons', saveCheck.errors.slice(0, 20).map(error => h('li', error)))));
+    return;
   }
 
   // RNG: persisted deterministic stream when a dev seed is set, else entropy.
@@ -263,8 +422,32 @@ async function boot() {
   }, 60000);
 
   window.heroStore = store; // debugging convenience for the dev workflow
-  window.addEventListener('hashchange', render);
+  window.addEventListener('hashchange', () => {
+    rememberScroll();
+    const context = store.ui.returnContext;
+    if (context && location.hash === context.route) {
+      store.ui.pendingReopen = context;
+      store.ui.returnContext = null;
+    }
+    render();
+  });
   window.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape' && store.ui.modalStack.length) {
+      ev.preventDefault();
+      closeTopModal();
+      return;
+    }
+    if (ev.altKey && ev.key === 'ArrowLeft') {
+      ev.preventDefault();
+      goBack();
+      return;
+    }
+    if (ev.ctrlKey && !ev.shiftKey && ev.code === 'KeyF' && store.ui.activeSearchInput?.isConnected) {
+      ev.preventDefault();
+      store.ui.activeSearchInput.focus();
+      store.ui.activeSearchInput.select?.();
+      return;
+    }
     if (ev.ctrlKey && ev.shiftKey && ev.code === 'KeyD') {
       store.state.settings.devPanel = !store.state.settings.devPanel;
       store.save().then(render);

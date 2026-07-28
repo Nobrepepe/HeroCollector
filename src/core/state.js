@@ -4,8 +4,9 @@
 import { characterPower, activeTier, cumulativeGearPower } from './power.js';
 import { evaluateParty, partyLegality, objectiveSatisfied } from './synergy.js';
 import { equipmentRecipe, equipmentName } from './content.js';
+import { analyzeEquipmentGoal, analyzePinnedGoals } from './progression.js';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 // ------------------------------------------------------------- new state
 export function newPlayerState(content, now = Date.now()) {
@@ -47,7 +48,19 @@ export function newPlayerState(content, now = Date.now()) {
     activePartyIndex: 0,
     pins: [],
     archive: { fragments: {} },
-    settings: { resetHour: b.energy.resetHour, textScale: 1, reducedMotion: false, confirmBulk: true },
+    settings: {
+      resetHour: b.energy.resetHour, textScale: 1, reducedMotion: false,
+      confirmBulk: true, farmingResults: 'automatic'
+    },
+    ui: {
+      roster: {
+        world: 'all', archetype: 'all', faction: 'all', ownership: 'all',
+        sort: 'name', direction: 'asc'
+      },
+      campaignId: 'main',
+      archiveCollapsed: { worlds: {}, collections: {} },
+      nodePartyById: {}
+    },
     progressLog: [],
     lastResetSummary: null
   };
@@ -115,8 +128,56 @@ export function syncSaveWithContent(content, state) {
     }
   }
   const beforePins = state.pins.length;
-  state.pins = state.pins.filter(p => content.characterById[p.characterId]);
+  state.pins = state.pins.filter(p => {
+    const cs = state.characters[p.characterId];
+    if (!content.characterById[p.characterId] || !cs) return false;
+    if (p.type === 'equipment') {
+      return !!content.characterMeta.slots[p.slot]
+        && cs.owned
+        && !!activeTier(content.balance, cs, content.maxGearTier)
+        && !cs.slots[p.slot];
+    }
+    if (p.type === 'character') {
+      if (p.objective === 'unlock') return !cs.owned;
+      if (p.objective === 'promotion') return cs.stars < (p.targetStars ?? cs.stars + 1);
+      return cs.stars < 7;
+    }
+    return false;
+  });
   if (state.pins.length < beforePins) report.push(`Removed ${beforePins - state.pins.length} pin(s) for missing content.`);
+  state.ui ??= {
+    roster: { world: 'all', archetype: 'all', faction: 'all', ownership: 'all', sort: 'name', direction: 'asc' },
+    campaignId: 'main', archiveCollapsed: { worlds: {}, collections: {} }, nodePartyById: {}
+  };
+  state.ui.nodePartyById ??= {};
+  for (const [nodeId, index] of Object.entries(state.ui.nodePartyById)) {
+    if (!content.nodeById[nodeId] || !Number.isInteger(index) || index < 0 || index >= state.parties.length) {
+      delete state.ui.nodePartyById[nodeId];
+      report.push(`Removed an invalid saved party preference for ${nodeId}.`);
+    }
+  }
+  const campaigns = new Set(['main', 'shadow', ...content.worlds.map(w => w.campaignId)]);
+  if (!campaigns.has(state.ui.campaignId)) state.ui.campaignId = 'main';
+  const roster = state.ui.roster ??= {
+    world: 'all', archetype: 'all', faction: 'all', ownership: 'all', sort: 'name', direction: 'asc'
+  };
+  if (!new Set(['all', ...content.worlds.map(w => w.id)]).has(roster.world)) roster.world = 'all';
+  if (!new Set(['all', ...Object.keys(content.archetypes)]).has(roster.archetype)) roster.archetype = 'all';
+  if (!new Set(['all', ...content.tags.filter(t => t.category === 'faction').map(t => t.id)]).has(roster.faction)) roster.faction = 'all';
+  if (!new Set(['all', 'owned', 'unowned', 'ready']).has(roster.ownership)) roster.ownership = 'all';
+  if (!new Set(['name', 'power', 'stars', 'gearTier', 'ready']).has(roster.sort)) roster.sort = 'name';
+  if (!new Set(['asc', 'desc']).has(roster.direction)) roster.direction = 'asc';
+  state.ui.archiveCollapsed ??= { worlds: {}, collections: {} };
+  const worldIds = new Set(content.worlds.map(w => w.id));
+  const collectionIds = new Set(content.archives.flatMap(a => a.collections.map(c => c.id)));
+  for (const id of Object.keys(state.ui.archiveCollapsed.worlds ?? {})) {
+    if (!worldIds.has(id)) delete state.ui.archiveCollapsed.worlds[id];
+  }
+  for (const id of Object.keys(state.ui.archiveCollapsed.collections ?? {})) {
+    if (!collectionIds.has(id)) delete state.ui.archiveCollapsed.collections[id];
+  }
+  if (!Number.isInteger(state.activePartyIndex)
+    || state.activePartyIndex < 0 || state.activePartyIndex >= state.parties.length) state.activePartyIndex = 0;
   return report;
 }
 
@@ -184,31 +245,7 @@ function addComp(state, id, qty) {
 // Materials reserved by pinned equipment recipes (GDD 6.2, 11.3): the material
 // cost of components still missing for each pinned piece.
 export function reservedMaterials(content, state) {
-  const reserved = { materials: {}, components: {} };
-  const compShort = {};
-  for (const pin of state.pins) {
-    if (pin.type !== 'equipment') continue;
-    const cs = state.characters[pin.characterId];
-    if (!cs || !cs.owned) continue;
-    const tier = activeTier(content.balance, cs, content.maxGearTier);
-    if (!tier || cs.slots[pin.slot]) continue;
-    const recipe = equipmentRecipe(content, pin.characterId, pin.slot, tier);
-    for (const input of recipe.inputs) {
-      compShort[input.componentId] = (compShort[input.componentId] ?? 0) + input.qty;
-    }
-  }
-  for (const [compId, need] of Object.entries(compShort)) {
-    const have = compQty(state, compId);
-    reserved.components[compId] = (reserved.components[compId] ?? 0) + need;
-    const missing = Math.max(0, need - have);
-    if (missing > 0) {
-      const def = content.componentById[compId];
-      for (const input of def.inputs) {
-        reserved.materials[input.materialId] = (reserved.materials[input.materialId] ?? 0) + input.qty * missing;
-      }
-    }
-  }
-  return reserved;
+  return analyzePinnedGoals(content, state).reservations;
 }
 
 // ------------------------------------------------------------- node access
@@ -291,6 +328,11 @@ export function maxSweepCount(content, state, nodeId) {
 export function clearNode(content, state, nodeId, members, count, rng, now = Date.now()) {
   const check = checkClear(content, state, nodeId, members, count);
   if (!check.ok) return { ok: false, reasons: check.reasons };
+  const readyBefore = new Set(content.characters
+    .filter(def => state.characters[def.id].owned
+      ? checkPromoteStar(content, state, def.id).ok
+      : checkUnlockCharacter(content, state, def.id).ok)
+    .map(def => def.id));
   const node = check.node;
   const b = content.balance;
   const ns = ensureNodeState(state, nodeId);
@@ -353,7 +395,12 @@ export function clearNode(content, state, nodeId, members, count, rng, now = Dat
   if (!wasCleared) {
     logProgress(state, `First clear: ${node.displayName}${rewards.firstClear ? ' (first-clear rewards claimed)' : ''}`, now);
   }
-  return { ok: true, rewards, node, evalResult: check.evalResult };
+  const newlyReadyCharacters = content.characters
+    .filter(def => !readyBefore.has(def.id) && (state.characters[def.id].owned
+      ? checkPromoteStar(content, state, def.id).ok
+      : checkUnlockCharacter(content, state, def.id).ok))
+    .map(def => def.id);
+  return { ok: true, rewards, node, evalResult: check.evalResult, newlyReadyCharacters };
 }
 
 // ------------------------------------------------------------- crafting
@@ -415,34 +462,68 @@ export function upcraft(content, state, materialId, times) {
 
 // ------------------------------------------------------------- equipment
 export function checkCraftEquipment(content, state, characterId, slot) {
-  const cs = state.characters[characterId];
-  if (!cs || !cs.owned) return { ok: false, reasons: ['Character not owned.'] };
-  const tier = activeTier(content.balance, cs, content.maxGearTier);
-  if (!tier) return { ok: false, reasons: [`Current campaigns support Gear Tier ${content.maxGearTier}. Add higher-grade material nodes to continue.`] };
-  if (cs.slots[slot]) return { ok: false, reasons: ['This slot is already equipped for the current tier. Complete the tier to continue.'] };
-  const recipe = equipmentRecipe(content, characterId, slot, tier);
-  const reasons = [];
-  for (const input of recipe.inputs) {
-    const have = compQty(state, input.componentId);
-    if (have < input.qty) {
-      reasons.push(`Need ${input.qty} ${content.componentById[input.componentId].displayName} (have ${have}).`);
-    }
-  }
-  return { ok: reasons.length === 0, reasons, recipe, tier };
+  const plan = analyzeEquipmentGoal(content, state, characterId, slot);
+  return {
+    ok: plan.state === 'components-ready',
+    reasons: plan.state === 'components-ready' ? [] :
+      plan.state === 'chain-ready'
+        ? ['Required components can be crafted from available materials.']
+        : plan.reasons,
+    recipe: plan.recipe,
+    tier: plan.tier,
+    plan
+  };
 }
 
 // Crafting an equipment piece equips it immediately (GDD 5.3).
 export function craftEquipment(content, state, characterId, slot, now = Date.now()) {
-  const check = checkCraftEquipment(content, state, characterId, slot);
+  return craftAndEquipEquipment(content, state, characterId, slot, now);
+}
+
+export function checkCraftAndEquipEquipment(content, state, characterId, slot) {
+  const currentKey = `equipment:${characterId}:${slot}`;
+  const otherPins = state.pins.filter(p =>
+    (p.type === 'equipment' ? `equipment:${p.characterId}:${p.slot}` : `${p.type}:${p.characterId}`) !== currentKey);
+  const otherReservations = analyzePinnedGoals(content, state, { pins: otherPins }).reservations;
+  const plan = analyzeEquipmentGoal(content, state, characterId, slot, { reservedByOthers: otherReservations });
+  return { ok: plan.craftable, reasons: plan.reasons, warnings: plan.warnings, plan };
+}
+
+export function craftAndEquipEquipment(content, state, characterId, slot, now = Date.now()) {
+  const check = checkCraftAndEquipEquipment(content, state, characterId, slot);
   if (!check.ok) return { ok: false, reasons: check.reasons };
+  const plan = check.plan;
   const cs = state.characters[characterId];
   const before = characterPower(content, cs);
-  for (const input of check.recipe.inputs) addComp(state, input.componentId, -input.qty);
+  const materials = { ...state.inventory.materials };
+  const components = { ...state.inventory.components };
+  for (const [id, amount] of Object.entries(plan.consumption.materials)) {
+    materials[id] = (materials[id] ?? 0) - amount;
+    if (materials[id] < 0) return { ok: false, reasons: [`Craft plan would make ${id} negative.`] };
+    if (materials[id] === 0) delete materials[id];
+  }
+  for (const [id, amount] of Object.entries(plan.consumption.components)) {
+    components[id] = (components[id] ?? 0) - amount;
+    if (components[id] < 0) return { ok: false, reasons: [`Craft plan would make ${id} negative.`] };
+    if (components[id] === 0) delete components[id];
+  }
+  // Missing components are crafted and immediately consumed, so they never
+  // need to be committed to the component inventory.
+  state.inventory.materials = materials;
+  state.inventory.components = components;
   cs.slots[slot] = true;
   const after = characterPower(content, cs);
-  const name = equipmentName(content, characterId, slot, check.tier);
+  const name = equipmentName(content, characterId, slot, plan.tier);
+  removePin(state, { type: 'equipment', characterId, slot });
   logProgress(state, `${content.characterById[characterId].displayName} equipped ${name} (+${after - before} Power)`, now);
-  return { ok: true, tier: check.tier, name, powerBefore: before, powerAfter: after };
+  return {
+    ok: true, tier: plan.tier, name, powerBefore: before, powerAfter: after,
+    componentsCrafted: plan.componentsToCraft,
+    conversions: plan.conversions,
+    resourcesSpent: plan.consumption,
+    warnings: plan.warnings,
+    reservationConflicts: plan.reservationConflicts ?? []
+  };
 }
 
 export function checkCompleteTier(content, state, characterId) {
@@ -465,6 +546,7 @@ export function completeGearTier(content, state, characterId, now = Date.now()) 
   if (!check.ok) return { ok: false, reasons: check.reasons };
   const cs = state.characters[characterId];
   const before = characterPower(content, cs);
+  cleanupCompletedPins(content, state);
   cs.gearTier = check.tier;
   cs.slots = emptySlots(content);
   const after = characterPower(content, cs);
@@ -493,6 +575,7 @@ export function promoteStar(content, state, characterId, now = Date.now()) {
   const before = characterPower(content, cs);
   cs.shards -= check.need;
   cs.stars += 1;
+  cleanupCompletedPins(content, state);
   const after = characterPower(content, cs);
   logProgress(state, `${content.characterById[characterId].displayName} promoted to ${cs.stars} Stars (+${after - before} Power)`, now);
   return { ok: true, stars: cs.stars, powerBefore: before, powerAfter: after };
@@ -519,6 +602,7 @@ export function unlockCharacter(content, state, characterId, now = Date.now()) {
   cs.shards -= check.tier.cumulativeShards;
   cs.owned = true;
   cs.stars = check.tier.unlockStar;
+  cleanupCompletedPins(content, state);
   const def = content.characterById[characterId];
   logProgress(state, `Unlocked ${def.displayName} at ${cs.stars} Star${cs.stars > 1 ? 's' : ''}!`, now);
   return { ok: true, stars: cs.stars };
@@ -545,18 +629,106 @@ export function renameParty(state, partyIndex, name) {
   return { ok: true };
 }
 
+export function copyParty(state, targetIndex, sourceIndex) {
+  const target = state.parties[targetIndex], source = state.parties[sourceIndex];
+  if (!target || !source) return { ok: false, reasons: ['Unknown party preset.'] };
+  if (targetIndex === sourceIndex) return { ok: false, reasons: ['Choose a different preset to copy.'] };
+  target.members = [...source.members];
+  return { ok: true, targetIndex, sourceIndex };
+}
+
+export function clearParty(state, partyIndex) {
+  const party = state.parties[partyIndex];
+  if (!party) return { ok: false, reasons: ['Unknown party preset.'] };
+  party.members = [null, null, null, null, null];
+  return { ok: true, partyIndex };
+}
+
+export function selectPartyPreset(state, partyIndex, nodeId = null) {
+  if (!Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= state.parties.length) {
+    partyIndex = 0;
+  }
+  state.activePartyIndex = partyIndex;
+  if (nodeId) {
+    state.ui ??= {};
+    state.ui.nodePartyById ??= {};
+    state.ui.nodePartyById[nodeId] = partyIndex;
+  }
+  return { ok: true, partyIndex };
+}
+
+export function preferredPartyIndex(state, nodeId = null) {
+  const preferred = nodeId ? state.ui?.nodePartyById?.[nodeId] : undefined;
+  if (Number.isInteger(preferred) && preferred >= 0 && preferred < state.parties.length) return preferred;
+  if (Number.isInteger(state.activePartyIndex)
+    && state.activePartyIndex >= 0 && state.activePartyIndex < state.parties.length) return state.activePartyIndex;
+  return 0;
+}
+
 const pinKey = p => p.type === 'equipment' ? `equipment:${p.characterId}:${p.slot}` : `${p.type}:${p.characterId}`;
-export function togglePin(state, pin) {
+export function togglePin(state, pin, content = null) {
   const key = pinKey(pin);
   const idx = state.pins.findIndex(p => pinKey(p) === key);
   if (idx !== -1) { state.pins.splice(idx, 1); return { ok: true, pinned: false }; }
-  if (state.pins.length >= 8) return { ok: false, reasons: ['Pin limit reached (8). Unpin something first.'] };
-  state.pins.push(pin);
-  return { ok: true, pinned: true };
+  const normalized = { ...pin };
+  if (pin.type === 'character' && content) {
+    const cs = state.characters[pin.characterId];
+    const def = content.characterById[pin.characterId];
+    if (!cs || !def) return { ok: false, reasons: ['Unknown character.'] };
+    if (!cs.owned) {
+      normalized.objective = 'unlock';
+      normalized.targetStars = content.balance.acquisitionTiers[def.tier].unlockStar;
+    } else {
+      if (cs.stars >= 7) return { ok: false, reasons: ['This character has no remaining shard goal.'] };
+      normalized.objective = 'promotion';
+      normalized.targetStars = cs.stars + 1;
+    }
+  }
+  state.pins.push(normalized);
+  return { ok: true, pinned: true, pin: normalized, index: state.pins.length - 1 };
 }
 export function isPinned(state, pin) {
   const key = pinKey(pin);
   return state.pins.some(p => pinKey(p) === key);
+}
+
+export function removePin(state, pin) {
+  const key = pinKey(pin);
+  const index = state.pins.findIndex(p => pinKey(p) === key);
+  if (index < 0) return { ok: true, removed: false };
+  const [removed] = state.pins.splice(index, 1);
+  return { ok: true, removed: true, pin: removed, index };
+}
+
+export function movePin(state, index, direction) {
+  const target = index + direction;
+  if (!Number.isInteger(index) || ![-1, 1].includes(direction)
+    || index < 0 || index >= state.pins.length || target < 0 || target >= state.pins.length) {
+    return { ok: false, reasons: ['Goal cannot be moved in that direction.'] };
+  }
+  const [pin] = state.pins.splice(index, 1);
+  state.pins.splice(target, 0, pin);
+  return { ok: true, index: target, pin };
+}
+
+export function cleanupCompletedPins(content, state) {
+  const before = state.pins.length;
+  state.pins = state.pins.filter(pin => {
+    const cs = state.characters[pin.characterId];
+    if (!cs || !content.characterById[pin.characterId]) return false;
+    if (pin.type === 'equipment') {
+      return !!content.characterMeta.slots[pin.slot]
+        && cs.owned && !!activeTier(content.balance, cs, content.maxGearTier)
+        && !cs.slots[pin.slot];
+    }
+    if (pin.type === 'character') {
+      if (pin.objective === 'unlock') return !cs.owned;
+      if (pin.objective === 'promotion') return cs.stars < pin.targetStars;
+      return cs.stars < 7;
+    }
+    return false;
+  });
+  return { ok: true, removed: before - state.pins.length };
 }
 
 // ------------------------------------------------------------- archive status
@@ -622,7 +794,7 @@ export function readyUpgrades(content, state) {
       const tier = activeTier(content.balance, cs, content.maxGearTier);
       if (tier) {
         for (const slot of content.characterMeta.slotOrder) {
-          if (!cs.slots[slot] && checkCraftEquipment(content, state, def.id, slot).ok) {
+          if (!cs.slots[slot] && analyzeEquipmentGoal(content, state, def.id, slot).craftable) {
             list.push({ type: 'craftEquipment', characterId: def.id, slot, text: `${def.displayName}: ${equipmentName(content, def.id, slot, tier)} can be crafted` });
           }
         }
