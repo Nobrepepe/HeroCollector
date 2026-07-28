@@ -2,10 +2,14 @@
 // synergies with explanations, raw power, cap, effective power, node compare.
 import { h, fmt, pct } from './dom.js';
 import { evaluateParty } from '../core/synergy.js';
-import { setPartyMember, renameParty, nodeState, nodeUnlocked } from '../core/state.js';
+import {
+  setPartyMember, renameParty, nodeState, nodeUnlocked,
+  copyParty, clearParty, selectPartyPreset
+} from '../core/state.js';
 import { characterPower } from '../core/power.js';
 import { portrait, starline, campaignLabel, nodeTypeMeta } from './shared.js';
 import { openModal } from '../app.js';
+import { openCharacterPicker } from './character-picker.js';
 
 export function renderParty(store, root, arg) {
   const { content, state } = store;
@@ -16,7 +20,8 @@ export function renderParty(store, root, arg) {
   const tabs = h('div.tab-bar');
   state.parties.forEach((p, i) => {
     tabs.appendChild(h('button.tab-btn' + (i === idx ? '.active' : ''), {
-      onclick: () => { state.activePartyIndex = i; store.save().then(() => renderPartyAgain(store, root)); }
+      onclick: () => store.tx(() => selectPartyPreset(state, i), { rerender: false })
+        .then(() => renderPartyAgain(store, root))
     }, p.name));
   });
   root.appendChild(tabs);
@@ -28,6 +33,12 @@ export function renderParty(store, root, arg) {
   renameRow.appendChild(h('button.btn.tiny', {
     onclick: () => store.tx(() => renameParty(state, idx, nameInput.value))
   }, 'Rename preset'));
+  renameRow.appendChild(h('button.btn.tiny', {
+    onclick: () => copyPreset(store, idx, () => renderPartyAgain(store, root))
+  }, 'Copy From…'));
+  renameRow.appendChild(h('button.btn.tiny.danger', {
+    onclick: () => confirmClearPreset(store, idx, () => renderPartyAgain(store, root))
+  }, 'Clear Preset'));
   root.appendChild(renameRow);
 
   // ---------- slots
@@ -114,31 +125,45 @@ function renderPartyAgain(store, root) {
 }
 
 function pickMember(store, partyIdx, slotIdx, done) {
-  const { content, state } = store;
+  openCharacterPicker(store, {
+    partyIndex: partyIdx,
+    slotIndex: slotIdx,
+    onSelect: async characterId => {
+      await store.tx(() => setPartyMember(store.content, store.state, partyIdx, slotIdx, characterId), { rerender: false });
+      done();
+    }
+  });
+}
+
+function copyPreset(store, targetIndex, done) {
   openModal((modal, close) => {
-    modal.appendChild(h('h2', 'Choose a character'));
-    const current = state.parties[partyIdx].members[slotIdx];
-    if (current) {
-      modal.appendChild(h('button.btn.danger.tiny', {
-        onclick: () => { store.tx(() => setPartyMember(content, state, partyIdx, slotIdx, null), { rerender: false }).then(() => { close(); done(); }); }
-      }, 'Remove from slot'));
-    }
-    const grid = h('div.card-grid', { style: { marginTop: '10px' } });
-    for (const def of content.characters) {
-      const cs = state.characters[def.id];
-      if (!cs.owned) continue;
-      const inParty = state.parties[partyIdx].members.includes(def.id);
-      const card = h('button.char-card', {
-        onclick: () => { store.tx(() => setPartyMember(content, state, partyIdx, slotIdx, def.id), { rerender: false }).then(() => { close(); done(); }); }
-      });
-      card.appendChild(portrait(store, def.id, 'sm'));
-      const body = h('div');
-      body.appendChild(h('div.name', def.displayName, inParty ? h('span.small.muted', ' (in party)') : null));
-      body.appendChild(h('div.sub', `${content.archetypes[def.archetype].name} · ${fmt(characterPower(content, cs))} Power`));
-      card.appendChild(body);
-      grid.appendChild(card);
-    }
-    modal.appendChild(grid);
-    modal.appendChild(h('div', { style: { marginTop: '12px' } }, h('button.btn', { onclick: close }, 'Cancel')));
+    modal.appendChild(h('h2', 'Copy party members from…'));
+    const select = h('select', { 'aria-label': 'Source preset' });
+    store.state.parties.forEach((party, index) => {
+      if (index !== targetIndex) select.appendChild(h('option', { value: String(index) }, party.name));
+    });
+    modal.append(select, h('div.modal-actions',
+      h('button.btn.primary', {
+        onclick: async () => {
+          await store.tx(() => copyParty(store.state, targetIndex, Number(select.value)), { rerender: false });
+          close(); done();
+        }
+      }, 'Copy members'),
+      h('button.btn', { onclick: close }, 'Cancel')));
+  });
+}
+
+function confirmClearPreset(store, index, done) {
+  openModal((modal, close) => {
+    modal.appendChild(h('h2', `Clear ${store.state.parties[index].name}?`));
+    modal.appendChild(h('p.warn', 'All five member slots in this preset will be emptied.'));
+    modal.appendChild(h('div.modal-actions',
+      h('button.btn.danger', {
+        onclick: async () => {
+          await store.tx(() => clearParty(store.state, index), { rerender: false });
+          close(); done();
+        }
+      }, 'Clear Preset'),
+      h('button.btn', { onclick: close }, 'Cancel')));
   });
 }

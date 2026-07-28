@@ -3,14 +3,17 @@
 import { h, fmt } from './dom.js';
 import {
   matQty, compQty, craftComponent, checkCraftComponent, maxCraftableComponents,
-  upcraft, checkUpcraft, reservedMaterials
+  upcraft, checkUpcraft
 } from '../core/state.js';
-import { openFindSources } from './shared.js';
+import { analyzePinnedGoals } from '../core/progression.js';
+import { openFindSources } from './find-sources.js';
+import { openGearDialog } from './gear.js';
 import { openModal, toast } from '../app.js';
 
 export function renderInventory(store, root) {
   const { content, state } = store;
-  const reserved = reservedMaterials(content, state);
+  const goalAnalysis = analyzePinnedGoals(content, state);
+  const reserved = goalAnalysis.reservations;
 
   // ---------- materials
   const matPanel = h('div.panel');
@@ -32,7 +35,10 @@ export function renderInventory(store, root) {
         title: 'Sources & upcrafting',
         onclick: () => openMaterialActions(store, id)
       }, fmt(qty)));
-      if (res > 0) cell.appendChild(h('div.small.pin-color', { title: 'Reserved by pinned recipes' }, `📌 ${fmt(res)}`));
+      if (res > 0) {
+        cell.appendChild(h('div.small.pin-color', { title: 'Reserved by goals' }, `Reserved ${fmt(res)}`));
+        cell.appendChild(h('div.small.muted', `Uncommitted ${fmt(Math.max(0, qty - res))}`));
+      }
       row.appendChild(cell);
     }
     table.appendChild(row);
@@ -53,7 +59,8 @@ export function renderInventory(store, root) {
     if (have === 0 && maxN === 0 && resC === 0) continue; // keep the table scannable
     const recipeText = comp.inputs.map(i => `${i.qty} × ${content.materialById[i.materialId].displayName}`).join(' + ');
     ctable.appendChild(h('tr',
-      h('td', `${comp.icon} ${comp.displayName}`, resC > 0 ? h('div.small.pin-color', `📌 ${resC} needed by pins`) : null),
+      h('td', `${comp.icon} ${comp.displayName}`,
+        resC > 0 ? h('div.small.pin-color', `Reserved ${fmt(resC)} · Uncommitted ${fmt(Math.max(0, have - resC))}`) : null),
       h('td.small', recipeText, ' ', h('button.link.small', { onclick: () => openFindSources(store, { type: 'component', id: comp.id }) }, 'find')),
       h('td', fmt(have)),
       h('td', craftControls(store, comp.id, maxN))
@@ -68,11 +75,20 @@ export function renderInventory(store, root) {
   pinPanel.appendChild(h('h2', '📌 Pinned recipes'));
   const eqPins = state.pins.filter(p => p.type === 'equipment');
   if (eqPins.length === 0) pinPanel.appendChild(h('p.muted.small', 'Pin recipes from a character’s gear screen to reserve their materials and track them from Home.'));
+  const grouped = new Map();
   for (const pin of eqPins) {
-    const def = content.characterById[pin.characterId];
-    pinPanel.appendChild(h('div.kv',
-      h('span', `${def.displayName} — ${content.characterMeta.slots[pin.slot].name}`),
-      h('button.btn.tiny', { onclick: () => store.go(`#/character/${pin.characterId}`) }, 'View')));
+    const list = grouped.get(pin.characterId) ?? [];
+    list.push(pin);
+    grouped.set(pin.characterId, list);
+  }
+  for (const [characterId, pins] of grouped) {
+    const def = content.characterById[characterId];
+    pinPanel.appendChild(h('h3', def.displayName));
+    for (const pin of pins) {
+      pinPanel.appendChild(h('div.kv',
+        h('span', content.characterMeta.slots[pin.slot].name),
+        h('button.btn.tiny', { onclick: () => openGearDialog(store, pin.characterId, pin.slot) }, 'Open gear')));
+    }
   }
   root.appendChild(pinPanel);
 }
@@ -109,7 +125,7 @@ function openMaterialActions(store, materialId) {
   openModal((modal, close) => {
     modal.appendChild(h('h2', `${m.icon} ${m.displayName}`));
     modal.appendChild(h('p', `In inventory: ${fmt(matQty(state, materialId))}`));
-    const reserved = reservedMaterials(content, state).materials[materialId] ?? 0;
+    const reserved = analyzePinnedGoals(content, state).reservations.materials[materialId] ?? 0;
     if (reserved > 0) modal.appendChild(h('p.small.pin-color', `📌 ${reserved} reserved by pinned recipes.`));
 
     if (m.conversionTarget) {

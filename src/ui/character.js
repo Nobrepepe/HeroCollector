@@ -1,14 +1,14 @@
 // Character Detail (GDD 11.2): artwork, tags, Power breakdown, Stars/shards,
 // six equipment slots with recipes, Find Sources, skins, and lore.
 import { h, fmt } from './dom.js';
-import { characterPowerBreakdown, activeTier, slotPower } from '../core/power.js';
-import { equipmentRecipe, equipmentName } from '../core/content.js';
+import { characterPowerBreakdown } from '../core/power.js';
 import {
-  compQty, craftEquipment, checkCraftEquipment, completeGearTier, checkCompleteTier,
   promoteStar, checkPromoteStar, unlockCharacter, checkUnlockCharacter,
   togglePin, isPinned, unlockedSkins, selectSkin
 } from '../core/state.js';
-import { portrait, starline, tagChips, openFindSources, activeSkin } from './shared.js';
+import { portrait, starline, tagChips, activeSkin } from './shared.js';
+import { openFindSources } from './find-sources.js';
+import { gearPanel, openGearDialog } from './gear.js';
 import { openModal, toast } from '../app.js';
 
 export function renderCharacter(store, root, characterId) {
@@ -32,15 +32,20 @@ export function renderCharacter(store, root, characterId) {
   idBody.appendChild(h('div', starline(cs.stars)));
   idBody.appendChild(tagChips(store, def));
   idBody.appendChild(h('p.muted', def.description));
-  if (cs.owned) idBody.appendChild(gearPanel(store, characterId, true));
+  if (cs.owned) idBody.appendChild(gearPanel(store, characterId));
   head.appendChild(idBody);
   root.appendChild(head);
+  if (store.ui.pendingReopen?.gear?.characterId === characterId) {
+    const pending = store.ui.pendingReopen;
+    store.ui.pendingReopen = null;
+    queueMicrotask(() => openGearDialog(store, characterId, pending.gear.slot));
+  }
 
   // ---------- acquisition / stars
   const starPanel = h('div.panel');
   starPanel.appendChild(h('h2', cs.owned ? 'Stars & shards' : 'Acquisition'));
   const pinBtn = (label = 'Pin shard goal') => h('button.btn.tiny' + (isPinned(state, { type: 'character', characterId }) ? '.pin-color' : ''), {
-    onclick: () => store.tx(() => togglePin(state, { type: 'character', characterId }))
+    onclick: () => store.tx(() => togglePin(state, { type: 'character', characterId }, content))
   }, isPinned(state, { type: 'character', characterId }) ? '📌 Pinned' : `📌 ${label}`);
 
   if (!cs.owned) {
@@ -130,93 +135,4 @@ function promoteWithFeedback(store, characterId) {
     if (r.ok) toast(`⭐ ${store.content.characterById[characterId].displayName}: ${fmt(r.powerBefore)} → ${fmt(r.powerAfter)} Power (+${fmt(r.powerAfter - r.powerBefore)})`);
     return r;
   });
-}
-
-function gearPanel(store, characterId, compact = false) {
-  const { content, state } = store;
-  const cs = state.characters[characterId];
-  const b = content.balance;
-  const panel = h('div.panel' + (compact ? '.character-gear' : ''));
-  const tier = activeTier(b, cs, content.maxGearTier);
-
-  if (!tier) {
-    panel.appendChild(h('h2', `Gear — Current cap reached (Tier ${content.maxGearTier})`));
-    panel.appendChild(h('p.good', content.maxGearTier >= b.gearTierPower.length
-      ? 'All ten Gear Tiers are finished. This character is Gear Complete.'
-      : `The current campaigns support Gear Tier ${content.maxGearTier}. Publishing freely repeatable ${content.materialMeta.gradeOrder[content.maxMaterialGradeRank + 1] ?? 'higher-grade'} material nodes will raise the cap.`));
-    return panel;
-  }
-
-  const tierPower = b.gearTierPower[tier - 1];
-  const profile = content.tierProfileByTier[tier];
-  panel.appendChild(h('h2', `Gear Tier ${tier} of ${content.maxGearTier} currently available`));
-  panel.appendChild(h('p.small.muted',
-    `${profile.stage}. Each equipped piece grants ${slotPower(b, tier)} Power (10% of this tier's ${tierPower}). Completing the tier consumes all six pieces and locks in the full ${tierPower} permanently.`));
-
-  const grid = h('div.slot-grid' + (compact ? '.compact' : ''));
-  for (const slot of content.characterMeta.slotOrder) {
-    grid.appendChild(slotCard(store, characterId, slot, tier));
-  }
-  panel.appendChild(grid);
-
-  const done = checkCompleteTier(content, state, characterId);
-  panel.appendChild(h('div', { style: { marginTop: '12px', display: 'flex', gap: '10px', alignItems: 'center' } },
-    h('button.btn.primary', {
-      disabled: !done.ok,
-      onclick: () => store.tx(() => {
-        const r = completeGearTier(content, state, characterId);
-        if (r.ok) toast(`🛡️ Gear Tier ${r.tier} complete: ${fmt(r.powerBefore)} → ${fmt(r.powerAfter)} Power (+${fmt(r.powerAfter - r.powerBefore)})`);
-        return r;
-      })
-    }, `Complete Tier ${tier}`),
-    done.ok ? h('span.good.small', 'All six pieces equipped — ready!') : h('span.muted.small', done.reasons[0])
-  ));
-  return panel;
-}
-
-function slotCard(store, characterId, slot, tier) {
-  const { content, state } = store;
-  const cs = state.characters[characterId];
-  const slotMeta = content.characterMeta.slots[slot];
-  const name = equipmentName(content, characterId, slot, tier);
-  const donePiece = cs.slots[slot];
-  const card = h('div.slot-card' + (donePiece ? '.done' : ''));
-  const pin = { type: 'equipment', characterId, slot };
-
-  const eqImg = content.images.equipment[`${characterId}:${slot}`];
-  card.appendChild(h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' } },
-    h('span.slot-name', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-      eqImg ? h('img.equip-thumb', { src: eqImg, alt: '' }) : h('span', slotMeta.icon), ` ${name}`),
-    h('button.pin-btn' + (isPinned(state, pin) ? '.pinned' : ''), {
-      title: isPinned(state, pin) ? 'Unpin recipe' : 'Pin recipe (reserves its materials)',
-      onclick: () => store.tx(() => togglePin(state, pin))
-    }, '📌')));
-  card.appendChild(h('div.flavor', `${slotMeta.name} · ${content.characterById[characterId].equipmentLines[slot]} line`));
-
-  if (donePiece) {
-    card.appendChild(h('div.good.small', `Equipped (+${slotPower(content.balance, tier)} Power)`));
-    return card;
-  }
-
-  const recipe = equipmentRecipe(content, characterId, slot, tier);
-  for (const input of recipe.inputs) {
-    const have = compQty(state, input.componentId);
-    const k = content.componentById[input.componentId];
-    card.appendChild(h('div.ing',
-      h('span', `${k.icon} ${k.displayName}`),
-      h('span' + (have >= input.qty ? '.enough' : '.short'), `${have}/${input.qty} `,
-        have < input.qty ? h('button.link.small', { onclick: () => openFindSources(store, { type: 'component', id: input.componentId }) }, 'find') : null)));
-  }
-  const chk = checkCraftEquipment(content, state, characterId, slot);
-  card.appendChild(h('button.btn.tiny' + (chk.ok ? '.primary' : ''), {
-    disabled: !chk.ok,
-    style: { marginTop: '6px' },
-    title: chk.ok ? '' : chk.reasons.join(' '),
-    onclick: () => store.tx(() => {
-      const r = craftEquipment(content, state, characterId, slot);
-      if (r.ok) toast(`✨ ${r.name} equipped: ${fmt(r.powerBefore)} → ${fmt(r.powerAfter)} Power`);
-      return r;
-    })
-  }, 'Craft & equip'));
-  return card;
 }

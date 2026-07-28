@@ -202,10 +202,15 @@ export function validateContent(content) {
 // Save-file validation: every ID the save references must exist in content.
 export function validateSave(content, state) {
   const errors = [];
+  if (![1, 2].includes(state.schemaVersion)) errors.push(`Unsupported save schema ${state.schemaVersion}`);
+  if (!state.characters || !state.inventory || !state.nodes || !Array.isArray(state.parties)) {
+    return { ok: false, errors: ['Save is missing required gameplay state.'] };
+  }
   for (const id of Object.keys(state.characters)) {
-    if (!content.characterById[id]) errors.push(`Save references unknown character ${id}`);
     const selectedSkinId = state.characters[id].selectedSkinId;
-    if (selectedSkinId && !content.skinById[selectedSkinId]) errors.push(`Save references unknown skin ${selectedSkinId}`);
+    if (content.characterById[id] && selectedSkinId && !content.skinById[selectedSkinId]) {
+      errors.push(`Save references unknown skin ${selectedSkinId}`);
+    }
   }
   for (const id of Object.keys(state.inventory.materials)) {
     if (!content.materialById[id]) errors.push(`Save references unknown material ${id}`);
@@ -216,14 +221,84 @@ export function validateSave(content, state) {
     if (state.inventory.components[id] < 0) errors.push(`Negative component quantity: ${id}`);
   }
   for (const id of Object.keys(state.nodes)) {
-    if (!content.nodeById[id]) errors.push(`Save references unknown node ${id}`);
+    if ((state.nodes[id].attemptsToday ?? 0) < 0) errors.push(`Negative attempt count: ${id}`);
   }
   for (const id of Object.keys(state.archive.fragments)) {
-    if (!content.fragmentById[id]) errors.push(`Save references unknown fragment ${id}`);
+    if (typeof state.archive.fragments[id] !== 'boolean') errors.push(`Invalid fragment state: ${id}`);
   }
   for (const party of state.parties) {
+    if (!Array.isArray(party.members) || party.members.length !== content.balance.partySize) {
+      errors.push(`Party "${party.name}" must contain ${content.balance.partySize} slots`);
+      continue;
+    }
+    if (new Set(party.members.filter(Boolean)).size !== party.members.filter(Boolean).length) {
+      errors.push(`Party "${party.name}" contains duplicate characters`);
+    }
     for (const m of party.members) {
       if (m !== null && !content.characterById[m]) errors.push(`Party "${party.name}" references unknown character ${m}`);
+    }
+  }
+  if (!Number.isInteger(state.activePartyIndex)
+    || state.activePartyIndex < 0 || state.activePartyIndex >= state.parties.length) {
+    errors.push('Active party index is invalid');
+  }
+  const pinKeys = new Set();
+  for (const pin of state.pins ?? []) {
+    if (!['equipment', 'character'].includes(pin.type)) {
+      errors.push(`Unknown pin type ${pin.type}`);
+      continue;
+    }
+    if (!content.characterById[pin.characterId]) errors.push(`Pin references unknown character ${pin.characterId}`);
+    const key = pin.type === 'equipment'
+      ? `equipment:${pin.characterId}:${pin.slot}`
+      : `character:${pin.characterId}`;
+    if (pinKeys.has(key)) errors.push(`Duplicate pin ${key}`);
+    pinKeys.add(key);
+    if (pin.type === 'equipment' && !content.characterMeta.slots[pin.slot]) {
+      errors.push(`Pin references unknown equipment slot ${pin.slot}`);
+    }
+    if (pin.type === 'character' && state.schemaVersion >= 2) {
+      if (!['unlock', 'promotion'].includes(pin.objective)) errors.push(`Shard pin ${pin.characterId} has an invalid objective`);
+      if (!Number.isInteger(pin.targetStars) || pin.targetStars < 1 || pin.targetStars > 7) {
+        errors.push(`Shard pin ${pin.characterId} has an invalid target`);
+      }
+    }
+  }
+  if (state.schemaVersion >= 2) {
+    const ui = state.ui;
+    if (!ui || typeof ui !== 'object') {
+      errors.push('Missing UI preferences');
+    } else {
+      const roster = ui.roster ?? {};
+      const allowed = {
+        world: new Set(['all', ...content.worlds.map(w => w.id)]),
+        archetype: new Set(['all', ...Object.keys(content.archetypes)]),
+        faction: new Set(['all', ...content.tags.filter(t => t.category === 'faction').map(t => t.id)]),
+        ownership: new Set(['all', 'owned', 'unowned', 'ready']),
+        sort: new Set(['name', 'power', 'stars', 'gearTier', 'ready']),
+        direction: new Set(['asc', 'desc'])
+      };
+      for (const [key, values] of Object.entries(allowed)) {
+        if (!values.has(roster[key])) errors.push(`Invalid roster preference ${key}`);
+      }
+      const campaigns = new Set(['main', 'shadow', ...content.worlds.map(w => w.campaignId)]);
+      if (!campaigns.has(ui.campaignId)) errors.push(`Unknown campaign preference ${ui.campaignId}`);
+      for (const [nodeId, index] of Object.entries(ui.nodePartyById ?? {})) {
+        if (!content.nodeById[nodeId]) errors.push(`Party preference references unknown node ${nodeId}`);
+        if (!Number.isInteger(index) || index < 0 || index >= state.parties.length) {
+          errors.push(`Invalid party preference index for ${nodeId}`);
+        }
+      }
+      for (const [id, value] of Object.entries(ui.archiveCollapsed?.worlds ?? {})) {
+        if (!content.worldById[id] || typeof value !== 'boolean') errors.push(`Invalid Archive world preference ${id}`);
+      }
+      const collectionIds = new Set(content.archives.flatMap(a => a.collections.map(c => c.id)));
+      for (const [id, value] of Object.entries(ui.archiveCollapsed?.collections ?? {})) {
+        if (!collectionIds.has(id) || typeof value !== 'boolean') errors.push(`Invalid Archive collection preference ${id}`);
+      }
+    }
+    if (!['automatic', 'full', 'compact'].includes(state.settings?.farmingResults)) {
+      errors.push('Invalid farming result preference');
     }
   }
   if (state.energy < 0) errors.push('Negative Energy');

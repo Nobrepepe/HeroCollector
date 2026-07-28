@@ -2,7 +2,8 @@
 // confirmation preferences, save tools, credits.
 import { h } from './dom.js';
 import { exportSave, importSave } from '../platform.js';
-import { newPlayerState, syncSaveWithContent, SCHEMA_VERSION } from '../core/state.js';
+import { newPlayerState, syncSaveWithContent } from '../core/state.js';
+import { migratePlayerState } from '../core/migrate.js';
 import { validateSave } from '../core/validate.js';
 import { openModal, toast, render } from '../app.js';
 
@@ -24,6 +25,15 @@ export function renderSettings(store, root) {
   });
   gp.appendChild(labeled('Daily reset time (local time zone)', resetSel));
   gp.appendChild(toggle(store, 'Confirm bulk actions with a preview', 'confirmBulk'));
+  const resultMode = h('select', { 'aria-label': 'Farming result presentation' },
+    h('option', { value: 'automatic', selected: state.settings.farmingResults === 'automatic' }, 'Automatic (recommended)'),
+    h('option', { value: 'full', selected: state.settings.farmingResults === 'full' }, 'Always full'),
+    h('option', { value: 'compact', selected: state.settings.farmingResults === 'compact' }, 'Always compact'));
+  resultMode.addEventListener('change', () => {
+    state.settings.farmingResults = resultMode.value;
+    store.save();
+  });
+  gp.appendChild(labeled('Farming results', resultMode));
   root.appendChild(gp);
 
   // ---------- accessibility
@@ -49,23 +59,29 @@ export function renderSettings(store, root) {
       onclick: async () => {
         const imported = await importSave();
         if (!imported) { toast('Import canceled or unreadable.', 'error'); return; }
-        if (imported.schemaVersion !== SCHEMA_VERSION) { toast(`Unsupported schema version ${imported.schemaVersion}.`, 'error'); return; }
+        let migrated;
+        try {
+          migrated = migratePlayerState(content, imported);
+        } catch (error) {
+          toast(`Import migration failed: ${error instanceof Error ? error.message : String(error)}`, 'error');
+          return;
+        }
+        // Match normal startup: clean stale live references while preserving
+        // dormant progress before validating the imported state.
+        syncSaveWithContent(content, migrated);
         const finishImport = async () => {
-          store.state = imported;
-          syncSaveWithContent(content, store.state);
+          store.state = migrated;
           await store.save();
           toast('Save imported.');
           render();
         };
-        const check = validateSave(content, imported);
+        const check = validateSave(content, migrated);
         if (!check.ok) {
           openModal((modal, close) => {
-            modal.appendChild(h('h2', 'Import warnings'));
-            modal.appendChild(h('p.muted.small', 'The save references content that is not currently in the game (for example, unpublished creations). That progress stays dormant and returns when the content does.'));
+            modal.appendChild(h('h2', 'Save import blocked'));
+            modal.appendChild(h('p.bad.small', 'The migrated save is malformed. The active save was left unchanged.'));
             modal.appendChild(h('ul.reasons', check.errors.slice(0, 10).map(e => h('li', e))));
-            modal.appendChild(h('div', { style: { display: 'flex', gap: '8px' } },
-              h('button.btn.primary', { onclick: () => { close(); finishImport(); } }, 'Import anyway'),
-              h('button.btn', { onclick: close }, 'Cancel')));
+            modal.appendChild(h('div.modal-actions', h('button.btn', { onclick: close }, 'Close')));
           });
           return;
         }
