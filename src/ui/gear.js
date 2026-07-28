@@ -137,7 +137,7 @@ export function openGearDialog(store, characterId, slot) {
           : analysis.state === 'chain-ready' ? 'Craft Components & Equip' : 'Missing Materials';
         actions.appendChild(h('button.btn.primary', {
           disabled: !checked.ok,
-          onclick: () => commitEquipment(store, characterId, slot, checked, renderDialog)
+          onclick: () => craftEquipmentWithConfirmation(store, characterId, slot, { onSuccess: renderDialog })
         }, label));
       }
       actions.appendChild(h('button.btn', { onclick: close }, 'Close'));
@@ -147,7 +147,12 @@ export function openGearDialog(store, characterId, slot) {
   });
 }
 
-function commitEquipment(store, characterId, slot, checked, refresh) {
+export function craftEquipmentWithConfirmation(store, characterId, slot, { onSuccess } = {}) {
+  const checked = checkCraftAndEquipEquipment(store.content, store.state, characterId, slot);
+  if (!checked.ok) {
+    toast(checked.reasons.join(' '), 'error');
+    return;
+  }
   const run = async () => {
     const result = await store.tx(() =>
       craftAndEquipEquipment(store.content, store.state, characterId, slot, store.now()));
@@ -157,7 +162,7 @@ function commitEquipment(store, characterId, slot, checked, refresh) {
       setTimeout(() => {
         if (store.ui.justEquipped === `${characterId}:${slot}`) store.ui.justEquipped = null;
       }, 900);
-      refresh();
+      onSuccess?.(result);
     }
   };
   if (checked.plan.reservationConflicts?.length) {

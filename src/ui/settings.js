@@ -66,9 +66,11 @@ export function renderSettings(store, root) {
           toast(`Import migration failed: ${error instanceof Error ? error.message : String(error)}`, 'error');
           return;
         }
+        // Match normal startup: clean stale live references while preserving
+        // dormant progress before validating the imported state.
+        syncSaveWithContent(content, migrated);
         const finishImport = async () => {
           store.state = migrated;
-          syncSaveWithContent(content, store.state);
           await store.save();
           toast('Save imported.');
           render();

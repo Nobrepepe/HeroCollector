@@ -69,7 +69,9 @@ export function sourceRow(store, row, { onUpdate, returnContext } = {}) {
     wrapper.appendChild(actions);
   } else if (row.status.cleared || row.unlock.unlocked) {
     actions.appendChild(h('button.btn.tiny', {
-      onclick: () => store.go(`#/node/${node.id}`)
+      onclick: () => store.go(`#/node/${node.id}`, {
+        returnContext: returnContext ?? { route: location.hash || '#/home' }
+      })
     }, 'Open'));
     wrapper.appendChild(actions);
   }

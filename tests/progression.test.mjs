@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { loadContent } from './helpers.mjs';
 import {
   newPlayerState, craftAndEquipEquipment, togglePin, copyParty, clearParty,
-  selectPartyPreset, preferredPartyIndex, checkCraftAndEquipEquipment, SCHEMA_VERSION
+  selectPartyPreset, preferredPartyIndex, checkCraftAndEquipEquipment,
+  setPartyMember, syncSaveWithContent, SCHEMA_VERSION
 } from '../src/core/state.js';
 import {
   analyzeEquipmentGoal, analyzePinnedGoals, allocateMaterialDemand
@@ -131,6 +132,10 @@ test('party copy is independent, clear is scoped, and node preference falls back
   assert.equal(preferredPartyIndex(state, 'main_1'), 2);
   state.ui.nodePartyById.main_1 = 99;
   assert.equal(preferredPartyIndex(state, 'main_1'), 2);
+  const occupied = state.parties[0].members[1];
+  assert.ok(occupied);
+  assert.ok(setPartyMember(content, state, 0, 1, null).ok);
+  assert.equal(state.parties[0].members[1], null);
 });
 
 test('v1 migration preserves gameplay, is immutable/idempotent, and validates', () => {
@@ -151,4 +156,20 @@ test('v1 migration preserves gameplay, is immutable/idempotent, and validates', 
   assert.equal(validateSave(content, migrated).ok, true);
   migrated.ui.nodePartyById.main_1 = 99;
   assert.equal(validateSave(content, migrated).ok, false);
+});
+
+test('import pipeline synchronizes removed live references before validation', () => {
+  const state = migratePlayerState(content, newPlayerState(content, NOW));
+  state.characters.char_removed_custom = {
+    owned: true, stars: 3, shards: 9, gearTier: 1,
+    slots: {}, pity: false, skinUnlocked: false, selectedSkinId: null
+  };
+  state.parties[0].members[0] = 'char_removed_custom';
+  state.pins.push({ type: 'equipment', characterId: 'char_removed_custom', slot: 'attire' });
+  assert.equal(validateSave(content, state).ok, false);
+  syncSaveWithContent(content, state);
+  assert.equal(state.parties[0].members[0], null);
+  assert.equal(state.pins.some(pin => pin.characterId === 'char_removed_custom'), false);
+  assert.equal(state.characters.char_removed_custom.stars, 3);
+  assert.equal(validateSave(content, state).ok, true);
 });

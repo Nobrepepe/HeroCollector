@@ -91,11 +91,19 @@ export function openCharacterPicker(store, { partyIndex, slotIndex, onSelect }) 
       }));
       preferences.ownership = 'owned';
       const grid = h('div.picker-grid');
+      const current = store.state.parties[partyIndex].members[slotIndex];
+      if (current) {
+        modal.appendChild(h('button.btn.danger.tiny', {
+          onclick: async () => {
+            await onSelect(null);
+            close();
+          }
+        }, 'Remove from slot'));
+      }
       modal.appendChild(grid);
       const renderGrid = () => {
         grid.replaceChildren();
         const party = store.state.parties[partyIndex];
-        const current = party.members[slotIndex];
         const beforeMembers = party.members.filter(Boolean);
         const before = evaluateParty(store.content, store.state, beforeMembers);
         const candidates = filterCharacters(store.content, store.state, preferences, new Set(), search)

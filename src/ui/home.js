@@ -1,13 +1,13 @@
 import { h, fmt } from './dom.js';
 import {
-  readyUpgrades, nodeState, nodeUnlocked, craftAndEquipEquipment,
+  readyUpgrades, nodeState, nodeUnlocked,
   completeGearTier, promoteStar, unlockCharacter, movePin, removePin,
   cleanupCompletedPins
 } from '../core/state.js';
 import { analyzePinnedGoals } from '../core/progression.js';
 import { portrait, campaignLabel } from './shared.js';
 import { openFindSources } from './find-sources.js';
-import { openGearDialog } from './gear.js';
+import { craftEquipmentWithConfirmation, openGearDialog } from './gear.js';
 
 export function renderHome(store, root) {
   const { content, state } = store;
@@ -167,12 +167,14 @@ function readyPanel(store) {
       const action = {
         completeTier: () => completeGearTier(content, state, item.characterId),
         promoteStar: () => promoteStar(content, state, item.characterId),
-        craftEquipment: () => craftAndEquipEquipment(content, state, item.characterId, item.slot),
+        craftEquipment: () => craftEquipmentWithConfirmation(store, item.characterId, item.slot),
         unlock: () => unlockCharacter(content, state, item.characterId)
       }[item.type];
       details.appendChild(h('div.kv', h('span', item.text),
         h('div.goal-controls',
-          h('button.btn.tiny.primary', { onclick: () => store.tx(action) }, 'Do it'),
+          h('button.btn.tiny.primary', {
+            onclick: () => item.type === 'craftEquipment' ? action() : store.tx(action)
+          }, 'Do it'),
           h('button.btn.tiny', {
             onclick: () => item.type === 'craftEquipment'
               ? openGearDialog(store, item.characterId, item.slot)

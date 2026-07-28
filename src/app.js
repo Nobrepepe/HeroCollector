@@ -232,7 +232,11 @@ export function render() {
   const { name, arg } = parseRoute();
   const route = routes[name];
   const routeKey = `${name}:${arg ?? ''}`;
-  if (store.ui.currentRouteKey && store.ui.currentRouteKey !== routeKey) {
+  if (store.ui.currentRouteKey === routeKey) {
+    // Transactions can rebuild the current screen without a route change.
+    // Capture its live position before clearing so the rerender stays put.
+    rememberScroll();
+  } else if (store.ui.currentRouteKey) {
     store.ui.routeHistory.push(store.ui.currentRouteKey);
     if (store.ui.routeHistory.length > 50) store.ui.routeHistory.shift();
     clearModals();
