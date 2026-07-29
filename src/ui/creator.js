@@ -14,6 +14,7 @@ import {
 
 export function renderCreator(store, root, arg) {
   const parts = (arg ?? '').split('/').filter(Boolean);
+  root.classList.add('creator-screen');
   if (parts[0] === 'world' && parts[1]) return worldEditor(store, root, parts[1]);
   if (parts[0] === 'char' && parts[1]) return charEditor(store, root, parts[1]);
   if (parts[0] === 'main-chapter' && parts[1] !== undefined) return chapterEditor(store, root, 'main', Number(parts[1]));
@@ -43,7 +44,10 @@ function textInput(obj, key, store, { placeholder = '', maxlength = 60 } = {}) {
 }
 function textArea(obj, key, store) {
   const input = h('textarea', obj[key] ?? '');
+  const grow = () => { input.style.height = 'auto'; input.style.height = `${input.scrollHeight}px`; };
+  input.addEventListener('input', grow);
   input.addEventListener('change', () => { obj[key] = input.value; commit(store); });
+  queueMicrotask(grow);
   return input;
 }
 function numInput(obj, key, store, { min = 0, step = 50 } = {}) {
@@ -80,8 +84,12 @@ function familyGradeSelects(nd, store, content) {
 // ------------------------------------------------------------- overview
 function overview(store, root) {
   const { customDB: db } = store;
+  root.classList.add('creator-overview');
 
-  root.appendChild(h('p.muted.small', 'The whole game is yours to author: worlds, characters, the Main Campaign, archives, and all art live in the creator database. A world needs at least 5 characters to be published; the game starts once the readiness checklist below is complete.'));
+  root.appendChild(h('header.creator-title',
+    h('div.eyebrow', 'Content Creator'),
+    h('h1.display-s', store.gameReady.ready ? 'Your game is playable.' : `${store.gameReady.checks.filter(check => !check.ok).length} things left before your game can start.`),
+    h('p.muted', `${db.worlds.length} worlds authored, ${db.characters.length} characters, ${db.mainChapters.length} chapter pairs.`)));
 
   // ---- game readiness
   const rp = h('div.panel');
@@ -108,7 +116,9 @@ function overview(store, root) {
   }
   for (const w of db.worlds) {
     const gate = canPublishWorld(db, w.id);
-    const row = h('div.creator-list-row');
+    const row = h('div.creator-list-row.creator-world-card' + (w.image ? '' : '.art-fallback'), {
+      style: w.image ? { backgroundImage: `url("${w.image}")` } : {}
+    });
     row.appendChild(h('span', { style: { fontSize: '1.4rem' } }, w.icon));
     row.appendChild(h('div.grow',
       h('div', h('b', w.displayName), ' ', h('span.badge.' + w.status, w.status.toUpperCase())),
@@ -143,6 +153,9 @@ function overview(store, root) {
     row.appendChild(h('div.grow',
       h('div', h('b', `Chapter ${i + 1}`), h('span.small.muted', ` — nodes ${i * 10 + 1}–${i * 10 + 10}`)),
       h('div.small.muted', `Shadow assignments: ${shardChars.filter(x => x !== '—').length}/10`)));
+    row.appendChild(h('div.chapter-dots',
+      h('div', h('span.caption', 'Main'), ...ch.nodes.map(() => h('i.filled'))),
+      h('div', h('span.caption', 'Shadow'), ...(shadow?.nodes ?? []).map(node => h('i' + (node.shardCharacterId ? '.assigned' : ''))))));
     row.appendChild(h('button.btn.tiny.primary', { onclick: () => store.go(`#/creator/main-chapter/${i}`) }, 'Edit Main'));
     row.appendChild(h('button.btn.tiny.primary', { onclick: () => store.go(`#/creator/shadow-chapter/${i}`) }, 'Edit Shadow'));
     if (i === db.mainChapters.length - 1) {
@@ -203,7 +216,7 @@ function overview(store, root) {
         toast('Creator database reset.');
       })
     }, 'Reset creator data…')));
-  root.appendChild(tp);
+  root.insertBefore(tp, rp);
 }
 
 function promptName(title, onDone) {
@@ -235,7 +248,11 @@ function worldEditor(store, root, worldId) {
   const { customDB: db } = store;
   const w = db.worlds.find(x => x.id === worldId);
   if (!w) { root.appendChild(h('p.bad', 'Unknown world.')); return; }
+  root.classList.add('creator-world');
   root.appendChild(backLink(store, '#/creator', 'Content Creator'));
+  root.appendChild(h('header.creator-world-hero' + (w.image ? '' : '.art-fallback'), {
+    style: w.image ? { backgroundImage: `url("${w.image}")` } : {}
+  }, h('div.eyebrow', w.status), h('h1.display-m', w.displayName), h('p', w.tagline)));
 
   // ---- identity & status
   const idp = h('div.panel');
@@ -252,6 +269,12 @@ function worldEditor(store, root, worldId) {
     imageWell('world', 'World banner (16:9)', () => w.image, v => { w.image = v; }, () => commit(store, true))));
 
   const gate = canPublishWorld(db, w.id);
+  idp.appendChild(h('div.publish-path',
+    h('div.publish-station.done', h('i'), h('span', 'A world with a name'), h('small', w.displayName ? 'done' : 'still missing')),
+    h('div.publish-station' + (db.characters.filter(c => c.worldId === w.id).length >= 5 ? '.done' : '.blocking'),
+      h('i'), h('span', 'Five characters written'), h('small', `${db.characters.filter(c => c.worldId === w.id).length} of 5`)),
+    h('div.publish-station' + (gate.ok ? '.done' : '.blocking'), h('i'), h('span', 'Every one findable'),
+      h('small', gate.ok ? 'done' : gate.reasons.at(-1) ?? 'still missing'))));
   const statusRow = h('div', { style: { marginTop: '14px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' } });
   if (w.status === 'draft') {
     statusRow.appendChild(h('button.btn.primary', {
@@ -299,6 +322,10 @@ function worldEditor(store, root, worldId) {
   ];
   for (let ch = 0; ch < 3; ch++) {
     np.appendChild(h('h3', `Chapter ${ch + 1}`));
+    np.appendChild(imageWell('chapter', `Chapter ${ch + 1} key art (16:9)`,
+      () => w.campaignChapterImages[ch],
+      value => { w.campaignChapterImages[ch] = value; },
+      () => commit(store, true)));
     for (let i = 0; i < 10; i++) {
       const nd = w.campaignNodes[ch * 10 + i];
       const row = h('div.node-edit-row.world');
@@ -406,6 +433,7 @@ function charEditor(store, root, charId) {
   const { customDB: db, content } = store;
   const c = db.characters.find(x => x.id === charId);
   if (!c) { root.appendChild(h('p.bad', 'Unknown character.')); return; }
+  root.classList.add('creator-character');
   root.appendChild(backLink(store, `#/creator/world/${c.worldId}`, 'world'));
 
   const idp = h('div.panel');
@@ -523,6 +551,7 @@ function chapterEditor(store, root, campaign, idx) {
   const isShadow = campaign === 'shadow';
   const ch = (isShadow ? db.shadowChapters : db.mainChapters)[idx];
   if (!ch) { root.appendChild(h('p.bad', 'Unknown chapter.')); return; }
+  root.classList.add('creator-chapter');
   const chapterNum = idx + 1;
   root.appendChild(backLink(store, '#/creator', 'Content Creator'));
 
@@ -531,6 +560,11 @@ function chapterEditor(store, root, campaign, idx) {
   panel.appendChild(h('p.small.muted', isShadow
     ? 'Every node requires a shard character and allows five runs per day. Each unlocks when the corresponding Main node is cleared; Shadow nodes do not gate one another.'
     : 'All nodes are freely repeatable material sources. Thresholds never decrease along the campaign; positions 5 and 10 are checkpoints with larger first-clear rewards.'));
+  panel.appendChild(h('div.chapter-art-editor',
+    imageWell('chapter', `${isShadow ? 'Shadow' : 'Main'} Chapter ${chapterNum} key art (16:9)`,
+      () => ch.image,
+      value => { ch.image = value; },
+      () => commit(store, true))));
 
   const charOptions = [
     ['', '— choose character —'],
@@ -545,7 +579,10 @@ function chapterEditor(store, root, campaign, idx) {
     const row = h('div.node-edit-row');
     row.appendChild(h('span.muted.small', String(idx * 10 + pos)));
     row.appendChild(textInput(nd, 'name', store));
-    row.appendChild(numInput(nd, 'threshold', store, { min: 0 }));
+    const chapterMax = Math.max(1, ...ch.nodes.map(node => node.threshold));
+    row.appendChild(h('div.threshold-edit',
+      numInput(nd, 'threshold', store, { min: 0 }),
+      h('i', { style: { width: `${Math.max(2, nd.threshold / chapterMax * 100)}%` } })));
     row.append(...familyGradeSelects(nd, store, content));
     if (isShadow) {
       row.appendChild(selectInput(nd, 'shardCharacterId', store, charOptions, { structural: true }));

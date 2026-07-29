@@ -8,7 +8,7 @@
 // instead of producing invalid content. The game itself stays in setup mode
 // until the content meets the minimum prerequisites to start a game.
 
-export const CUSTOM_DB_VERSION = 4;
+export const CUSTOM_DB_VERSION = 5;
 
 export function emptyCustomDB() {
   return {
@@ -29,6 +29,7 @@ export function upgradeCustomDB(db) {
     ...db,
     worlds: (db.worlds ?? []).map(w => ({
       ...w,
+      campaignChapterImages: Array.from({ length: 3 }, (_, i) => w.campaignChapterImages?.[i] ?? null),
       campaignNodes: (w.campaignNodes ?? []).map(nd => ({ ...nd })),
       archive: w.archive ? {
         ...w.archive,
@@ -86,6 +87,15 @@ export function upgradeCustomDB(db) {
       delete w.archive.skin;
     }
   }
+  // v4 -> v5: each authored campaign chapter may carry its own 16:9 key art.
+  // Null defaults keep existing content packs valid and compact.
+  if (oldVersion < 5) {
+    for (const chapter of out.mainChapters) chapter.image ??= null;
+    for (const chapter of out.shadowChapters) chapter.image ??= null;
+    for (const world of out.worlds) {
+      world.campaignChapterImages = Array.from({ length: 3 }, (_, i) => world.campaignChapterImages?.[i] ?? null);
+    }
+  }
   out.version = CUSTOM_DB_VERSION;
   return out;
 }
@@ -133,6 +143,7 @@ export function newCustomWorld(name) {
     icon: '🌍',
     palette: { primary: '#5a7a9e', accent: '#9ec3e8', dark: '#1c2733' },
     image: null,
+    campaignChapterImages: [null, null, null],
     campaignNodes,
     archive: { collections, fullSkin: { characterId: null, name: '', portrait: null, fullBody: null } }
   };
@@ -200,11 +211,12 @@ export function newMainChapter(db) {
       grade
     };
   });
-  return { nodes };
+  return { image: null, nodes };
 }
 
 export function newShadowChapter(mainChapter, chapterIndex) {
   return {
+    image: null,
     nodes: mainChapter.nodes.map((nd, i) => ({
       name: `Shadow — ${nd.name || `Chapter ${chapterIndex + 1} — Node ${i + 1}`}`,
       threshold: nd.threshold,
@@ -541,9 +553,18 @@ export function mergeContent(systemRaw, db) {
   ];
 
   // --- images from the database
-  const images = { world: {}, portrait: {}, fullBody: {}, equipment: {}, relic: {}, skin: {} };
+  const images = { world: {}, chapter: {}, portrait: {}, fullBody: {}, equipment: {}, relic: {}, skin: {} };
+  db.mainChapters.forEach((chapter, index) => {
+    if (chapter.image) images.chapter[`main:${index + 1}`] = chapter.image;
+  });
+  db.shadowChapters.forEach((chapter, index) => {
+    if (chapter.image) images.chapter[`shadow:${index + 1}`] = chapter.image;
+  });
   for (const w of db.worlds) {
     if (w.image) images.world[w.id] = w.image;
+    (w.campaignChapterImages ?? []).forEach((image, index) => {
+      if (image) images.chapter[`wc_${w.id}:${index + 1}`] = image;
+    });
     w.archive.collections.forEach((col, c) => col.relics.forEach((relic, r) => {
       if (relic.image) images.relic[`${w.id}_relic_${c * 5 + r + 1}`] = relic.image;
     }));

@@ -5,6 +5,7 @@ import { buildContent } from './core/content.js';
 import { validateContent, validateSave } from './core/validate.js';
 import { newPlayerState, applyDailyReset, syncSaveWithContent } from './core/state.js';
 import { migratePlayerState } from './core/migrate.js';
+import { characterPower } from './core/power.js';
 import { makeRng, entropySeed } from './core/rng.js';
 import { upgradeCustomDB, mergeContent, gameReadiness } from './core/custom.js';
 import { loadRawContent, loadSave, writeSave, loadCustomContent, writeCustomContent } from './platform.js';
@@ -49,11 +50,22 @@ const store = {
   },
   // Run a core transaction, autosave on success, toast errors, re-render.
   async tx(fn, { rerender = true, quiet = false } = {}) {
+    this.ui.transactionBefore = {
+      energy: this.state.energy,
+      materials: { ...this.state.inventory.materials },
+      shards: Object.fromEntries(Object.entries(this.state.characters).map(([id, cs]) => [id, cs.shards])),
+      fragments: { ...this.state.archive.fragments },
+      power: Object.fromEntries(this.content.characters.map(def => [
+        def.id, characterPower(this.content, this.state.characters[def.id])
+      ]))
+    };
     const result = fn();
     if (result && result.ok === false) {
       if (!quiet) toast((result.reasons ?? ['Action failed.']).join(' '), 'error');
     } else {
       await this.save();
+      this.ui.lastPowerByCharacter = this.ui.transactionBefore.power;
+      this.ui.lastTransactionResult = result;
     }
     if (rerender) render();
     return result;
@@ -208,12 +220,12 @@ export function clearModals({ restoreFocus = false } = {}) {
 
 // ------------------------------------------------------------- routing
 const routes = {
-  home: { title: 'Home', icon: '🏠', render: renderHome, nav: true },
-  roster: { title: 'Roster', icon: '👥', render: renderRoster, nav: true },
-  party: { title: 'Party Builder', icon: '⚔️', render: renderParty, nav: true },
-  campaign: { title: 'Campaign', icon: '🗺️', render: renderCampaign, nav: true },
-  inventory: { title: 'Inventory & Crafting', icon: '🎒', render: renderInventory, nav: true },
-  archive: { title: 'World Archive', icon: '🏛️', render: renderArchive, nav: true },
+  home: { title: 'Today', icon: '🏠', render: renderHome, nav: true },
+  roster: { title: 'Collection', icon: '👥', render: renderRoster, nav: true },
+  party: { title: 'Party', icon: '⚔️', render: renderParty, nav: true },
+  campaign: { title: 'Journey', icon: '🗺️', render: renderCampaign, nav: true },
+  inventory: { title: 'Workshop', icon: '🎒', render: renderInventory, nav: true },
+  archive: { title: 'Archive', icon: '🏛️', render: renderArchive, nav: true },
   settings: { title: 'Settings', icon: '⚙️', render: renderSettings, nav: true },
   character: { title: 'Character', render: renderCharacter },
   node: { title: 'Node', render: renderNode },
@@ -232,7 +244,8 @@ export function render() {
   const { name, arg } = parseRoute();
   const route = routes[name];
   const routeKey = `${name}:${arg ?? ''}`;
-  if (store.ui.currentRouteKey === routeKey) {
+  const entering = store.ui.currentRouteKey !== routeKey;
+  if (!entering) {
     // Transactions can rebuild the current screen without a route change.
     // Capture its live position before clearing so the rerender stays put.
     rememberScroll();
@@ -248,6 +261,7 @@ export function render() {
   renderSidebar(name);
   const screen = document.getElementById('screen');
   clear(screen);
+  screen.className = entering ? 'screen-entering' : '';
   // Setup mode: until the content meets the minimum prerequisites for a
   // playable game, game screens show the readiness checklist instead.
   if (!store.gameReady.ready && GAME_ROUTES.has(name)) {
@@ -303,10 +317,10 @@ function renderSidebar(active) {
   clear(nav);
   nav.appendChild(h('div.logo', 'Hero ', h('span', 'Collector')));
   for (const [name, r] of Object.entries(routes)) {
-    if (!r.nav) continue;
+    if (!r.nav || name === 'settings') continue;
     nav.appendChild(h('button.nav-btn' + (name === active ? '.active' : ''), {
       onclick: () => store.go(`#/${name}`)
-    }, h('span.ico', r.icon), r.title));
+    }, h('span.nav-dot', { 'aria-hidden': 'true' }), r.title));
   }
   nav.appendChild(h('div.spacer'));
   // The Content Creator is always reachable while the game is in setup mode;
@@ -321,19 +335,25 @@ function renderSidebar(active) {
       onclick: () => store.go('#/dev')
     }, h('span.ico', '🧪'), 'Dev Panel'));
   }
-  nav.appendChild(h('div.small.muted', { style: { padding: '8px 12px' } }, 'MVP 1.0'));
+  const b = store.content?.balance;
+  const e = store.state?.energy ?? 0;
+  if (b) {
+    const reset = String(store.state.settings.resetHour).padStart(2, '0');
+    nav.appendChild(h('div.sidebar-energy',
+      h('div.eyebrow', 'Energy'),
+      h('div.energy-number', fmt(e), h('span', ` / ${fmt(b.energy.storageCap)}`)),
+      h('div.energy-line', h('i', { style: { width: `${Math.min(100, e / b.energy.storageCap * 100)}%` } })),
+      h('div.caption', `+${b.energy.dailyGrant} more at ${reset}:00`)));
+  }
+  nav.appendChild(h('button.nav-btn.settings-link' + (active === 'settings' ? '.active' : ''), {
+    onclick: () => store.go('#/settings')
+  }, h('span.nav-dot', { 'aria-hidden': 'true' }), 'Settings'));
 }
 
 function renderTopbar(title) {
   const bar = document.getElementById('topbar');
   clear(bar);
-  const b = store.content.balance;
-  const e = store.state.energy;
-  bar.appendChild(h('h1', title));
-  bar.appendChild(h('div.energy-pill', { title: `+${b.energy.dailyGrant} Energy daily at ${String(store.state.settings.resetHour).padStart(2, '0')}:00; stores up to ${b.energy.storageCap}` },
-    '⚡', `${fmt(e)} / ${b.energy.storageCap}`,
-    h('div.bar', h('div', { style: { width: `${Math.min(100, e / b.energy.storageCap * 100)}%` } }))
-  ));
+  bar.setAttribute('aria-label', title);
 }
 
 // ------------------------------------------------------------- boot

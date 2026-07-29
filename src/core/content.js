@@ -26,7 +26,7 @@ export function buildContent(raw) {
     maxMaterialGradeRank: -1,
     maxGearTier: 0,
     // Imported art (data URLs), filled in by the custom-content merge.
-    images: { world: {}, portrait: {}, fullBody: {}, equipment: {}, relic: {}, skin: {} }
+    images: { world: {}, chapter: {}, portrait: {}, fullBody: {}, equipment: {}, relic: {}, skin: {} }
   };
   for (const w of c.worlds) c.worldById[w.id] = w;
   for (const m of c.materials) c.materialById[m.id] = m;
