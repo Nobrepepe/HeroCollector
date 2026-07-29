@@ -9,6 +9,8 @@ import { openModal, toast, render } from '../app.js';
 
 export function renderSettings(store, root) {
   const { content, state } = store;
+  root.appendChild(h('header.utility-head', h('div.eyebrow', 'Local and offline'),
+    h('h1.display-s', 'Settings.'), h('p.muted', 'How the game feels, reads, saves, and resets on this device.')));
 
   // ---------- gameplay
   const gp = h('div.panel');

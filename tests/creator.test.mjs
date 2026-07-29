@@ -67,11 +67,14 @@ test('v2 migration moves legacy Main shards into incomplete paired Shadow chapte
   legacy.mainChapters[0].nodes[5].shardCharacterId = legacy.characters[1].id;
   legacy.mainChapters[0].nodes[8].shardCharacterId = legacy.characters[2].id;
   const upgraded = upgradeCustomDB(legacy);
-  assert.equal(upgraded.version, 4);
+  assert.equal(upgraded.version, 5);
   assert.equal(upgraded.shadowChapters.length, upgraded.mainChapters.length);
   assert.equal(upgraded.shadowChapters[0].nodes[2].shardCharacterId, legacy.characters[0].id);
   assert.equal(upgraded.shadowChapters[0].nodes[0].shardCharacterId, null);
   assert.ok(upgraded.mainChapters.every(ch => ch.nodes.every(nd => !('shardCharacterId' in nd))));
+  assert.ok(upgraded.mainChapters.every(ch => ch.image === null));
+  assert.ok(upgraded.shadowChapters.every(ch => ch.image === null));
+  assert.deepEqual(upgraded.worlds[0].campaignChapterImages, [null, null, null]);
 });
 
 test('sample pack merges cleanly into the full shipped game, all editable data', () => {
@@ -131,6 +134,9 @@ test('draft world: its characters and dependent chapters are held back', () => {
 test('published custom game merges completely, validates, and is ready', () => {
   const db = makeFullDB();
   db.worlds[0].status = 'published';
+  db.mainChapters[0].image = 'data:image/webp;base64,MAIN';
+  db.shadowChapters[0].image = 'data:image/webp;base64,SHADOW';
+  db.worlds[0].campaignChapterImages[1] = 'data:image/webp;base64,WORLD';
   const merged = mergeContent(systemRaw, db);
   const content = buildContent(merged.raw);
   assert.deepEqual(validateContent(content).errors, []);
@@ -152,6 +158,9 @@ test('published custom game merges completely, validates, and is ready', () => {
   assert.equal(content.archiveByWorld[w.id].collections.reduce((s, c) => s + c.relics.length, 0), 15);
   // imported art flows through
   assert.equal(merged.images.portrait[db.characters[0].id], 'data:image/webp;base64,AAA');
+  assert.equal(merged.images.chapter['main:1'], 'data:image/webp;base64,MAIN');
+  assert.equal(merged.images.chapter['shadow:1'], 'data:image/webp;base64,SHADOW');
+  assert.equal(merged.images.chapter[`wc_${w.id}:2`], 'data:image/webp;base64,WORLD');
   // starting flags survive
   assert.equal(content.characters.filter(d => d.starting).length, 5);
 });

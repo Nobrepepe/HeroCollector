@@ -15,6 +15,8 @@ export function renderParty(store, root, arg) {
   const { content, state } = store;
   const idx = state.activePartyIndex;
   const party = state.parties[idx];
+  root.appendChild(h('header.utility-head', h('div.eyebrow', 'Five voices, one reading'),
+    h('h1.display-s', 'Build your party.'), h('p.muted', 'Every bonus is visible before you cross a threshold.')));
 
   // ---------- preset tabs
   const tabs = h('div.tab-bar');

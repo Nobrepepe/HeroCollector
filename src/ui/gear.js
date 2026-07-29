@@ -64,6 +64,7 @@ function gearSlot(store, characterId, slot) {
   } else {
     button.appendChild(h('span.gear-plus', { 'aria-hidden': 'true' }, '+'));
     if (analysis.craftable) button.appendChild(h('span.gear-ready-cue', '✓ Ready'));
+    button.appendChild(h('span.gear-caption' + (analysis.craftable ? '.warn' : ''), `${meta.name}${analysis.craftable ? ' · ready' : ''}`));
   }
   if (pinned && !analysis.equipped) button.appendChild(h('span.gear-pin-marker', { 'aria-hidden': 'true' }, '📌'));
   return button;

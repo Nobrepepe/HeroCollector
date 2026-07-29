@@ -8,6 +8,7 @@ export const IMAGE_KINDS = {
   portrait:  { w: 512,  h: 512,  label: 'Portrait (square)' },
   fullBody:  { w: 576,  h: 1024, label: 'Full body (9:16, taller than wide)' },
   world:     { w: 1024, h: 576,  label: 'World banner (16:9, wider than tall)' },
+  chapter:   { w: 1280, h: 720,  label: 'Chapter key art (16:9, wider than tall)' },
   equipment: { w: 256,  h: 256,  label: 'Equipment (square)' },
   relic:     { w: 1024, h: 576,  label: 'Relic (16:9, wider than tall)' }
 };
@@ -21,38 +22,60 @@ export function pickAndProcessImage(kind) {
     input.onchange = async () => {
       const file = input.files[0];
       if (!file) return resolve(null);
-      try {
-        const bitmap = await createImageBitmap(file);
-        const canvas = document.createElement('canvas');
-        canvas.width = spec.w;
-        canvas.height = spec.h;
-        const ctx = canvas.getContext('2d');
-        // cover-crop: fill the target, cropping the overflowing dimension
-        const scale = Math.max(spec.w / bitmap.width, spec.h / bitmap.height);
-        const sw = spec.w / scale, sh = spec.h / scale;
-        const sx = (bitmap.width - sw) / 2, sy = (bitmap.height - sh) / 2;
-        ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, spec.w, spec.h);
-        bitmap.close();
-        let url = canvas.toDataURL('image/webp', 0.82);
-        if (!url.startsWith('data:image/webp')) url = canvas.toDataURL('image/jpeg', 0.85);
-        resolve(url);
-      } catch {
-        resolve(null);
-      }
+      resolve(await processImageFile(kind, file));
     };
     input.click();
   });
+}
+
+async function processImageFile(kind, file) {
+  const spec = IMAGE_KINDS[kind];
+  try {
+    const bitmap = await createImageBitmap(file);
+    const canvas = document.createElement('canvas');
+    canvas.width = spec.w;
+    canvas.height = spec.h;
+    const ctx = canvas.getContext('2d');
+    const scale = Math.max(spec.w / bitmap.width, spec.h / bitmap.height);
+    const sw = spec.w / scale, sh = spec.h / scale;
+    const sx = (bitmap.width - sw) / 2, sy = (bitmap.height - sh) / 2;
+    ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, spec.w, spec.h);
+    bitmap.close();
+    let url = canvas.toDataURL('image/webp', 0.82);
+    if (!url.startsWith('data:image/webp')) url = canvas.toDataURL('image/jpeg', 0.85);
+    return url;
+  } catch {
+    return null;
+  }
 }
 
 // A labeled image slot: preview + Import + Remove. `get`/`set` read and write
 // the data URL in the custom DB; `onChange` persists and re-renders.
 export function imageWell(kind, label, get, set, onChange) {
   const spec = IMAGE_KINDS[kind];
+  const current = get();
   const wrap = h('div.image-well');
   const preview = h('div.image-preview', {
-    style: { aspectRatio: `${spec.w} / ${spec.h}`, width: spec.w >= spec.h ? '180px' : `${Math.round(180 * spec.w / spec.h)}px` }
+    style: { aspectRatio: `${spec.w} / ${spec.h}`, width: spec.w >= spec.h ? '180px' : `${Math.round(180 * spec.w / spec.h)}px` },
+    tabindex: '0', role: 'button', 'aria-label': `${current ? 'Replace' : 'Import'} ${label}. You can also drop an image here.`
   });
-  const current = get();
+  const receive = async file => {
+    if (!file?.type?.startsWith('image/')) return;
+    const url = await processImageFile(kind, file);
+    if (url) { set(url); onChange(); }
+  };
+  preview.addEventListener('dragover', event => { event.preventDefault(); preview.classList.add('dragging'); });
+  preview.addEventListener('dragleave', () => preview.classList.remove('dragging'));
+  preview.addEventListener('drop', event => {
+    event.preventDefault(); preview.classList.remove('dragging'); receive(event.dataTransfer.files[0]);
+  });
+  preview.addEventListener('click', async () => {
+    const url = await pickAndProcessImage(kind);
+    if (url) { set(url); onChange(); }
+  });
+  preview.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); preview.click(); }
+  });
   if (current) {
     preview.appendChild(h('img', { src: current, alt: label }));
   } else {

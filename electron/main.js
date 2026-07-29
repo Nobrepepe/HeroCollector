@@ -21,7 +21,7 @@ function createWindow() {
     minWidth: 1100,
     minHeight: 700,
     title: 'Hero Collector',
-    backgroundColor: '#14161d',
+    backgroundColor: '#12100f',
     webPreferences: {
       preload: join(root, 'electron', 'preload.cjs'),
       contextIsolation: true,

@@ -14,6 +14,8 @@ export function renderInventory(store, root) {
   const { content, state } = store;
   const goalAnalysis = analyzePinnedGoals(content, state);
   const reserved = goalAnalysis.reservations;
+  root.appendChild(h('header.utility-head', h('div.eyebrow', 'Inventory and crafting'),
+    h('h1.display-s', 'The Workshop.'), h('p.muted', 'Materials become components; components become a hero’s next piece of power.')));
 
   // ---------- materials
   const matPanel = h('div.panel');
