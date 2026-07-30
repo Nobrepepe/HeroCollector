@@ -6,6 +6,8 @@ custom-content.json
 custom-content.json.bak
 save.json
 save.json.bak
+test_playthrough.json
+AGENT_README.md
 
 # Logs and platform noise
 *.log
