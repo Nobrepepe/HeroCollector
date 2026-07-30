@@ -1,7 +1,7 @@
 // Party synergy (GDD 7): tag-driven positive bonuses in integer basis points,
 // evaluated from reusable TagDefinitions. Only the highest threshold in a
 // stacking group applies; the total is capped by balance.synergyCapBp.
-import { characterPower } from './power.js';
+import { characterPowerForState } from './power.js';
 
 // Evaluate one tag definition against a party (array of CharacterDefinitions).
 // Returns { active, bonusBp, count, metThreshold, missing } — `missing` is a
@@ -56,7 +56,7 @@ export function evaluateParty(content, state, members) {
   const defs = members.map(id => content.characterById[id]).filter(Boolean);
   const rawPower = members.reduce((sum, id) => {
     const cs = state.characters[id];
-    return sum + (cs && cs.owned ? characterPower(content, cs) : 0);
+    return sum + (cs && cs.owned ? characterPowerForState(content, state, id) : 0);
   }, 0);
 
   const results = [];

@@ -8,6 +8,8 @@ import { characterPowerBreakdown } from '../core/power.js';
 import { makeRng } from '../core/rng.js';
 import { applyDailyReset, newPlayerState, nodeState } from '../core/state.js';
 import { openModal, toast, render } from '../app.js';
+import { addResource } from '../core/resources.js';
+import { generateExpeditionBoard } from '../core/expeditions.js';
 
 export function renderDev(store, root) {
   const { content, state } = store;
@@ -22,6 +24,11 @@ export function renderDev(store, root) {
   gr.appendChild(h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' } },
     h('span', 'Amount:'), amount,
     h('button.btn.tiny', { onclick: () => act(() => { state.energy = Math.max(0, state.energy + num(amount)); }) }, '± Energy'),
+    h('button.btn.tiny', { onclick: () => act(() => addResource(state, 'renown', num(amount))) }, '± Renown'),
+    h('button.btn.tiny', { onclick: () => act(() => addResource(state, 'intelligence', num(amount))) }, '± Intelligence'),
+    ...content.worlds.map(world => h('button.btn.tiny', {
+      onclick: () => act(() => addResource(state, world.worldAsset.id, num(amount)))
+    }, `± ${world.worldAsset.displayName}`)),
     h('button.btn.tiny', {
       onclick: () => act(() => {
         for (const m of content.materials) {
@@ -97,6 +104,17 @@ export function renderDev(store, root) {
     h('button.btn.tiny', { onclick: () => act(() => { for (const ns of Object.values(state.nodes)) ns.attemptsToday = 0; }) }, 'Refresh attempts'),
     h('button.btn.tiny', { onclick: () => act(() => { state.devTimeOffsetMs = 0; }) }, 'Clear time offset')));
   root.appendChild(tm);
+
+  const ex = h('div.panel', h('h2', 'Expeditions'));
+  const boardSeed = h('input', { type: 'number', value: 12345, 'aria-label': 'Expedition board seed' });
+  ex.append(boardSeed,
+    h('button.btn.tiny', { onclick: () => act(() =>
+      generateExpeditionBoard(content, state, makeRng(num(boardSeed) >>> 0), { seed: num(boardSeed) >>> 0 })) }, 'Generate board'),
+    h('button.btn.tiny', { onclick: () => act(() => {
+      for (const expedition of state.expeditions.active) expedition.returnDay = state.dayNumber;
+    }) }, 'Make active Expeditions due'),
+    h('pre.small', JSON.stringify(state.expeditions.board, null, 2)));
+  root.appendChild(ex);
 
   // ---------- rng
   const rg = h('div.panel');

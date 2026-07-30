@@ -8,7 +8,7 @@
 // instead of producing invalid content. The game itself stays in setup mode
 // until the content meets the minimum prerequisites to start a game.
 
-export const CUSTOM_DB_VERSION = 5;
+export const CUSTOM_DB_VERSION = 7;
 
 export function emptyCustomDB() {
   return {
@@ -17,7 +17,8 @@ export function emptyCustomDB() {
     characters: [],
     factions: [],
     mainChapters: [],
-    shadowChapters: []
+    shadowChapters: [],
+    expeditions: emptyExpeditionLibrary()
   };
 }
 
@@ -49,7 +50,8 @@ export function upgradeCustomDB(db) {
     })),
     shadowChapters: (db.shadowChapters ?? []).map(ch => ({
       ...ch, nodes: (ch.nodes ?? []).map(nd => ({ ...nd }))
-    }))
+    })),
+    expeditions: structuredClone(db.expeditions ?? emptyExpeditionLibrary())
   };
   // v1 -> v2: base-content overrides and removals no longer exist; chapters
   // now form the whole Main Campaign starting at Chapter 1.
@@ -95,6 +97,56 @@ export function upgradeCustomDB(db) {
     for (const world of out.worlds) {
       world.campaignChapterImages = Array.from({ length: 3 }, (_, i) => world.campaignChapterImages?.[i] ?? null);
     }
+  }
+  if (oldVersion < 6) {
+    for (const world of out.worlds) {
+      world.description ??= world.tagline ?? '';
+      world.displayOrder ??= out.worlds.indexOf(world);
+      world.worldAsset ??= {
+        id: `asset_${world.id}`, displayName: `${world.displayName} Asset`,
+        description: `Development resources belonging to ${world.displayName}.`, icon: '◆'
+      };
+      world.hq ??= null;
+      for (const node of world.campaignNodes) {
+        node.repeatRewards ??= [];
+        node.firstClearRewards ??= [];
+      }
+    }
+    for (const chapter of [...out.mainChapters, ...out.shadowChapters]) {
+      for (const node of chapter.nodes) {
+        node.worldId ??= null;
+        node.repeatRewards ??= [];
+        node.firstClearRewards ??= [];
+      }
+    }
+    // The shipped Eden pack receives the playable seed; unrelated creator
+    // databases remain opt-in and untouched beyond safe schema defaults.
+    const village = out.worlds.find(w => w.id === 'world_hidden_village');
+    const academy = out.worlds.find(w => w.id === 'world_magic_academy');
+    if (village && academy) {
+      village.worldAsset = { id: 'clan_seals', displayName: 'Clan Seals', description: 'Marks of trust and authority among the hidden clans.', icon: '印' };
+      academy.worldAsset = { id: 'arcane_sigils', displayName: 'Arcane Sigils', description: 'Inscribed proofs of research and magical service.', icon: '✦' };
+      village.hq = defaultHq(village, 'daily_free_pin');
+      academy.hq = defaultHq(academy, 'daily_free_reroll');
+      out.expeditions = sampleExpeditionLibrary(out.worlds);
+      for (const world of [village, academy]) {
+        world.campaignNodes.forEach((node, i) => {
+          node.firstClearRewards = [{ kind: 'resource', id: '@associated_world_asset', qty: 1 }];
+          if ((i + 1) % 5 === 0) {
+            node.repeatRewards = [{ kind: 'resource', id: '@associated_world_asset', qty: 1 }];
+            node.firstClearRewards.push({ kind: 'resource', id: 'renown', qty: 5 });
+          }
+        });
+      }
+      out.mainChapters.forEach(ch => ch.nodes.forEach((node, i) => {
+        if ((i + 1) % 5 === 0) node.firstClearRewards = [{ kind: 'resource', id: 'renown', qty: 10 }];
+      }));
+    }
+  }
+  if (oldVersion < 7) {
+    for (const world of out.worlds) world.hqImage ??= null;
+    out.expeditions.images ??= { global: null, worlds: {} };
+    out.expeditions.images.worlds ??= {};
   }
   out.version = CUSTOM_DB_VERSION;
   return out;
@@ -143,10 +195,130 @@ export function newCustomWorld(name) {
     icon: '🌍',
     palette: { primary: '#5a7a9e', accent: '#9ec3e8', dark: '#1c2733' },
     image: null,
+    hqImage: null,
     campaignChapterImages: [null, null, null],
     campaignNodes,
+    description: '', displayOrder: 0,
+    worldAsset: { id: `asset_${id}`, displayName: `${name || 'New World'} Asset`, description: '', icon: '◆' },
+    hq: null,
     archive: { collections, fullSkin: { characterId: null, name: '', portrait: null, fullBody: null } }
   };
+}
+
+export function emptyExpeditionLibrary() {
+  return {
+    settings: {
+      offerCount: 5, slotCount: 3, freeRerolls: 1, minimumFeasible: 2,
+      maxLongOffers: 1, generationAttempts: 40,
+      intelligenceCosts: { reroll: 1, pin: 1, reveal: 1 },
+      resultMultipliersBp: { completed: 10000, successful: 12500, exceptional: 15000 }
+    },
+    images: { global: null, worlds: {} },
+    requirements: [], optionalObjectives: [], rewardPackages: [], templates: [],
+    reports: {
+      completed: [
+        'The party returned with everything promised, even if the road asked more of them.',
+        'The route proved demanding, but the agreed supplies came home intact.',
+        'Careful work carried the party through. Nothing promised was lost.'
+      ],
+      successful: [
+        'The plan held. The party returned ahead of the expected margin.',
+        'The recommendation proved sound, and the return was clean.',
+        'Good preparation left room to gather more along the road.'
+      ],
+      exceptional: [
+        'The party found more than the route promised and brought the rare lead home.',
+        'An optional trail opened along the way, and the party followed it well.',
+        'Breadth and preparation turned ordinary work into an uncommon return.'
+      ]
+    }
+  };
+}
+
+const level = (renown, asset, extras = {}) => ({
+  cost: [{ kind: 'resource', id: 'renown', qty: renown }, { kind: 'resource', id: '@associated_world_asset', qty: asset }],
+  buildDays: 1, ...extras
+});
+
+export function defaultHq(world, signature = 'daily_free_reroll') {
+  const names = world.id === 'world_hidden_village'
+    ? ['Mission Hall', 'Training Grounds', 'Supply Depot', 'Clan Quarters']
+    : world.id === 'world_magic_academy'
+      ? ['Expeditionary Studies', 'Practical Arts Hall', 'Alchemy Laboratory', 'Student Commons']
+      : ['Operations Hall', 'Training Court', 'Supply House', 'Community Hall'];
+  const categories = ['operations', 'training', 'production', 'community'];
+  return {
+    enabled: true, backgrounds: [null, null, null],
+    ranks: [
+      { rank: 1, totalLevels: 0, reward: [] },
+      { rank: 2, totalLevels: 4, reward: [{ kind: 'resource', id: 'renown', qty: 25 }] },
+      { rank: 3, totalLevels: 8, reward: [{ kind: 'resource', id: 'intelligence', qty: 1 }] }
+    ],
+    signatureEffect: { type: signature, amount: 1 },
+    facilities: categories.map((category, i) => ({
+      id: `${world.id}_${category}`, category, displayName: names[i],
+      description: `${names[i]} develops ${category} across ${world.displayName}.`,
+      image: null,
+      levels: [
+        level(100, 10, category === 'community' ? { staffingSlots: 1 } : {}),
+        level(250, 25, category === 'community' ? { staffingSlots: 2 } : {}),
+        level(500, 50, category === 'community' ? { staffingSlots: 2, staffEffectBp: 15000 } : {})
+      ],
+      productionOptions: category === 'production' ? [
+        { id: 'world_asset', displayName: world.worldAsset.displayName, kind: 'resource', resourceId: '@associated_world_asset', quantities: [1, 1, 2] },
+        { id: 'basic_metal', displayName: 'Basic Metal', kind: 'material', resourceId: 'mat_metal_basic', quantities: [1, 2, 3] }
+      ] : []
+    }))
+  };
+}
+
+export function scaffoldWorldHq(world) {
+  world.hq ??= defaultHq(world);
+  return world.hq;
+}
+
+export function sampleExpeditionLibrary(worlds) {
+  const lib = emptyExpeditionLibrary();
+  lib.requirements = [
+    { id: 'req_associated', type: 'world_count', world: '@associated', count: 1, text: 'Include someone who knows this world.' },
+    { id: 'req_same_world', type: 'same_world', count: 2, text: 'Send two characters from the same world.' },
+    { id: 'req_two_worlds', type: 'distinct_worlds', count: 2, text: 'Bring knowledge from two worlds.' },
+    { id: 'req_two_arch', type: 'distinct_archetypes', count: 2, text: 'Bring two different archetypes.' },
+    { id: 'req_stars', type: 'combined_stars', count: 4, text: 'Bring at least four combined stars.' }
+  ];
+  lib.optionalObjectives = [
+    { id: 'opt_two_worlds', type: 'distinct_worlds', count: 2, text: 'Bring two different worlds.' },
+    { id: 'opt_two_arch', type: 'distinct_archetypes', count: 2, text: 'Bring two different archetypes.' },
+    { id: 'opt_star', type: 'star_character', stars: 3, count: 1, text: 'Include someone at three stars or above.' },
+    { id: 'opt_power', type: 'power_over_recommended', percentBp: 1000, count: 1, text: 'Exceed the recommendation by ten percent.' }
+  ];
+  const pkg = (id, entries, rare = []) => ({ id, displayName: id.replaceAll('_', ' '), entries, rare });
+  lib.rewardPackages = [
+    pkg('development', [{ kind: 'resource', id: 'renown', min: 40, max: 60 }, { kind: 'resource', id: '@associated_world_asset', min: 4, max: 6 }]),
+    pkg('world_supply', [{ kind: 'resource', id: '@associated_world_asset', min: 10, max: 16 }, { kind: 'resource', id: 'renown', min: 10, max: 15 }]),
+    pkg('equipment_cache', [{ kind: 'material', id: 'mat_metal_basic', min: 4, max: 8 }, { kind: 'resource', id: 'intelligence', min: 1, max: 1 }]),
+    pkg('intelligence_brief', [{ kind: 'resource', id: 'intelligence', min: 1, max: 2 }, { kind: 'resource', id: 'renown', min: 8, max: 12 }]),
+    { ...pkg('character_lead', [{ kind: 'resource', id: 'renown', min: 18, max: 28 }], [{ kind: 'resource', id: 'intelligence', qty: 1, chanceBp: 7000 }]), shardPool: 'associated_or_any', shardRange: [2, 4] },
+    pkg('long_venture', [{ kind: 'resource', id: 'renown', min: 70, max: 95 }, { kind: 'resource', id: '@associated_world_asset', min: 14, max: 20 }], [{ kind: 'resource', id: 'intelligence', qty: 2, chanceBp: 8000 }])
+  ];
+  const reqs = lib.requirements.map(r => r.id), opts = lib.optionalObjectives.map(r => r.id);
+  const titles = ['Quiet Roads, Useful Rumours', 'A Map Left Unfinished', 'Work Beyond the Gate'];
+  const descriptions = ['A measured route with a useful answer waiting at its end.', 'The work asks for breadth rather than battle.'];
+  const scopes = [null, ...worlds.slice(0, 2).map(w => w.id)];
+  for (let i = 0; i < 15; i++) {
+    lib.templates.push({
+      id: `exp_template_${i + 1}`, enabled: true, world: scopes[i % scopes.length], weight: 1,
+      durations: i % 5 === 4 ? [2] : [1], partySize: [2, 3, 4][i % 3],
+      requirementIds: [reqs[i % reqs.length], reqs[(i + 2) % reqs.length]], requirementCount: i % 4 === 0 ? 2 : 1,
+      optionalIds: [opts[i % opts.length], opts[(i + 1) % opts.length]],
+      rewardPackageId: (scopes[i % scopes.length] === null
+        ? lib.rewardPackages[[2, 3, 4][i % 3]]
+        : lib.rewardPackages[i % lib.rewardPackages.length]).id,
+      powerRatioBp: i % 3 === 0 ? [8500, 10000] : [10000, 11500],
+      titles: titles.map(t => `${t}${i ? ` ${i + 1}` : ''}`), descriptions
+    });
+  }
+  return lib;
 }
 
 export function newCustomCharacter(worldId, name, slotOrder, slotMeta) {
@@ -371,7 +543,9 @@ export function mergeContent(systemRaw, db) {
         threshold: nd.threshold,
         checkpoint: isCheckpoint,
         material,
-        previous: prevId
+        previous: prevId, world: nd.worldId ?? null,
+        repeatRewards: structuredClone(nd.repeatRewards ?? []),
+        firstClearRewards: structuredClone(nd.firstClearRewards ?? [])
       };
       if (isCheckpoint) {
         node.firstClear = { materials: [{ materialId: material, qty: 5 }], milestone: `Chapter ${chapterNum} checkpoint` };
@@ -421,7 +595,9 @@ export function mergeContent(systemRaw, db) {
         material,
         previous: null,
         mirrorNode: `main_${num}`,
-        shardCharacter: nd.shardCharacterId,
+        shardCharacter: nd.shardCharacterId, world: nd.worldId ?? null,
+        repeatRewards: structuredClone(nd.repeatRewards ?? []),
+        firstClearRewards: structuredClone(nd.firstClearRewards ?? []),
         firstClear: { materials: [{ materialId: material, qty: 1 }], shards: { characterId: nd.shardCharacterId, qty: 2 } }
       });
       sourced.add(nd.shardCharacterId);
@@ -469,6 +645,8 @@ export function mergeContent(systemRaw, db) {
     }
     finalWorlds.push({
       id: w.id, displayName: w.displayName, tagline: w.tagline,
+      description: w.description ?? '', displayOrder: w.displayOrder ?? 0,
+      worldAsset: structuredClone(w.worldAsset), hq: structuredClone(w.hq),
       palette: w.palette, icon: w.icon,
       campaignId: `wc_${w.id}`, archiveId: `archive_${w.id}`
     });
@@ -484,6 +662,8 @@ export function mergeContent(systemRaw, db) {
         threshold: nd.threshold,
         material,
         previous: num === 1 ? null : `wc_${w.id}_${num - 1}`,
+        repeatRewards: structuredClone(nd.repeatRewards ?? []),
+        firstClearRewards: structuredClone(nd.firstClearRewards ?? []),
         firstClear: { materials: [{ materialId: material, qty: 3 }], archiveFragment: `frag_${w.id}_${num}` }
       };
       if (nd.shardCharacterId) {
@@ -553,7 +733,10 @@ export function mergeContent(systemRaw, db) {
   ];
 
   // --- images from the database
-  const images = { world: {}, chapter: {}, portrait: {}, fullBody: {}, equipment: {}, relic: {}, skin: {} };
+  const images = {
+    world: {}, headquarters: {}, expedition: {}, chapter: {}, portrait: {},
+    fullBody: {}, equipment: {}, relic: {}, skin: {}, hq: {}, facility: {}
+  };
   db.mainChapters.forEach((chapter, index) => {
     if (chapter.image) images.chapter[`main:${index + 1}`] = chapter.image;
   });
@@ -562,6 +745,13 @@ export function mergeContent(systemRaw, db) {
   });
   for (const w of db.worlds) {
     if (w.image) images.world[w.id] = w.image;
+    if (w.hqImage) images.headquarters[w.id] = w.hqImage;
+    (w.hq?.backgrounds ?? []).forEach((image, index) => {
+      if (image) images.hq[`${w.id}:${index + 1}`] = image;
+    });
+    for (const facility of w.hq?.facilities ?? []) {
+      if (facility.image) images.facility[facility.id] = facility.image;
+    }
     (w.campaignChapterImages ?? []).forEach((image, index) => {
       if (image) images.chapter[`wc_${w.id}:${index + 1}`] = image;
     });
@@ -576,6 +766,10 @@ export function mergeContent(systemRaw, db) {
     if (w.archive.fullSkin?.portrait || w.archive.fullSkin?.fullBody) {
       images.skin[`skin_${w.id}_full`] = { portrait: w.archive.fullSkin.portrait, fullBody: w.archive.fullSkin.fullBody };
     }
+  }
+  if (db.expeditions?.images?.global) images.expedition.global = db.expeditions.images.global;
+  for (const [worldId, image] of Object.entries(db.expeditions?.images?.worlds ?? {})) {
+    if (image) images.expedition[worldId] = image;
   }
   for (const c of db.characters) {
     if (c.portrait) images.portrait[c.id] = c.portrait;
@@ -595,7 +789,22 @@ export function mergeContent(systemRaw, db) {
     tags,
     recipes: systemRaw.recipes,
     nodes: [...mainNodes, ...shadowNodes, ...wcNodes],
-    archives
+    archives,
+    expeditions: normalizeExpeditionLibrary(db.expeditions)
   };
   return { raw, images, health };
+}
+
+function normalizeExpeditionLibrary(value) {
+  const lib = structuredClone(value ?? emptyExpeditionLibrary());
+  lib.fallbackTemplate = lib.templates.find(t => t.partySize === 2 && t.durations?.includes(1))
+    ?? {
+      id: 'fallback_simple', enabled: true, world: null, weight: 1, durations: [1], partySize: 2,
+      requirementIds: [], requirementCount: 0,
+      optionalIds: [lib.optionalObjectives[0]?.id].filter(Boolean),
+      rewardPackageId: lib.rewardPackages[0]?.id,
+      powerRatioBp: [8000, 9000], titles: ['A Quiet Errand'],
+      descriptions: ['Straightforward work with a useful return.']
+    };
+  return lib;
 }

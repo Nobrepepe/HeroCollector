@@ -109,6 +109,20 @@ function v1ToV2(content, state) {
   return state;
 }
 
+function v2ToV3(content, state) {
+  state.dayNumber = Number.isInteger(state.dayNumber) && state.dayNumber > 0 ? state.dayNumber : 1;
+  state.inventory.resources ??= {};
+  state.inventory.resources.intelligence ??= 2;
+  state.expeditions ??= {
+    board: null, active: [], reports: [],
+    daily: { day: state.dayNumber, freeRerolls: content.expeditions?.settings?.freeRerolls ?? 1,
+      freeRerollsUsed: 0, freePins: 0, freePinsUsed: 0 }
+  };
+  state.headquarters ??= { worlds: {}, construction: null };
+  state.schemaVersion = 3;
+  return state;
+}
+
 export function migratePlayerState(content, inputState) {
   if (!inputState || typeof inputState !== 'object') throw new Error('Save data is not an object.');
   const state = structuredClone(inputState);
@@ -118,6 +132,9 @@ export function migratePlayerState(content, inputState) {
     if (version === 1) {
       v1ToV2(content, state);
       version = 2;
+    } else if (version === 2) {
+      v2ToV3(content, state);
+      version = 3;
     } else {
       throw new Error(`No migration path exists from schema ${version}.`);
     }
@@ -128,5 +145,13 @@ export function migratePlayerState(content, inputState) {
   state.settings.farmingResults = ['automatic', 'full', 'compact'].includes(state.settings.farmingResults)
     ? state.settings.farmingResults : 'automatic';
   state.schemaVersion = SCHEMA_VERSION;
+  if (state.schemaVersion >= 3) {
+    state.inventory.resources ??= {};
+    state.expeditions ??= { board: null, active: [], reports: [], daily: {
+      day: state.dayNumber ?? 1, freeRerolls: 1, freeRerollsUsed: 0, freePins: 0, freePinsUsed: 0
+    } };
+    state.headquarters ??= { worlds: {}, construction: null };
+    state.dayNumber ??= 1;
+  }
   return state;
 }

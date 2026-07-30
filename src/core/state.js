@@ -5,8 +5,12 @@ import { characterPower, activeTier, cumulativeGearPower } from './power.js';
 import { evaluateParty, partyLegality, objectiveSatisfied } from './synergy.js';
 import { equipmentRecipe, equipmentName } from './content.js';
 import { analyzeEquipmentGoal, analyzePinnedGoals } from './progression.js';
+import { makeRng } from './rng.js';
+import { grantRewardEntries } from './resources.js';
+import { generateExpeditionBoard, resolveDueExpeditions } from './expeditions.js';
+import { applyHqProduction, completeDueConstruction, dailyExpeditionAllowances } from './hq.js';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 // ------------------------------------------------------------- new state
 export function newPlayerState(content, now = Date.now()) {
@@ -42,7 +46,7 @@ export function newPlayerState(content, now = Date.now()) {
     lastResetKey: null,
     rng: null, // { seed, state } when a dev seed is set
     characters,
-    inventory: { materials: {}, components: {} },
+    inventory: { materials: {}, components: {}, resources: { intelligence: 2 } },
     nodes: {},
     parties,
     activePartyIndex: 0,
@@ -62,9 +66,16 @@ export function newPlayerState(content, now = Date.now()) {
       nodePartyById: {}
     },
     progressLog: [],
-    lastResetSummary: null
+    lastResetSummary: null,
+    dayNumber: 1,
+    expeditions: {
+      board: null, active: [], reports: [],
+      daily: { day: 1, freeRerolls: 1, freeRerollsUsed: 0, freePins: 0, freePinsUsed: 0 }
+    },
+    headquarters: { worlds: {}, construction: null }
   };
   applyDailyReset(content, state, now); // establishes the reset-day key
+  ensureExpeditionBoard(content, state);
   state.lastResetSummary = null;        // no "welcome back" on a brand-new save
   return state;
 }
@@ -212,22 +223,54 @@ export function applyDailyReset(content, state, now = Date.now()) {
   const key = resetDayKey(now, state.settings.resetHour);
   if (state.lastResetKey === null) {
     state.lastResetKey = key;
+    ensureExpeditionBoard(content, state);
     return null;
   }
   const days = daysBetweenKeys(state.lastResetKey, key);
   if (days <= 0) return null; // same day, or clock moved backward: never re-grant
   const before = state.energy;
-  state.energy = Math.min(b.energy.storageCap, state.energy + b.energy.dailyGrant * days);
-  for (const ns of Object.values(state.nodes)) ns.attemptsToday = 0;
+  const construction = [], production = [], expeditions = [];
+  for (let elapsed = 0; elapsed < days; elapsed++) {
+    state.dayNumber++;
+    state.energy = Math.min(b.energy.storageCap, state.energy + b.energy.dailyGrant);
+    for (const ns of Object.values(state.nodes)) ns.attemptsToday = 0;
+    const built = completeDueConstruction(content, state);
+    if (built) construction.push(built);
+    production.push(...applyHqProduction(content, state));
+    expeditions.push(...resolveDueExpeditions(content, state));
+    const pinned = state.expeditions.board?.offers.find(offer => offer.pinned) ?? null;
+    const allowances = dailyExpeditionAllowances(content, state);
+    state.expeditions.daily = {
+      day: state.dayNumber, ...allowances, freeRerollsUsed: 0, freePinsUsed: 0
+    };
+    if (content.expeditions?.templates?.length) {
+      generateExpeditionBoard(content, state, dayRng(state, elapsed), { seed: state.dayNumber, pinned });
+    } else {
+      state.expeditions.board = null;
+    }
+  }
   state.lastResetKey = key;
   const summary = {
     days,
     energyGained: state.energy - before,
     energy: state.energy,
-    attemptsReset: true
+    attemptsReset: true, construction, production, expeditions, acknowledged: false
   };
   state.lastResetSummary = summary;
   return summary;
+}
+
+function dayRng(state, salt = 0) {
+  let hash = 2166136261;
+  const text = `${state.createdAt}:${state.dayNumber}:${salt}`;
+  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
+  return makeRng(hash >>> 0);
+}
+
+export function ensureExpeditionBoard(content, state) {
+  if (!state.expeditions || !content.expeditions?.templates?.length) return null;
+  if (state.expeditions.board?.day === state.dayNumber) return state.expeditions.board;
+  return generateExpeditionBoard(content, state, dayRng(state), { seed: state.dayNumber });
 }
 
 // ------------------------------------------------------------- inventory
@@ -376,6 +419,14 @@ export function clearNode(content, state, nodeId, members, count, rng, now = Dat
     if (node.firstClear.milestone) rewards.milestones.push(node.firstClear.milestone);
     ns.firstClearClaimed = true;
     rewards.firstClear = true;
+  }
+  if (!wasCleared && node.firstClearRewards?.length) {
+    rewards.extra ??= [];
+    rewards.extra.push(...grantRewardEntries(content, state, node.firstClearRewards, node.world));
+  }
+  if (node.repeatRewards?.length) {
+    rewards.extra ??= [];
+    for (let run = 0; run < count; run++) rewards.extra.push(...grantRewardEntries(content, state, node.repeatRewards, node.world));
   }
 
   if (node.objective && !ns.objectiveClaimed && objectiveSatisfied(content, node.objective, members)) {

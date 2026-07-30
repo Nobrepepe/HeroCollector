@@ -1,4 +1,4 @@
-import { h, fmt } from './dom.js';
+import { enableMouseDragScroll, h, fmt } from './dom.js';
 import { readyUpgrades, checkUnlockCharacter } from '../core/state.js';
 import { characterPower } from '../core/power.js';
 import { portrait, starline } from './shared.js';
@@ -7,9 +7,11 @@ import { characterFilterBar, filterCharacters } from './character-picker.js';
 export function renderRoster(store, root) {
   const { content, state } = store;
   const preferences = state.ui.roster;
+  preferences.collectionDensity = preferences.collectionDensity === 'compact' ? 'compact' : 'gallery';
   const ready = new Set(readyUpgrades(content, state).map(item => item.characterId));
   let search = '';
   const ownedCount = content.characters.filter(def => state.characters[def.id].owned).length;
+  root.classList.add('collection-screen', `collection-density-${preferences.collectionDensity}`);
   root.appendChild(h('header.collection-head',
     h('div', h('div.eyebrow', 'Your people'), h('h1.display-s', `${ownedCount} of ${content.characters.length} met.`),
       h('p.muted', worldSentence(content))),
@@ -26,7 +28,10 @@ export function renderRoster(store, root) {
         }),
         primaryFilter(store, preferences, 'By power ↓', preferences.sort === 'power' && preferences.direction === 'desc', () => {
           preferences.sort = 'power'; preferences.direction = 'desc';
-        })),
+        }),
+        h('span.collection-view-separator', '·'),
+        densityControl(store, preferences, 'Gallery', 'gallery'),
+        densityControl(store, preferences, 'Compact', 'compact')),
       h('input.character-search', {
         type: 'search', placeholder: 'Search by name…', 'aria-label': 'Search characters',
         oninput: event => { search = event.target.value; paint(); }
@@ -38,82 +43,78 @@ export function renderRoster(store, root) {
   root.appendChild(more);
   const gallery = h('div.collection-gallery');
   enableMouseDragScroll(gallery);
+  const compact = h('div.collection-compact-grid');
   const outThere = h('section.still-out-there', h('div.eyebrow', 'Still out there'));
-  root.append(gallery, outThere);
+  const footer = h('footer.collection-compact-footer');
+  root.append(gallery, compact, outThere, footer);
 
   function paint() {
     gallery.replaceChildren();
+    compact.replaceChildren();
+    footer.replaceChildren();
     outThere.querySelectorAll('.unowned-row').forEach(el => el.remove());
     const rows = filterCharacters(content, state, preferences, ready, search);
     const owned = rows.filter(def => state.characters[def.id].owned);
     const unowned = rows.filter(def => !state.characters[def.id].owned);
-    owned.forEach((def, index) => gallery.appendChild(characterCard(store, def, ready.has(def.id), index)));
-    if (!owned.length) gallery.appendChild(h('p.muted', 'No met characters match these filters.'));
-    for (const def of unowned) {
-      const cs = state.characters[def.id];
-      const need = content.balance.acquisitionTiers[def.tier].cumulativeShards;
-      outThere.appendChild(h('button.unowned-row', { onclick: () => store.go(`#/character/${def.id}`) },
-        portrait(store, def.id, 'sm'), h('span', def.displayName),
-        h('span.caption', `${fmt(cs.shards)} / ${fmt(need)} shards`),
-        checkUnlockCharacter(content, state, def.id).ok ? h('span.good', 'ready') : null));
+    if (preferences.collectionDensity === 'gallery') {
+      owned.forEach((def, index) => gallery.appendChild(characterCard(store, def, ready.has(def.id), index)));
+      if (!owned.length) gallery.appendChild(h('p.muted', 'No met characters match these filters.'));
+      for (const def of unowned) {
+        const cs = state.characters[def.id];
+        const need = content.balance.acquisitionTiers[def.tier].cumulativeShards;
+        outThere.appendChild(h('button.unowned-row', { onclick: () => store.go(`#/character/${def.id}`) },
+          portrait(store, def.id, 'sm'), h('span', def.displayName),
+          h('span.caption', `${fmt(cs.shards)} / ${fmt(need)} shards`),
+          checkUnlockCharacter(content, state, def.id).ok ? h('span.good', 'ready') : null));
+      }
+    } else {
+      let pulseUsed = false;
+      rows.forEach(def => {
+        const isReady = ready.has(def.id);
+        compact.appendChild(compactCharacter(store, def, isReady, isReady && !pulseUsed));
+        if (isReady) pulseUsed = true;
+      });
+      if (!rows.length) compact.appendChild(h('p.muted', 'No characters match these filters.'));
+      const globalOwned = content.characters.filter(def => state.characters[def.id].owned).length;
+      const oneRun = content.characters.filter(def => !state.characters[def.id].owned && oneShardRunAway(content, state, def)).length;
+      footer.append(
+        h('div.fade-rule'),
+        h('div.collection-footer-line',
+          h('span', `${numberWord(oneRun)} ${oneRun === 1 ? 'is' : 'are'} one shard-run from joining you.`),
+          h('span', h('b.numeral', fmt(globalOwned)), ` met · ${fmt(content.characters.length - globalOwned)} still out there`)));
     }
-    outThere.hidden = unowned.length === 0;
+    gallery.hidden = preferences.collectionDensity !== 'gallery';
+    outThere.hidden = preferences.collectionDensity !== 'gallery' || unowned.length === 0;
+    compact.hidden = preferences.collectionDensity !== 'compact';
+    footer.hidden = preferences.collectionDensity !== 'compact';
   }
   paint();
 }
 
-function enableMouseDragScroll(gallery) {
-  let pointerId = null;
-  let startX = 0;
-  let startScroll = 0;
-  let dragged = false;
-
-  gallery.addEventListener('pointerdown', event => {
-    if (event.pointerType !== 'mouse' || event.button !== 0) return;
-    pointerId = event.pointerId;
-    startX = event.clientX;
-    startScroll = gallery.scrollLeft;
-    dragged = false;
-  });
-  gallery.addEventListener('pointermove', event => {
-    if (event.pointerId !== pointerId) return;
-    const distance = event.clientX - startX;
-    if (Math.abs(distance) > 6 && !dragged) {
-      dragged = true;
-      gallery.setPointerCapture(pointerId);
-      gallery.classList.add('dragging');
-    }
-    if (!dragged) return;
-    event.preventDefault();
-    gallery.scrollLeft = startScroll - distance;
-  });
-  const finish = event => {
-    if (event.pointerId !== pointerId) return;
-    if (gallery.hasPointerCapture(pointerId)) gallery.releasePointerCapture(pointerId);
-    pointerId = null;
-    gallery.classList.remove('dragging');
-  };
-  gallery.addEventListener('pointerup', finish);
-  gallery.addEventListener('pointercancel', finish);
-  gallery.addEventListener('click', event => {
-    if (!dragged) return;
-    event.preventDefault();
-    event.stopPropagation();
-    dragged = false;
-  }, true);
+function densityControl(store, preferences, label, density) {
+  return h('button.collection-density' + (preferences.collectionDensity === density ? '.active' : ''), {
+    onclick: () => {
+      preferences.collectionDensity = density;
+      store.save().then(() => rerenderRoster(store));
+    },
+    'aria-pressed': preferences.collectionDensity === density
+  }, label);
 }
 
 function primaryFilter(store, preferences, label, active, mutate) {
   return h('button.collection-filter' + (active ? '.active' : ''), {
     onclick: () => {
       mutate();
-      store.save().then(() => {
-        const root = document.getElementById('screen');
-        root.replaceChildren();
-        renderRoster(store, root);
-      });
+      store.save().then(() => rerenderRoster(store));
     }
   }, label);
+}
+
+function rerenderRoster(store) {
+  const root = document.getElementById('screen');
+  root.replaceChildren();
+  root.classList.remove('collection-density-gallery', 'collection-density-compact');
+  renderRoster(store, root);
 }
 
 function characterCard(store, def, isReady, index) {
@@ -142,4 +143,40 @@ function characterCard(store, def, isReady, index) {
 function worldSentence(content) {
   if (!content.worlds.length) return 'Your worlds are still being authored.';
   return content.worlds.map(world => world.displayName).join(' · ');
+}
+
+function compactCharacter(store, def, isReady, pulses) {
+  const cs = store.state.characters[def.id];
+  const owned = cs.owned;
+  const need = owned
+    ? (cs.stars < 7 ? store.content.balance.starShards[cs.stars] : null)
+    : store.content.balance.acquisitionTiers[def.tier].cumulativeShards;
+  const card = h('button.compact-character' + (owned ? '.owned' : '.unmet') + (isReady ? '.ready' : '') + (pulses ? '.pulses' : ''), {
+    onclick: () => store.go(`#/character/${def.id}`),
+    style: { '--character-color': def.color },
+    'aria-label': owned
+      ? `${def.displayName}, ${cs.stars} stars, ${fmt(characterPower(store.content, cs))} Power${isReady ? ', upgrade ready' : ''}`
+      : `${def.displayName}, not yet met, ${fmt(cs.shards)} of ${fmt(need)} shards`
+  });
+  const well = h('div.compact-character-well');
+  if (owned) well.appendChild(portrait(store, def.id, 'compact'));
+  card.append(well, h('span.compact-character-name', def.displayName));
+  if (owned) card.appendChild(starline(cs.stars));
+  card.appendChild(owned
+    ? h('span.compact-power', fmt(characterPower(store.content, cs)), h('small', ' power'))
+    : h('span.caption', cs.shards ? `${fmt(cs.shards)} / ${fmt(need)} shards` : 'not yet found'));
+  if (isReady) card.appendChild(h('span.compact-ready', cs.owned ? 'a star is ready' : 'ready to join'));
+  return card;
+}
+
+function oneShardRunAway(content, state, def) {
+  const cs = state.characters[def.id];
+  const need = content.balance.acquisitionTiers[def.tier].cumulativeShards;
+  const bestRun = Math.max(0, ...(content.shardNodesByCharacter[def.id] ?? [])
+    .map(node => content.balance.nodeDefaults[node.type]?.repeat?.count ?? 0));
+  return cs.shards < need && need - cs.shards <= bestRun;
+}
+
+function numberWord(number) {
+  return ({ 0: 'None', 1: 'One', 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five', 6: 'Six' })[number] ?? fmt(number);
 }

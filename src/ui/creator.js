@@ -9,7 +9,8 @@ import { imageWell } from './images.js';
 import { exportJson, importJson, loadSamplePack } from '../platform.js';
 import {
   emptyCustomDB, upgradeCustomDB, newCustomWorld, newCustomCharacter,
-  newCustomFaction, addCampaignChapter, canPublishWorld, characterShardAssignments
+  newCustomFaction, addCampaignChapter, canPublishWorld, characterShardAssignments,
+  scaffoldWorldHq, sampleExpeditionLibrary
 } from '../core/custom.js';
 
 export function renderCreator(store, root, arg) {
@@ -19,6 +20,7 @@ export function renderCreator(store, root, arg) {
   if (parts[0] === 'char' && parts[1]) return charEditor(store, root, parts[1]);
   if (parts[0] === 'main-chapter' && parts[1] !== undefined) return chapterEditor(store, root, 'main', Number(parts[1]));
   if (parts[0] === 'shadow-chapter' && parts[1] !== undefined) return chapterEditor(store, root, 'shadow', Number(parts[1]));
+  if (parts[0] === 'expeditions') return expeditionEditor(store, root);
   // Compatibility with old creator hashes.
   if (parts[0] === 'chapter' && parts[1] !== undefined) return chapterEditor(store, root, 'main', Number(parts[1]));
   return overview(store, root);
@@ -178,6 +180,15 @@ function overview(store, root) {
   }, '+ New Paired Chapter'));
   root.appendChild(cp);
 
+  const ep = h('div.panel');
+  ep.appendChild(h('h2', 'Expedition library'));
+  ep.appendChild(h('p.small.muted', `${db.expeditions.templates.length} templates · ${db.expeditions.rewardPackages.length} reward packages · ${db.expeditions.requirements.length} requirements.`));
+  ep.appendChild(h('button.btn.primary', { onclick: () => store.go('#/creator/expeditions') }, 'Edit Expeditions →'));
+  if (!db.expeditions.templates.length && db.worlds.length) ep.appendChild(h('button.btn', {
+    onclick: () => { db.expeditions = sampleExpeditionLibrary(db.worlds); commit(store, true); }
+  }, 'Add starter Expedition library'));
+  root.appendChild(ep);
+
   // ---- database tools
   const tp = h('div.panel');
   tp.appendChild(h('h2', 'Creator database'));
@@ -243,6 +254,76 @@ function confirmModal(store, title, warning, onConfirm) {
   });
 }
 
+function expeditionEditor(store, root) {
+  const lib = store.customDB.expeditions;
+  lib.images ??= { global: null, worlds: {} };
+  lib.images.worlds ??= {};
+  root.appendChild(backLink(store, '#/creator', 'Content Creator'));
+  root.appendChild(h('header.creator-title', h('div.eyebrow', 'Procedural content'),
+    h('h1.display-s', 'Expeditions are assembled here.'),
+    h('p.muted', 'Templates choose requirements, rewards, duration and prose; the board generator persists the assembled result.')));
+  const artwork = h('div.panel', h('h2', 'Offer artwork'),
+    h('p.small.muted', 'These portrait images use the exact aspect ratio of the player-facing offer containers. Across worlds is used for global offers; world artwork is used for offers associated with that world.'));
+  artwork.appendChild(h('div.wells.expedition-art-wells',
+    imageWell('expedition', 'Across worlds offer image (33:43)',
+      () => lib.images.global,
+      value => { lib.images.global = value; },
+      () => commit(store, true)),
+    ...store.customDB.worlds.map(world => imageWell('expedition', `${world.displayName} offer image (33:43)`,
+      () => lib.images.worlds[world.id],
+      value => { lib.images.worlds[world.id] = value; },
+      () => commit(store, true)))));
+  root.appendChild(artwork);
+  const settings = h('div.panel', h('h2', 'Generation settings'));
+  const sg = h('div.form-grid');
+  for (const [key, label] of [['offerCount', 'Offers per board'], ['slotCount', 'Active slots'], ['freeRerolls', 'Free rerolls'], ['minimumFeasible', 'Minimum feasible'], ['maxLongOffers', 'Long-offer limit'], ['generationAttempts', 'Attempt limit']]) {
+    sg.append(...field(label, numInput(lib.settings, key, store, { min: 0, step: 1 })));
+  }
+  settings.appendChild(sg); root.appendChild(settings);
+
+  const req = h('div.panel', h('h2', 'Requirement definitions'));
+  for (const item of [...lib.requirements, ...lib.optionalObjectives]) {
+    req.appendChild(h('div.creator-list-row',
+      h('span.caption', item.id), h('span', item.type),
+      h('div.grow', textInput(item, 'text', store, { maxlength: 140 })),
+      'count' in item ? numInput(item, 'count', store, { min: 1, step: 1 }) : null));
+  }
+  root.appendChild(req);
+
+  const rewards = h('div.panel', h('h2', 'Reward packages'));
+  for (const pack of lib.rewardPackages) {
+    rewards.appendChild(h('h3', pack.displayName || pack.id));
+    for (const entry of pack.entries) rewards.appendChild(h('div.creator-list-row',
+      h('span.caption', `${entry.kind} · ${entry.id}`),
+      h('span', 'minimum'), numInput(entry, 'min', store, { min: 0, step: 1 }),
+      h('span', 'maximum'), numInput(entry, 'max', store, { min: 0, step: 1 })));
+  }
+  root.appendChild(rewards);
+
+  const templates = h('div.panel', h('h2', 'Expedition templates'));
+  for (const template of lib.templates) {
+    const row = h('div.creator-list-row');
+    row.append(h('span.caption', template.id), h('div.grow',
+      h('div', template.titles?.[0] ?? 'Untitled'),
+      h('div.caption', `${template.world ?? 'global'} · ${template.partySize} characters · ${template.durations.join('/')} day`)),
+    numInput(template, 'weight', store, { min: 1, step: 1 }),
+    selectInput(template, 'rewardPackageId', store, lib.rewardPackages.map(p => [p.id, p.displayName || p.id])));
+    templates.appendChild(row);
+  }
+  root.appendChild(templates);
+
+  const reports = h('div.panel', h('h2', 'Return prose'));
+  for (const tier of ['completed', 'successful', 'exceptional']) {
+    reports.appendChild(h('h3', tier));
+    lib.reports[tier].forEach((text, index) => {
+      const area = h('textarea', text);
+      area.addEventListener('change', () => { lib.reports[tier][index] = area.value; commit(store); });
+      reports.appendChild(area);
+    });
+  }
+  root.appendChild(reports);
+}
+
 // ------------------------------------------------------------- world editor
 function worldEditor(store, root, worldId) {
   const { customDB: db } = store;
@@ -265,8 +346,16 @@ function worldEditor(store, root, worldId) {
   grid.append(...field('Accent color', colorInput(w.palette, 'accent', store)));
   grid.append(...field('Dark color', colorInput(w.palette, 'dark', store)));
   idp.appendChild(grid);
-  idp.appendChild(h('div.wells', { style: { marginTop: '12px' } },
-    imageWell('world', 'World banner (16:9)', () => w.image, v => { w.image = v; }, () => commit(store, true))));
+  const worldArtwork = h('div.wells.world-artwork-wells', { style: { marginTop: '12px' } },
+    imageWell('world', 'World banner (16:9)', () => w.image, v => { w.image = v; }, () => commit(store, true)),
+    imageWell('hq', 'Headquarters image (16:9)', () => w.hqImage, v => { w.hqImage = v; }, () => commit(store, true)));
+  for (const facility of w.hq?.facilities ?? []) {
+    worldArtwork.appendChild(imageWell('facility', `${facility.displayName} building image (16:9)`,
+      () => facility.image,
+      value => { facility.image = value; },
+      () => commit(store, true)));
+  }
+  idp.appendChild(worldArtwork);
 
   const gate = canPublishWorld(db, w.id);
   idp.appendChild(h('div.publish-path',
@@ -308,6 +397,28 @@ function worldEditor(store, root, worldId) {
   }, 'Delete world'));
   idp.appendChild(statusRow);
   root.appendChild(idp);
+
+  const hqp = h('div.panel');
+  hqp.appendChild(h('h2', 'World Headquarters'));
+  const ag = h('div.form-grid');
+  ag.append(...field('World Asset name', textInput(w.worldAsset, 'displayName', store)));
+  ag.append(...field('World Asset description', textInput(w.worldAsset, 'description', store, { maxlength: 140 })));
+  ag.append(...field('World Asset icon', textInput(w.worldAsset, 'icon', store, { maxlength: 4 })));
+  hqp.appendChild(ag);
+  if (!w.hq) {
+    hqp.appendChild(h('p.muted', 'This world has no Headquarters configuration. Existing worlds stay opt-in.'));
+    hqp.appendChild(h('button.btn.primary', { onclick: () => { scaffoldWorldHq(w); commit(store, true); } }, 'Set up Headquarters →'));
+  } else {
+    hqp.appendChild(h('div.wells',
+      ...[0, 1, 2].map(index => imageWell('hq', `HQ Rank ${index + 1} background`,
+        () => w.hq.backgrounds[index], value => { w.hq.backgrounds[index] = value; }, () => commit(store, true)))));
+    w.hq.facilities.forEach(facility => {
+      hqp.appendChild(h('div.creator-list-row',
+        h('div.grow', textInput(facility, 'displayName', store), textInput(facility, 'description', store, { maxlength: 140 })),
+        h('span.caption', `${facility.category} · ${facility.levels.length} levels`)));
+    });
+  }
+  root.appendChild(hqp);
 
   // ---- characters
   root.appendChild(characterListPanel(store, w.id));
@@ -573,6 +684,7 @@ function chapterEditor(store, root, campaign, idx) {
       return [x.id, `${x.displayName} (${w?.displayName ?? '?'})`];
     })
   ];
+  const worldOptions = [['', 'Global'], ...db.worlds.map(world => [world.id, world.displayName])];
 
   ch.nodes.forEach((nd, i) => {
     const pos = i + 1;
@@ -584,12 +696,18 @@ function chapterEditor(store, root, campaign, idx) {
       numInput(nd, 'threshold', store, { min: 0 }),
       h('i', { style: { width: `${Math.max(2, nd.threshold / chapterMax * 100)}%` } })));
     row.append(...familyGradeSelects(nd, store, content));
+    row.appendChild(selectInput(nd, 'worldId', store, worldOptions, { structural: true }));
     if (isShadow) {
       row.appendChild(selectInput(nd, 'shardCharacterId', store, charOptions, { structural: true }));
     } else {
       row.appendChild(h('span.small.muted', pos % 5 === 0 ? '🏁 checkpoint' : (pos >= 7 ? 'advanced node' : 'ordinary node')));
     }
     panel.appendChild(row);
+    const rewards = h('div.node-extra-rewards', h('span.caption', 'Additional rewards'));
+    rewards.appendChild(rewardQuantityInput(nd, 'firstClearRewards', 'renown', 'First-clear Renown', store));
+    rewards.appendChild(rewardQuantityInput(nd, 'firstClearRewards', '@associated_world_asset', 'First-clear World Asset', store));
+    rewards.appendChild(rewardQuantityInput(nd, 'repeatRewards', '@associated_world_asset', 'Repeat World Asset', store));
+    panel.appendChild(rewards);
   });
 
   const actions = h('div', { style: { marginTop: '12px', display: 'flex', gap: '10px' } });
@@ -616,4 +734,17 @@ function chapterEditor(store, root, campaign, idx) {
   }
   panel.appendChild(actions);
   root.appendChild(panel);
+}
+
+function rewardQuantityInput(node, listKey, resourceId, label, store) {
+  node[listKey] ??= [];
+  const existing = node[listKey].find(entry => entry.kind === 'resource' && entry.id === resourceId);
+  const input = h('input', { type: 'number', min: 0, step: 1, value: existing?.qty ?? 0, 'aria-label': label });
+  input.addEventListener('change', () => {
+    node[listKey] = node[listKey].filter(entry => !(entry.kind === 'resource' && entry.id === resourceId));
+    const qty = Math.max(0, Number(input.value) || 0);
+    if (qty) node[listKey].push({ kind: 'resource', id: resourceId, qty });
+    commit(store);
+  });
+  return h('label', label, input);
 }

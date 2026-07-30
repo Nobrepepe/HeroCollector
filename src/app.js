@@ -3,7 +3,7 @@
 // transactions and re-render.
 import { buildContent } from './core/content.js';
 import { validateContent, validateSave } from './core/validate.js';
-import { newPlayerState, applyDailyReset, syncSaveWithContent } from './core/state.js';
+import { newPlayerState, applyDailyReset, syncSaveWithContent, ensureExpeditionBoard } from './core/state.js';
 import { migratePlayerState } from './core/migrate.js';
 import { characterPower } from './core/power.js';
 import { makeRng, entropySeed } from './core/rng.js';
@@ -21,6 +21,8 @@ import { renderArchive } from './ui/archive.js';
 import { renderSettings } from './ui/settings.js';
 import { renderDev } from './ui/dev.js';
 import { renderCreator } from './ui/creator.js';
+import { renderExpeditions } from './ui/expeditions.js';
+import { renderHeadquarters } from './ui/headquarters.js';
 
 const store = {
   content: null,
@@ -224,6 +226,8 @@ const routes = {
   roster: { title: 'Collection', icon: '👥', render: renderRoster, nav: true },
   party: { title: 'Party', icon: '⚔️', render: renderParty, nav: true },
   campaign: { title: 'Journey', icon: '🗺️', render: renderCampaign, nav: true },
+  expeditions: { title: 'Expeditions', icon: '🧭', render: renderExpeditions, nav: true },
+  headquarters: { title: 'Headquarters', icon: '🏰', render: renderHeadquarters, nav: true },
   inventory: { title: 'Workshop', icon: '🎒', render: renderInventory, nav: true },
   archive: { title: 'Archive', icon: '🏛️', render: renderArchive, nav: true },
   settings: { title: 'Settings', icon: '⚙️', render: renderSettings, nav: true },
@@ -238,7 +242,7 @@ function parseRoute() {
   return { name: routes[parts[0]] ? parts[0] : 'home', arg: parts.slice(1).join('/') || null };
 }
 
-const GAME_ROUTES = new Set(['home', 'roster', 'party', 'campaign', 'inventory', 'archive', 'character', 'node']);
+const GAME_ROUTES = new Set(['home', 'roster', 'party', 'campaign', 'expeditions', 'headquarters', 'inventory', 'archive', 'character', 'node']);
 
 export function render() {
   const { name, arg } = parseRoute();
@@ -410,6 +414,7 @@ async function boot() {
       toast(`Save updated for changed content (${scrubbed.length} stale reference${scrubbed.length > 1 ? 's' : ''} cleaned).`);
     }
   }
+  ensureExpeditionBoard(store.content, store.state);
   const saveCheck = validateSave(store.content, store.state);
   if (!saveCheck.ok) {
     const screen = document.getElementById('screen');
@@ -431,16 +436,14 @@ async function boot() {
 
   const summary = applyDailyReset(store.content, store.state, store.now());
   await store.save();
-  if (summary) {
-    toast(`Daily reset: +${summary.energyGained} Energy (${summary.days} day${summary.days > 1 ? 's' : ''} applied), shard attempts refreshed.`);
-  }
+  showDaySummary(summary ?? store.state.lastResetSummary);
 
   // Re-check the reset every minute while the app stays open.
   setInterval(async () => {
     const s = applyDailyReset(store.content, store.state, store.now());
     if (s) {
       await store.save();
-      toast(`Daily reset: +${s.energyGained} Energy, shard attempts refreshed.`);
+      showDaySummary(s);
       render();
     }
   }, 60000);
@@ -478,6 +481,28 @@ async function boot() {
     }
   });
   render();
+}
+
+function showDaySummary(summary) {
+  if (!summary || summary.acknowledged) return;
+  openModal((modal, close) => {
+    modal.appendChild(h('div.eyebrow', `${summary.days} game day${summary.days === 1 ? '' : 's'} advanced`));
+    modal.appendChild(h('h2', summary.expeditions?.length
+      ? `${summary.expeditions.length} Expedition${summary.expeditions.length === 1 ? ' has' : 's have'} returned.`
+      : 'A new day has opened.'));
+    modal.appendChild(h('p', `${summary.energyGained} Energy restored. Shard attempts are ready again.`));
+    for (const build of summary.construction ?? []) modal.appendChild(h('p.good', `${build.facilityName} reached Level ${build.targetLevel}.`));
+    if (summary.production?.length) modal.appendChild(h('p', `${summary.production.length} automatic production entr${summary.production.length === 1 ? 'y was' : 'ies were'} added to inventory.`));
+    for (const report of summary.expeditions ?? []) modal.appendChild(h('div.return-report',
+      h('div.title', report.name), h('p', `${report.tier}. ${report.report}`)));
+    modal.appendChild(h('button.btn.primary', {
+      onclick: async () => {
+        summary.acknowledged = true;
+        await store.save();
+        close();
+      }
+    }, 'Begin the day →'));
+  });
 }
 
 boot();

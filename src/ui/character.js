@@ -8,6 +8,8 @@ import { starline, activeSkin } from './shared.js';
 import { openFindSources } from './find-sources.js';
 import { gearPanel, openGearDialog } from './gear.js';
 import { toast } from '../app.js';
+import { characterExpedition } from '../core/expeditions.js';
+import { hqState } from '../core/hq.js';
 
 export function renderCharacter(store, root, characterId) {
   const { content, state } = store;
@@ -31,6 +33,12 @@ export function renderCharacter(store, root, characterId) {
     h('div.eyebrow', `${arch.icon} ${arch.name} · ${world.icon} ${world.displayName}${def.faction ? ` · ${content.tagById[def.faction]?.displayName}` : ''}`),
     h('h1.display-xl', def.displayName),
     starline(cs.stars));
+  const away = characterExpedition(state, characterId);
+  const staffed = content.worlds.flatMap(w => Object.entries(hqState(state, w.id).staff ?? {})
+    .flatMap(([facilityId, ids]) => ids.includes(characterId) ? [{ world: w, facilityId }] : []))[0];
+  if (away || staffed) body.appendChild(h('p.caption.character-assignments',
+    away ? `Expedition · ${away.name}, returns day ${away.returnDay}. ` : '',
+    staffed ? `HQ staff · ${staffed.world.hq?.facilities.find(f => f.id === staffed.facilityId)?.displayName}.` : ''));
 
   if (cs.owned) body.appendChild(ownedProgress(store, def, cs, power));
   else body.appendChild(unownedProgress(store, def, cs));

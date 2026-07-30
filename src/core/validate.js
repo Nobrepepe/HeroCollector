@@ -15,11 +15,55 @@ export function validateContent(content) {
     seen.add(id);
   };
   for (const w of content.worlds) uniq(w.id, 'world');
+  for (const w of content.worlds) {
+    if (!w.worldAsset?.id) err(`${w.id}: missing World Asset definition`);
+    else uniq(w.worldAsset.id, 'world resource');
+    if (w.hq?.enabled) {
+      if (w.hq.backgrounds?.length !== 3) err(`${w.id}: HQ needs three background slots`);
+      if (w.hq.facilities?.length !== 4) err(`${w.id}: HQ needs four facilities`);
+      if (w.hq.ranks?.length < 3) err(`${w.id}: HQ needs three rank thresholds`);
+      for (const facility of w.hq.facilities ?? []) {
+        uniq(facility.id, 'facility');
+        if (facility.levels?.length !== 3) err(`${facility.id}: facility needs three levels`);
+      }
+    }
+  }
   for (const m of content.materials) uniq(m.id, 'material');
   for (const k of content.components) uniq(k.id, 'component');
   for (const c of content.characters) uniq(c.id, 'character');
   for (const t of content.tags) uniq(t.id, 'tag');
   for (const n of content.nodes) uniq(n.id, 'node');
+  for (const n of content.nodes) {
+    if (n.world && !content.worldById[n.world]) err(`${n.id}: unknown world ${n.world}`);
+    for (const reward of [...(n.repeatRewards ?? []), ...(n.firstClearRewards ?? [])]) {
+      if (reward.kind === 'resource' && reward.id === '@associated_world_asset' && !n.world) {
+        err(`${n.id}: associated World Asset reward requires a world`);
+      }
+    }
+  }
+  for (const requirement of content.expeditions.requirements ?? []) uniq(requirement.id, 'Expedition requirement');
+  for (const optional of content.expeditions.optionalObjectives ?? []) uniq(optional.id, 'Expedition optional objective');
+  for (const pack of content.expeditions.rewardPackages ?? []) {
+    uniq(pack.id, 'Expedition reward package');
+    for (const reward of pack.entries ?? []) {
+      if (!Number.isInteger(reward.min) || !Number.isInteger(reward.max) || reward.min < 0 || reward.max < reward.min) {
+        err(`${pack.id}: invalid reward range`);
+      }
+      if (reward.kind === 'resource' && reward.id !== '@associated_world_asset' && !content.resourceById[reward.id]) {
+        err(`${pack.id}: unknown resource ${reward.id}`);
+      }
+      if (reward.kind === 'material' && !content.materialById[reward.id]) err(`${pack.id}: unknown material ${reward.id}`);
+    }
+  }
+  for (const template of content.expeditions.templates ?? []) {
+    uniq(template.id, 'Expedition template');
+    if (template.world && !content.worldById[template.world]) err(`${template.id}: unknown world ${template.world}`);
+    if (!content.expeditions.rewardById[template.rewardPackageId]) err(`${template.id}: unknown reward package ${template.rewardPackageId}`);
+    for (const id of template.requirementIds ?? []) if (!content.expeditions.requirementById[id]) err(`${template.id}: unknown requirement ${id}`);
+    for (const id of template.optionalIds ?? []) if (!content.expeditions.optionalById[id]) err(`${template.id}: unknown optional objective ${id}`);
+    if (template.partySize < 1 || template.partySize > 4) err(`${template.id}: invalid party size`);
+    if (!template.titles?.length || !template.descriptions?.length) err(`${template.id}: missing procedural prose`);
+  }
 
   // --- characters: exactly one world and one archetype; valid references
   for (const c of content.characters) {
@@ -202,7 +246,7 @@ export function validateContent(content) {
 // Save-file validation: every ID the save references must exist in content.
 export function validateSave(content, state) {
   const errors = [];
-  if (![1, 2].includes(state.schemaVersion)) errors.push(`Unsupported save schema ${state.schemaVersion}`);
+  if (![1, 2, 3].includes(state.schemaVersion)) errors.push(`Unsupported save schema ${state.schemaVersion}`);
   if (!state.characters || !state.inventory || !state.nodes || !Array.isArray(state.parties)) {
     return { ok: false, errors: ['Save is missing required gameplay state.'] };
   }
@@ -219,6 +263,16 @@ export function validateSave(content, state) {
   for (const id of Object.keys(state.inventory.components)) {
     if (!content.componentById[id]) errors.push(`Save references unknown component ${id}`);
     if (state.inventory.components[id] < 0) errors.push(`Negative component quantity: ${id}`);
+  }
+  for (const [id, qty] of Object.entries(state.inventory.resources ?? {})) {
+    if (!Number.isFinite(qty) || qty < 0) errors.push(`Invalid resource quantity: ${id}`);
+  }
+  if (state.schemaVersion >= 3) {
+    if (!Number.isInteger(state.dayNumber) || state.dayNumber < 1) errors.push('Invalid logical day number');
+    if (!state.expeditions || !Array.isArray(state.expeditions.active) || !Array.isArray(state.expeditions.reports)) {
+      errors.push('Missing Expedition state');
+    }
+    if (!state.headquarters || typeof state.headquarters.worlds !== 'object') errors.push('Missing Headquarters state');
   }
   for (const id of Object.keys(state.nodes)) {
     if ((state.nodes[id].attemptsToday ?? 0) < 0) errors.push(`Negative attempt count: ${id}`);
