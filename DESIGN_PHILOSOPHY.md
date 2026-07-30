@@ -91,6 +91,11 @@ Corollary: **let content be cut off by the frame.** The Collection row is intent
 viewport; the last card is half-visible. A collection that fits exactly does not feel like a
 collection.
 
+**Screens never scroll.** Every screen in this app fits 1440×900. If content does not fit, the answer
+is a second screen (Archive world → collection) or a second density (Collection gallery → compact) —
+never a vertical scroll and never a horizontal strip inside a section. Art may bleed off the frame;
+content may not continue past it.
+
 ### Rule 4 — Colour is never the only carrier
 
 Amber means ready, mint means it clears, faint means locked — and every one of those states is *also*
@@ -222,8 +227,10 @@ about a third of the time."* Odds in words, exact counts as numerals.
 
 **Text controls.** Filters, tabs and presets are plain text runs. The selected one is `--text`
 weight 600 with a short amber rule under it that fades right. **Put the underline on the selected
-element itself, never at a measured offset** — measured offsets desynchronise on re-render and text
-scaling.
+element itself** (`padding-bottom` + a `border-image` gradient `border-bottom`), **never at a measured
+offset** — measured offsets desynchronise on re-render and text scaling. When one row carries two
+independent controls (a filter and a view switch), only one underline may be amber; the other is
+neutral `rgba(244,236,225,.34)`.
 
 **Underlined inputs.** `background: none; border: 0; border-bottom: 1px solid rgba(244,236,225,.18);
 padding: 4px 0`. Textareas auto-grow. Selects are underlined text.
@@ -317,9 +324,13 @@ When building something new, find the closest existing screen and inherit its sh
 | A payoff moment | **Results** | Full frame, radial burst, one reactive headline, the rarest reward is the hero |
 | A sequence or map | **Journey** | Undulating dot path on a fading line, parallax art behind |
 | A collection with partial items | **Archive** | Progress-as-artwork before progress-as-bar |
+| A set of sets (worlds → collections) | **Archive world / collection** | Two screens that each fit, big art behind each level, never one long scroll |
+| The same content at two densities | **Collection gallery / compact** | One default display case plus a text-switch density; the switch's underline is neutral, not amber |
 | An authoring tool | **Creator** | Density permitted, but eyebrows/underlined inputs/text tabs still apply; validation drawn as a path |
+| An inventory / making surface | **Workshop** | Lead with what can be done now; the inventory is a shelf of serif numerals with em-dash zeros, and the full grid hides behind disclosure |
+| A blocked or empty state | **Workshop, cold** | Same skeleton as the ready state, ghosted art, disabled action, and the shortfall drawn as a path to the way out |
 
-**Not yet designed:** Workshop/Inventory, Party, Settings. Apply §1–§7 by analogy — eyebrow labels,
+**Not yet designed:** Party, Settings. Apply §1–§7 by analogy — eyebrow labels,
 fading rules, serif numerals, no boxes — and **ask before inventing a new layout archetype for them.**
 
 ---

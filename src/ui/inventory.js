@@ -1,173 +1,380 @@
-// Inventory / Crafting (GDD 11.2): materials by family/grade, components,
-// upcrafting, pinned recipes with reservations, bulk crafting, source links.
+// Workshop: lead with the nearest piece of gear, keep inventory behind disclosure.
 import { h, fmt } from './dom.js';
 import {
   matQty, compQty, craftComponent, checkCraftComponent, maxCraftableComponents,
   upcraft, checkUpcraft
 } from '../core/state.js';
-import { analyzePinnedGoals } from '../core/progression.js';
 import { openFindSources } from './find-sources.js';
-import { openGearDialog } from './gear.js';
+import { openGearDialog, craftEquipmentWithConfirmation } from './gear.js';
 import { openModal, toast } from '../app.js';
+import { resourceQty } from '../core/resources.js';
+import { buildWorkshopModel } from './workshop-model.js';
+import { rankMaterialSources } from '../core/sources.js';
 
 export function renderInventory(store, root) {
+  const model = buildWorkshopModel(store.content, store.state);
+  const cold = !model.bench?.analysis.craftable;
+  root.classList.add('workshop-screen', cold ? 'workshop-cold' : 'workshop-ready');
+  root.appendChild(h('div.workshop-glow', { 'aria-hidden': 'true' }));
+  root.appendChild(h('div.workshop-forge.art-fallback', { 'aria-hidden': 'true' }));
+
+  root.appendChild(workshopHeader(store, model));
+  root.appendChild(h('div.fade-rule.workshop-rule'));
+
+  const stage = h('div.workshop-stage');
+  stage.appendChild(benchSection(store, model));
+  stage.appendChild(cold ? shortestPath(store, model) : nearbySection(store, model));
+  root.appendChild(stage);
+  root.appendChild(h('div.fade-rule.workshop-rule.second'));
+
+  root.appendChild(materialShelf(store, model));
+  root.appendChild(h('div.workshop-bottom',
+    itemisedMaterials(store, model),
+    developmentResources(store)));
+  root.appendChild(componentDisclosure(store, model));
+}
+
+function workshopHeader(store, model) {
+  const count = model.ready.length;
+  let headline;
+  let subline;
+  if (count > 0) {
+    headline = `${numberWord(count)} piece${count === 1 ? ' is' : 's are'} ready to forge.`;
+    subline = 'The nearest gain is already on the bench. Materials move only when you choose it.';
+  } else if (model.bench && model.blocking) {
+    const familyName = store.content.materialMeta.families[model.blocking.material.family].name;
+    headline = `The bench is cold — ${quantityPhrase(model.blocking.qty, familyName)} short.`;
+    const runCount = model.source ? runsNeeded(model.blocking.qty, model.source.guaranteed) : 0;
+    subline = model.source
+      ? `${numberWord(runCount)} run${runCount === 1 ? '' : 's'} of ${model.source.node.displayName} cover it.`
+      : `${model.blocking.material.displayName} has no live source yet.`;
+  } else {
+    headline = 'The bench is quiet.';
+    subline = 'Every available gear line is complete, or the next tier has not opened yet.';
+  }
+  return h('header.workshop-head',
+    h('div.eyebrow', 'Workshop · inventory and crafting'),
+    h('h1.display-m', headline),
+    h('p', subline));
+}
+
+function benchSection(store, model) {
+  const section = h('section.workshop-bench', h('div.eyebrow', model.bench?.analysis.craftable ? 'Ready at the bench' : 'Nearest piece'));
+  const candidate = model.bench;
+  if (!candidate) {
+    section.appendChild(h('p.muted', 'There is nothing left to set on the bench.'));
+    return section;
+  }
   const { content, state } = store;
-  const goalAnalysis = analyzePinnedGoals(content, state);
-  const reserved = goalAnalysis.reservations;
-  root.appendChild(h('header.utility-head', h('div.eyebrow', 'Inventory and crafting'),
-    h('h1.display-s', 'The Workshop.'), h('p.muted', 'Materials become components; components become a hero’s next piece of power.')));
+  const image = content.images.equipment[`${candidate.characterId}:${candidate.slot}`];
+  const art = h('div.workshop-piece-art.bleed-portrait' + (image ? '' : '.art-fallback'), {
+    style: { '--character-color': candidate.character.color }
+  });
+  if (image) art.appendChild(h('img', { src: image, alt: candidate.analysis.equipmentName }));
+  else art.appendChild(h('span', candidate.slotMeta.icon));
+  section.appendChild(art);
+  section.append(
+    h('div.workshop-piece-copy',
+      h('h2.title', candidate.analysis.equipmentName),
+      h('div.caption', `Gear tier ${candidate.tier} · ${candidate.slotMeta.name.toLowerCase()} · ${candidate.character.displayName} is wearing nothing there`),
+      h('div.workshop-power',
+        h('span.display-l', `+${fmt(candidate.powerGain)}`),
+        h('span.good', `power for ${candidate.character.displayName}, the moment it is equipped`)),
+      h('div.workshop-powerbar', {
+        style: { '--character-color': candidate.character.color }
+      }, h('i', { style: { width: `${Math.min(94, candidate.powerBefore / (candidate.powerBefore + candidate.powerGain) * 100)}%` } })),
+      h('div.caption', `${fmt(candidate.powerBefore)} now · ${fmt(candidate.powerBefore + candidate.powerGain)} after`),
+      h('p.workshop-cost', candidate.analysis.craftable
+        ? costSentence(content, state, candidate)
+        : shortfallSentence(content, state, model.blocking)),
+      h('div.workshop-forge-action',
+        h('button.btn.primary', {
+          disabled: !candidate.analysis.craftable,
+          onclick: () => craftEquipmentWithConfirmation(store, candidate.characterId, candidate.slot)
+        }, 'Forge it →'),
+        h('div.caption', candidate.analysis.craftable
+          ? 'No Energy. Materials only.'
+          : 'Nothing is spent.'))));
+  return section;
+}
 
-  // ---------- materials
-  const matPanel = h('div.panel');
-  matPanel.appendChild(h('h2', 'Materials'));
-  matPanel.appendChild(h('p.small.muted', `Upcraft: ${content.balance.upcraftRatio} of one family and grade → 1 of the next unlocked grade. Current campaigns support Gear Tier ${content.maxGearTier}; higher grades unlock when matching freely repeatable nodes are published. 📌 amounts are reserved by pinned recipes.`));
-  const table = h('table.data.mat-table');
-  const header = h('tr', h('th', 'Family'));
-  for (const g of content.materialMeta.gradeOrder) header.appendChild(h('th.mat-qty', content.materialMeta.grades[g].name));
-  table.appendChild(header);
-  for (const family of content.materialMeta.familyOrder) {
-    const fm = content.materialMeta.families[family];
-    const row = h('tr', h('td', `${fm.icon} ${fm.name}`, h('div.small.muted', fm.blurb)));
-    for (const grade of content.materialMeta.gradeOrder) {
-      const id = `mat_${family}_${grade}`;
-      const qty = matQty(state, id);
-      const res = reserved.materials[id] ?? 0;
-      const cell = h('td.mat-qty');
-      cell.appendChild(h('button.link', {
-        title: 'Sources & upcrafting',
-        onclick: () => openMaterialActions(store, id)
-      }, fmt(qty)));
-      if (res > 0) {
-        cell.appendChild(h('div.small.pin-color', { title: 'Reserved by goals' }, `Reserved ${fmt(res)}`));
-        cell.appendChild(h('div.small.muted', `Uncommitted ${fmt(Math.max(0, qty - res))}`));
+function nearbySection(store, model) {
+  const section = h('section.workshop-nearby', h('div.eyebrow', 'One upcraft away'));
+  if (!model.nearby.length) {
+    section.appendChild(h('p.muted', 'Nothing else is close enough to crowd the bench.'));
+  }
+  model.nearby.forEach((candidate, index) => {
+    const missing = primaryMissing(store.content, candidate);
+    const source = missing ? rankMaterialSources(store.content, store.state, missing.material.id)[0] : null;
+    section.appendChild(h('div.nearby-recipe',
+      h('button.nearby-name', {
+        onclick: () => openGearDialog(store, candidate.characterId, candidate.slot)
+      }, candidate.analysis.equipmentName),
+      h('p', missing
+        ? `${candidate.character.displayName} is ${quantityPhrase(missing.qty, missing.material.displayName)} short. You hold ${fmt(matQty(store.state, missing.material.id))}; ${source ? source.node.displayName : 'no live node'} is the nearest source.`
+        : 'Its components are the next closest work on the bench.'),
+      missing ? h('button.link', {
+        onclick: () => openFindSources(store, { type: 'material', id: missing.material.id })
+      }, 'Where they drop →') : null,
+      index < model.nearby.length - 1 ? h('div.fade-rule.nearby-rule') : null));
+  });
+  if (model.totals.reserved > 0) {
+    section.appendChild(h('p.caption', `${fmt(model.totals.reserved)} material${model.totals.reserved === 1 ? ' is' : 's are'} held for pinned work.`));
+  }
+  return section;
+}
+
+function shortestPath(store, model) {
+  const section = h('section.workshop-shortest', h('div.eyebrow', 'The shortest way there'));
+  if (!model.bench || !model.blocking) {
+    section.appendChild(h('p.muted', 'No material path is available.'));
+    return section;
+  }
+  const source = model.source;
+  const sourceName = source?.node.displayName ?? 'No source authored';
+  const path = h('div.workshop-path',
+    h('div.workshop-path-stop.source',
+      h('i'), h('span', sourceName),
+      h('small', source ? `⚡ ${source.energy} · ~${source.guaranteed} ${model.blocking.material.displayName} a run` : 'not yet available')),
+    h('div.workshop-path-stop.material',
+      h('i'), h('span', model.blocking.material.displayName),
+      h('small', `${fmt(model.blocking.qty)} more`)),
+    h('div.workshop-path-stop.piece',
+      h('i'), h('span', model.bench.analysis.equipmentName),
+      h('small', 'no Energy')));
+  section.appendChild(path);
+  section.appendChild(source
+    ? h('button.link.workshop-way-out', { onclick: () => store.go(`#/node/${source.node.id}`) }, `Go to ${source.node.displayName} →`)
+    : h('button.link.workshop-way-out', {
+      onclick: () => openFindSources(store, { type: 'material', id: model.blocking.material.id })
+    }, 'Find another way →'));
+  return section;
+}
+
+function materialShelf(store, model) {
+  const shelf = h('section.workshop-materials', h('div.eyebrow', 'Materials'));
+  const grid = h('div.material-shelf');
+  for (const family of model.families) {
+    const blocking = model.blocking?.material.family === family.family;
+    grid.appendChild(h('div.material-family',
+      h('div.material-family-name', family.definition.icon, ' ', family.definition.name),
+      h('div.material-family-counts',
+        ...family.grades.map(item => h('button.material-count' + (item.qty ? '' : '.empty'), {
+          title: `${item.definition.displayName}: ${fmt(item.qty)}`,
+          'aria-label': `${item.definition.displayName}: ${fmt(item.qty)}. Open sources and upcrafting.`,
+          onclick: () => openMaterialActions(store, item.id)
+        }, item.qty ? fmt(item.qty) : '—'))),
+      blocking
+        ? h('div.caption.bad', `${fmt(model.blocking.qty)} short for ${model.bench.analysis.equipmentName}`)
+        : family.note ? h('div.caption', family.note) : null));
+  }
+  shelf.appendChild(grid);
+  return shelf;
+}
+
+function itemisedMaterials(store, model) {
+  const details = h('details.workshop-itemised');
+  details.appendChild(h('summary', 'Materials, itemised ⌄'));
+  details.appendChild(h('div.itemised-head',
+    h('div', h('div.eyebrow', 'Everything on the shelf'),
+      h('h2.display-s', `${fmt(model.totals.held)} held, and ${model.totals.upcrafts ? `${fmt(model.totals.upcrafts)} upcraft${model.totals.upcrafts === 1 ? '' : 's'} in reach` : 'no upcraft in reach'}.`),
+      h('p', `Five of one grade becomes one of the next. Current campaigns support gear tier ${store.content.maxGearTier}.`)),
+    h('div.itemised-totals',
+      h('span', h('b.numeral', fmt(model.totals.held)), ' held'),
+      h('span', h('b.numeral', fmt(model.totals.aboveBasic)), ' above basic'),
+      h('span', h('b.numeral', fmt(model.totals.reserved)), ' reserved'))));
+  const grid = h('div.itemised-grid');
+  grid.appendChild(h('div.itemised-row.header',
+    h('span', 'Family'),
+    ...store.content.materialMeta.gradeOrder.map(grade => h('span', store.content.materialMeta.grades[grade].name)),
+    h('span', 'Meaning')));
+  for (const family of model.families) {
+    grid.appendChild(h('div.itemised-row',
+      h('div', h('span.material-family-name', `${family.definition.icon} ${family.definition.name}`),
+        h('span.caption', family.definition.blurb)),
+      ...family.grades.map(item => h('button.material-count' + (item.qty ? '' : '.empty'), {
+        title: 'Sources & upcrafting', onclick: () => openMaterialActions(store, item.id)
+      }, item.qty ? fmt(item.qty) : '—')),
+      h('span.caption', itemisedMeaning(store, family, model))));
+  }
+  details.append(grid, h('p.caption', 'Headquarters production is configured at Headquarters.'),
+    h('button.link.back-to-bench', {
+      onclick: () => {
+        details.open = false;
+        details.scrollIntoView({
+          behavior: document.documentElement.classList.contains('reduced-motion') ? 'auto' : 'smooth'
+        });
       }
-      row.appendChild(cell);
-    }
-    table.appendChild(row);
-  }
-  matPanel.appendChild(table);
-  root.appendChild(matPanel);
+    }, 'Back to the bench ↑'));
+  return details;
+}
 
-  // ---------- components
-  const compPanel = h('div.panel');
-  compPanel.appendChild(h('h2', 'Components'));
-  compPanel.appendChild(h('p.small.muted', 'Materials craft generic components; components assemble character equipment.'));
-  const ctable = h('table.data');
-  ctable.appendChild(h('tr', h('th', 'Component'), h('th', 'Recipe'), h('th', 'Owned'), h('th', 'Craft')));
-  for (const comp of content.components) {
-    const have = compQty(state, comp.id);
-    const maxN = maxCraftableComponents(content, state, comp.id);
-    const resC = reserved.components[comp.id] ?? 0;
-    if (have === 0 && maxN === 0 && resC === 0) continue; // keep the table scannable
-    const recipeText = comp.inputs.map(i => `${i.qty} × ${content.materialById[i.materialId].displayName}`).join(' + ');
-    ctable.appendChild(h('tr',
-      h('td', `${comp.icon} ${comp.displayName}`,
-        resC > 0 ? h('div.small.pin-color', `Reserved ${fmt(resC)} · Uncommitted ${fmt(Math.max(0, have - resC))}`) : null),
-      h('td.small', recipeText, ' ', h('button.link.small', { onclick: () => openFindSources(store, { type: 'component', id: comp.id }) }, 'find')),
-      h('td', fmt(have)),
-      h('td', craftControls(store, comp.id, maxN))
-    ));
+function developmentResources(store) {
+  const held = [];
+  const empty = [];
+  for (const resource of store.content.resources) {
+    const qty = resourceQty(store.state, resource.id);
+    if (qty) held.push(h('span', h('b.numeral', fmt(qty)), ` ${resource.displayName}`));
+    else empty.push(resource.displayName);
   }
-  if (ctable.children.length === 1) ctable.appendChild(h('tr', h('td', { colspan: 4 }, h('span.muted', 'No components yet — farm materials from campaign nodes.'))));
-  compPanel.appendChild(ctable);
-  root.appendChild(compPanel);
+  return h('section.workshop-resources',
+    h('div.eyebrow', 'Development resources'),
+    h('div.resource-line', held.length ? held : h('span.caption', 'None held')),
+    empty.length ? h('p.caption', `${joinNatural(empty)} not yet earned`) : null);
+}
 
-  // ---------- pinned recipes
-  const pinPanel = h('div.panel');
-  pinPanel.appendChild(h('h2', '📌 Pinned recipes'));
-  const eqPins = state.pins.filter(p => p.type === 'equipment');
-  if (eqPins.length === 0) pinPanel.appendChild(h('p.muted.small', 'Pin recipes from a character’s gear screen to reserve their materials and track them from Home.'));
-  const grouped = new Map();
-  for (const pin of eqPins) {
-    const list = grouped.get(pin.characterId) ?? [];
-    list.push(pin);
-    grouped.set(pin.characterId, list);
+function componentDisclosure(store, model) {
+  const details = h('details.workshop-components');
+  details.appendChild(h('summary', 'Components and pinned work ⌄'));
+  const list = h('div.component-list');
+  for (const component of store.content.components) {
+    const have = compQty(store.state, component.id);
+    const max = maxCraftableComponents(store.content, store.state, component.id);
+    const reserved = model.reservations.components[component.id] ?? 0;
+    if (!have && !max && !reserved) continue;
+    list.appendChild(h('div.component-row',
+      h('div', h('span.title', component.displayName),
+        h('div.caption', component.inputs.map(input => `${input.qty} ${store.content.materialById[input.materialId].displayName}`).join(' · '))),
+      h('div.component-owned', h('span.numeral', fmt(have)), reserved ? h('span.caption', `${fmt(reserved)} reserved`) : null),
+      craftControls(store, component.id, max)));
   }
-  for (const [characterId, pins] of grouped) {
-    const def = content.characterById[characterId];
-    pinPanel.appendChild(h('h3', def.displayName));
-    for (const pin of pins) {
-      pinPanel.appendChild(h('div.kv',
-        h('span', content.characterMeta.slots[pin.slot].name),
-        h('button.btn.tiny', { onclick: () => openGearDialog(store, pin.characterId, pin.slot) }, 'Open gear')));
-    }
+  if (!list.firstChild) list.appendChild(h('p.muted', 'No components are held or ready to craft.'));
+  const pins = store.state.pins.filter(pin => pin.type === 'equipment');
+  if (pins.length) {
+    list.appendChild(h('div.fade-rule'));
+    pins.forEach(pin => list.appendChild(h('div.pinned-work',
+      h('span', `${store.content.characterById[pin.characterId].displayName} · ${store.content.characterMeta.slots[pin.slot].name}`),
+      h('button.link', { onclick: () => openGearDialog(store, pin.characterId, pin.slot) }, 'Open gear →'))));
   }
-  root.appendChild(pinPanel);
+  details.appendChild(list);
+  return details;
 }
 
 function craftControls(store, componentId, maxN) {
   const { content, state } = store;
-  const wrap = h('div', { style: { display: 'flex', gap: '6px', alignItems: 'center' } });
+  const wrap = h('div.component-craft');
   const qty = h('input', { type: 'number', min: 1, max: Math.max(1, maxN), value: 1, 'aria-label': 'Craft quantity' });
-  const doCraft = (n) => {
+  const doCraft = n => {
     const check = checkCraftComponent(content, state, componentId, n);
     if (!check.ok) { toast(check.reasons.join(' '), 'error'); return; }
-    const preview = check.def.inputs.map(i => `${i.qty * n} × ${content.materialById[i.materialId].displayName}`).join(' + ');
+    const preview = check.def.inputs.map(input => `${input.qty * n} × ${content.materialById[input.materialId].displayName}`).join(' + ');
     const run = () => store.tx(() => craftComponent(content, state, componentId, n));
     if (state.settings.confirmBulk && n > 1) {
       openModal((modal, close) => {
-        modal.appendChild(h('h2', 'Bulk craft preview'));
-        modal.appendChild(h('p', `Craft ${n} × ${check.def.displayName}?`));
-        modal.appendChild(h('p.small.muted', `Consumes ${preview}.`));
-        modal.appendChild(h('div', { style: { display: 'flex', gap: '8px' } },
-          h('button.btn.primary', { onclick: () => { close(); run(); } }, 'Craft'),
-          h('button.btn', { onclick: close }, 'Cancel')));
+        modal.append(h('h2', 'Bulk craft preview'), h('p', `Craft ${n} × ${check.def.displayName}?`),
+          h('p.small.muted', `Consumes ${preview}.`),
+          h('div.modal-actions',
+            h('button.btn.primary', { onclick: () => { close(); run(); } }, 'Craft'),
+            h('button.btn', { onclick: close }, 'Cancel')));
       });
     } else run();
   };
-  wrap.appendChild(h('button.btn.tiny', { disabled: maxN < 1, onclick: () => doCraft(Math.max(1, Math.min(maxN, Number(qty.value) || 1))) }, 'Craft'));
-  wrap.appendChild(qty);
-  wrap.appendChild(h('button.btn.tiny', { disabled: maxN < 1, title: `Craft the maximum (${maxN})`, onclick: () => doCraft(maxN) }, `Max ${maxN}`));
+  wrap.append(h('button.link', {
+    disabled: maxN < 1,
+    onclick: () => doCraft(Math.max(1, Math.min(maxN, Number(qty.value) || 1)))
+  }, 'Craft'), qty, h('button.link', {
+    disabled: maxN < 1, title: `Craft the maximum (${maxN})`, onclick: () => doCraft(maxN)
+  }, `Max ${fmt(maxN)}`));
   return wrap;
 }
 
 function openMaterialActions(store, materialId) {
   const { content, state } = store;
-  const m = content.materialById[materialId];
+  const material = content.materialById[materialId];
   openModal((modal, close) => {
-    modal.appendChild(h('h2', `${m.icon} ${m.displayName}`));
-    modal.appendChild(h('p', `In inventory: ${fmt(matQty(state, materialId))}`));
-    const reserved = analyzePinnedGoals(content, state).reservations.materials[materialId] ?? 0;
-    if (reserved > 0) modal.appendChild(h('p.small.pin-color', `📌 ${reserved} reserved by pinned recipes.`));
-
-    if (m.conversionTarget) {
-      const target = content.materialById[m.conversionTarget];
-      modal.appendChild(h('h3', 'Upcraft'));
-      const maxTimes = Math.floor(matQty(state, materialId) / m.conversionCost);
-      const availability = checkUpcraft(content, { ...state, inventory: { ...state.inventory, materials: { ...state.inventory.materials, [materialId]: Math.max(m.conversionCost, matQty(state, materialId)) } } }, materialId, 1);
+    modal.append(h('h2', `${material.icon} ${material.displayName}`),
+      h('p', `In inventory: ${fmt(matQty(state, materialId))}`));
+    const reserved = buildWorkshopModel(content, state).reservations.materials[materialId] ?? 0;
+    if (reserved) modal.appendChild(h('p.small.pin-color', `${fmt(reserved)} reserved by pinned recipes.`));
+    if (material.conversionTarget) {
+      const target = content.materialById[material.conversionTarget];
+      const maxTimes = Math.floor(matQty(state, materialId) / material.conversionCost);
+      const availability = checkUpcraft(content, {
+        ...state, inventory: { ...state.inventory, materials: { ...state.inventory.materials, [materialId]: Math.max(material.conversionCost, matQty(state, materialId)) } }
+      }, materialId, 1);
       const qty = h('input', { type: 'number', min: 1, max: Math.max(1, maxTimes), value: 1, 'aria-label': 'Upcraft count' });
-      const info = h('p.small.muted', `${m.conversionCost} × ${m.displayName} → 1 × ${target.displayName}. You can do this ${maxTimes} time${maxTimes === 1 ? '' : 's'}.`);
-      modal.appendChild(info);
+      modal.append(h('h3', 'Upcraft'),
+        h('p.small.muted', `${material.conversionCost} ${material.displayName} becomes one ${target.displayName}. ${fmt(maxTimes)} possible now.`));
       if (!availability.ok) modal.appendChild(h('p.small.warn', availability.reasons[0]));
-      modal.appendChild(h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
-        qty,
-        h('button.btn.primary', {
-          disabled: maxTimes < 1 || !availability.ok,
-          onclick: () => {
-            const n = Math.max(1, Math.min(maxTimes, Number(qty.value) || 1));
-            const check = checkUpcraft(content, state, materialId, n);
-            if (!check.ok) { toast(check.reasons.join(' '), 'error'); return; }
-            const commit = () => { close(); store.tx(() => {
-              const r = upcraft(content, state, materialId, n);
-              if (r.ok) toast(`⚗️ Upcrafted ${n} × ${target.displayName}.`);
-              return r;
-            }); };
-            if (check.warning) {
-              openModal((m2, close2) => {
-                m2.appendChild(h('h2', 'Reserved materials'));
-                m2.appendChild(h('p.warn', check.warning));
-                m2.appendChild(h('div', { style: { display: 'flex', gap: '8px' } },
-                  h('button.btn.primary', { onclick: () => { close2(); commit(); } }, 'Upcraft anyway'),
-                  h('button.btn', { onclick: close2 }, 'Cancel')));
-              });
-            } else commit();
-          }
-        }, 'Upcraft')));
-    } else {
-      modal.appendChild(h('p.small.muted', 'Masterwork is the highest grade — no further conversion.'));
-    }
-    modal.appendChild(h('div', { style: { marginTop: '14px', display: 'flex', gap: '8px' } },
-      h('button.btn', { onclick: () => { close(); openFindSources(store, { type: 'material', id: materialId }); } }, 'Find Sources'),
+      modal.appendChild(h('div.modal-actions', qty, h('button.btn.primary', {
+        disabled: maxTimes < 1 || !availability.ok,
+        onclick: () => {
+          const count = Math.max(1, Math.min(maxTimes, Number(qty.value) || 1));
+          const check = checkUpcraft(content, state, materialId, count);
+          if (!check.ok) { toast(check.reasons.join(' '), 'error'); return; }
+          const commit = () => {
+            close();
+            store.tx(() => {
+              const result = upcraft(content, state, materialId, count);
+              if (result.ok) toast(`Upcrafted ${fmt(count)} ${target.displayName}.`);
+              return result;
+            });
+          };
+          if (check.warning) openModal((confirm, closeConfirm) => {
+            confirm.append(h('h2', 'Reserved materials'), h('p.warn', check.warning),
+              h('div.modal-actions',
+                h('button.btn.primary', { onclick: () => { closeConfirm(); commit(); } }, 'Upcraft anyway'),
+                h('button.btn', { onclick: closeConfirm }, 'Cancel')));
+          });
+          else commit();
+        }
+      }, 'Upcraft')));
+    } else modal.appendChild(h('p.small.muted', 'Masterwork is the highest grade.'));
+    modal.appendChild(h('div.modal-actions',
+      h('button.btn', { onclick: () => { close(); openFindSources(store, { type: 'material', id: materialId }); } }, 'Where it drops'),
       h('button.btn', { onclick: close }, 'Close')));
   });
+}
+
+function costSentence(content, state, candidate) {
+  const rows = Object.entries(candidate.analysis.totalMaterialDemand);
+  if (!rows.length) return 'The required components are already held.';
+  return `${joinNatural(rows.map(([id, required]) => {
+    const material = content.materialById[id];
+    return `${fmt(required)} ${material.displayName} — you hold ${fmt(matQty(state, id))}`;
+  }))}.`;
+}
+
+function shortfallSentence(content, state, blocking) {
+  if (!blocking) return 'The materials are not yet within reach.';
+  const required = (state.inventory.materials[blocking.material.id] ?? 0) + blocking.qty;
+  const held = matQty(state, blocking.material.id);
+  const familyName = content.materialMeta.families[blocking.material.family].name;
+  return `${numberWord(held)} of ${fmt(required)} ${familyName}.`;
+}
+
+function primaryMissing(content, candidate) {
+  return Object.entries(candidate.analysis.totalMaterialMissing)
+    .map(([id, qty]) => ({ material: content.materialById[id], qty }))
+    .sort((a, b) => b.qty - a.qty)[0] ?? null;
+}
+
+function itemisedMeaning(store, family, model) {
+  if (model.blocking?.material.family === family.family) {
+    return `${fmt(model.blocking.qty)} short for ${model.bench.analysis.equipmentName}`;
+  }
+  if (family.note) return family.note;
+  if (!family.allHeld) {
+    const material = family.grades[0].definition;
+    const source = rankMaterialSources(store.content, store.state, material.id)[0];
+    return source ? `none yet · drops in ${source.node.displayName}` : 'none yet';
+  }
+  return `${fmt(family.allHeld)} held`;
+}
+
+function runsNeeded(shortfall, guaranteed) {
+  return Math.max(1, Math.ceil(shortfall / Math.max(1, guaranteed)));
+}
+
+function quantityPhrase(qty, noun) {
+  return `${fmt(qty)} ${noun}`;
+}
+
+function numberWord(number) {
+  return ({ 1: 'One', 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five', 6: 'Six' })[number] ?? fmt(number);
+}
+
+function joinNatural(items) {
+  if (items.length < 2) return items[0] ?? '';
+  return `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
 }

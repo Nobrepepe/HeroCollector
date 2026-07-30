@@ -36,6 +36,14 @@ export function characterPower(content, charState) {
   return characterPowerBreakdown(content, charState).total;
 }
 
+export function characterPowerForState(content, state, characterId) {
+  const def = content.characterById[characterId];
+  const base = characterPower(content, state.characters[characterId]);
+  const training = def ? content.worldById[def.world]?.hq?.facilities.find(f => f.category === 'training') : null;
+  const level = training ? state.headquarters?.worlds?.[def.world]?.facilities?.[training.id] ?? 0 : 0;
+  return base + ([0, 25, 50, 100][level] ?? 0);
+}
+
 export function maxCharacterPower(content) {
   const b = content.balance;
   return b.basePower

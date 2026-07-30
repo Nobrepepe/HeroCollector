@@ -10,7 +10,10 @@ export const IMAGE_KINDS = {
   world:     { w: 1024, h: 576,  label: 'World banner (16:9, wider than tall)' },
   chapter:   { w: 1280, h: 720,  label: 'Chapter key art (16:9, wider than tall)' },
   equipment: { w: 256,  h: 256,  label: 'Equipment (square)' },
-  relic:     { w: 1024, h: 576,  label: 'Relic (16:9, wider than tall)' }
+  relic:     { w: 1024, h: 576,  label: 'Relic (16:9, wider than tall)' },
+  hq:        { w: 1280, h: 720,  label: 'Headquarters background (16:9)' },
+  facility:  { w: 1024, h: 576,  label: 'Headquarters building art (16:9)' },
+  expedition: { w: 660, h: 860, label: 'Expedition offer art (33:43, taller than wide)' }
 };
 
 export function pickAndProcessImage(kind) {

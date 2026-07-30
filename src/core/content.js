@@ -18,17 +18,34 @@ export function buildContent(raw) {
     templates: raw.recipes.templates,
     nodes: raw.nodes,
     archives: raw.archives,
+    expeditions: raw.expeditions ?? {
+      settings: { offerCount: 5, slotCount: 3, freeRerolls: 1, minimumFeasible: 2, maxLongOffers: 1, generationAttempts: 20,
+        intelligenceCosts: { reroll: 1, pin: 1, reveal: 1 },
+        resultMultipliersBp: { completed: 10000, successful: 12500, exceptional: 15000 } },
+      requirements: [], optionalObjectives: [], rewardPackages: [], templates: [], reports: {}, fallbackTemplate: null
+    },
 
-    worldById: {}, materialById: {}, componentById: {}, characterById: {},
+    worldById: {}, resourceById: {}, materialById: {}, componentById: {}, characterById: {},
     tagById: {}, nodeById: {}, templateByKey: {}, tierProfileByTier: {},
     archiveByWorld: {}, fragmentById: {}, skinById: {},
     nodesByCampaign: {}, shardNodesByCharacter: {}, nodesByMaterial: {},
     maxMaterialGradeRank: -1,
     maxGearTier: 0,
     // Imported art (data URLs), filled in by the custom-content merge.
-    images: { world: {}, chapter: {}, portrait: {}, fullBody: {}, equipment: {}, relic: {}, skin: {} }
+    images: {
+      world: {}, headquarters: {}, expedition: {}, chapter: {}, portrait: {},
+      fullBody: {}, equipment: {}, relic: {}, skin: {}, hq: {}, facility: {}
+    }
   };
-  for (const w of c.worlds) c.worldById[w.id] = w;
+  c.resources = [
+    { id: 'renown', displayName: 'Renown', description: 'Shared influence used to develop Headquarters.', icon: '✧' },
+    { id: 'intelligence', displayName: 'Intelligence', description: 'Information used to shape Expedition offers.', icon: '◈' }
+  ];
+  for (const w of c.worlds) {
+    c.worldById[w.id] = w;
+    if (w.worldAsset) c.resources.push(w.worldAsset);
+  }
+  for (const resource of c.resources) c.resourceById[resource.id] = resource;
   for (const m of c.materials) c.materialById[m.id] = m;
   for (const k of c.components) c.componentById[k.id] = k;
   for (const ch of c.characters) c.characterById[ch.id] = ch;
@@ -61,6 +78,9 @@ export function buildContent(raw) {
     }
     if (a.fullReward) c.skinById[a.fullReward.id] = { ...a.fullReward, archiveId: a.id, world: a.world, fullArchive: true };
   }
+  c.expeditions.requirementById = Object.fromEntries((c.expeditions.requirements ?? []).map(x => [x.id, x]));
+  c.expeditions.optionalById = Object.fromEntries((c.expeditions.optionalObjectives ?? []).map(x => [x.id, x]));
+  c.expeditions.rewardById = Object.fromEntries((c.expeditions.rewardPackages ?? []).map(x => [x.id, x]));
   return c;
 }
 

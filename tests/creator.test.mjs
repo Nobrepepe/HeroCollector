@@ -67,7 +67,7 @@ test('v2 migration moves legacy Main shards into incomplete paired Shadow chapte
   legacy.mainChapters[0].nodes[5].shardCharacterId = legacy.characters[1].id;
   legacy.mainChapters[0].nodes[8].shardCharacterId = legacy.characters[2].id;
   const upgraded = upgradeCustomDB(legacy);
-  assert.equal(upgraded.version, 5);
+  assert.equal(upgraded.version, 7);
   assert.equal(upgraded.shadowChapters.length, upgraded.mainChapters.length);
   assert.equal(upgraded.shadowChapters[0].nodes[2].shardCharacterId, legacy.characters[0].id);
   assert.equal(upgraded.shadowChapters[0].nodes[0].shardCharacterId, null);
@@ -75,6 +75,22 @@ test('v2 migration moves legacy Main shards into incomplete paired Shadow chapte
   assert.ok(upgraded.mainChapters.every(ch => ch.image === null));
   assert.ok(upgraded.shadowChapters.every(ch => ch.image === null));
   assert.deepEqual(upgraded.worlds[0].campaignChapterImages, [null, null, null]);
+  assert.equal(upgraded.worlds[0].hqImage, null);
+  assert.deepEqual(upgraded.expeditions.images, { global: null, worlds: {} });
+});
+
+test('Expedition and Headquarters artwork survives creator merge under stable world IDs', () => {
+  const db = loadSamplePack();
+  const world = db.worlds[0];
+  db.expeditions.images.global = 'data:image/webp;base64,GLOBAL';
+  db.expeditions.images.worlds[world.id] = 'data:image/webp;base64,OFFER';
+  world.hqImage = 'data:image/webp;base64,HQ';
+  world.hq.facilities[0].image = 'data:image/webp;base64,BUILDING';
+  const merged = mergeContent(systemRaw, db);
+  assert.equal(merged.images.expedition.global, 'data:image/webp;base64,GLOBAL');
+  assert.equal(merged.images.expedition[world.id], 'data:image/webp;base64,OFFER');
+  assert.equal(merged.images.headquarters[world.id], 'data:image/webp;base64,HQ');
+  assert.equal(merged.images.facility[world.hq.facilities[0].id], 'data:image/webp;base64,BUILDING');
 });
 
 test('sample pack merges cleanly into the full shipped game, all editable data', () => {

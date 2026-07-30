@@ -44,3 +44,46 @@ export function pct(bp) {
 export function stars(n, max = 7) {
   return '★'.repeat(n) + '☆'.repeat(Math.max(0, max - n));
 }
+
+// Mouse-drag horizontal shelves without interfering with their clickable
+// children. Touch and trackpad scrolling continue to use native behavior.
+export function enableMouseDragScroll(element) {
+  let pointerId = null;
+  let startX = 0;
+  let startScroll = 0;
+  let dragged = false;
+
+  element.addEventListener('pointerdown', event => {
+    if (event.pointerType !== 'mouse' || event.button !== 0) return;
+    pointerId = event.pointerId;
+    startX = event.clientX;
+    startScroll = element.scrollLeft;
+    dragged = false;
+  });
+  element.addEventListener('pointermove', event => {
+    if (event.pointerId !== pointerId) return;
+    const distance = event.clientX - startX;
+    if (Math.abs(distance) > 6 && !dragged) {
+      dragged = true;
+      element.setPointerCapture(pointerId);
+      element.classList.add('dragging');
+    }
+    if (!dragged) return;
+    event.preventDefault();
+    element.scrollLeft = startScroll - distance;
+  });
+  const finish = event => {
+    if (event.pointerId !== pointerId) return;
+    if (element.hasPointerCapture(pointerId)) element.releasePointerCapture(pointerId);
+    pointerId = null;
+    element.classList.remove('dragging');
+  };
+  element.addEventListener('pointerup', finish);
+  element.addEventListener('pointercancel', finish);
+  element.addEventListener('click', event => {
+    if (!dragged) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragged = false;
+  }, true);
+}

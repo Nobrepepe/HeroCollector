@@ -118,7 +118,7 @@ function fragmentColumn(store, fragmentId) {
   const puzzle = h('div.relic.result-relic');
   relic?.fragments.forEach((fragment, pieceIndex) => {
     const owned = !!store.state.archive.fragments[fragment.id];
-    puzzle.appendChild(h(`div.relic-piece.${pieceIndex === 0 ? 'left' : 'right'}${owned && image ? '' : '.relic-piece--empty'}${pieceIndex === index ? '.new-piece' : ''}`, {
+    puzzle.appendChild(h(`div.relic-piece.${pieceIndex === 0 ? 'left' : 'right'}${owned && image ? '' : '.relic-piece--empty'}${pieceIndex === index ? `.new-piece.${pieceIndex === 0 ? 'from-left' : 'from-right'}` : ''}`, {
       style: owned && image ? { backgroundImage: `url("${image}")` } : {}
     }));
   });
