@@ -123,6 +123,22 @@ function v2ToV3(content, state) {
   return state;
 }
 
+function v3ToV4(state) {
+  state.inventory.resources ??= {};
+  state.inventory.resources.field_supply ??= 0;
+  state.energySystems ??= { daily: { day: state.dayNumber ?? 1, suppliesUsed: 0, momentumRefunded: 0 } };
+  state.energySystems.daily ??= { day: state.dayNumber ?? 1, suppliesUsed: 0, momentumRefunded: 0 };
+  state.energySystems.daily.day = Number.isInteger(state.energySystems.daily.day) ? state.energySystems.daily.day : (state.dayNumber ?? 1);
+  state.energySystems.daily.suppliesUsed = Number.isInteger(state.energySystems.daily.suppliesUsed) ? state.energySystems.daily.suppliesUsed : 0;
+  state.energySystems.daily.momentumRefunded = Number.isInteger(state.energySystems.daily.momentumRefunded) ? state.energySystems.daily.momentumRefunded : 0;
+  if (state.energySystems.daily.day !== (state.dayNumber ?? 1)) {
+    state.energySystems.daily = { day: state.dayNumber ?? 1, suppliesUsed: 0, momentumRefunded: 0 };
+  }
+  state.crises ??= { active: null, lastSpawnDay: null, cycleSeen: [], history: [] };
+  state.schemaVersion = 4;
+  return state;
+}
+
 export function migratePlayerState(content, inputState) {
   if (!inputState || typeof inputState !== 'object') throw new Error('Save data is not an object.');
   const state = structuredClone(inputState);
@@ -135,6 +151,9 @@ export function migratePlayerState(content, inputState) {
     } else if (version === 2) {
       v2ToV3(content, state);
       version = 3;
+    } else if (version === 3) {
+      v3ToV4(state);
+      version = 4;
     } else {
       throw new Error(`No migration path exists from schema ${version}.`);
     }
@@ -153,5 +172,6 @@ export function migratePlayerState(content, inputState) {
     state.headquarters ??= { worlds: {}, construction: null };
     state.dayNumber ??= 1;
   }
+  if (state.schemaVersion >= 4) v3ToV4(state);
   return state;
 }

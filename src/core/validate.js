@@ -3,6 +3,8 @@
 // fragments map 1:1 onto World Campaign first clears, and synergy definitions
 // stay inside the global cap. Produces a human-readable error list.
 import { equipmentRecipe } from './content.js';
+import { fieldSupplyLimits, FIELD_SUPPLY_ID } from './energy.js';
+import { CRISIS_BOON_TYPES } from './crises.js';
 
 export function validateContent(content) {
   const errors = [];
@@ -63,6 +65,57 @@ export function validateContent(content) {
     for (const id of template.optionalIds ?? []) if (!content.expeditions.optionalById[id]) err(`${template.id}: unknown optional objective ${id}`);
     if (template.partySize < 1 || template.partySize > 4) err(`${template.id}: invalid party size`);
     if (!template.titles?.length || !template.descriptions?.length) err(`${template.id}: missing procedural prose`);
+    for (const reward of template.fixedRewards ?? []) {
+      if (reward.kind !== 'resource' || reward.id !== FIELD_SUPPLY_ID || reward.qty !== 1) err(`${template.id}: invalid fixed reward`);
+      if (template.id !== content.expeditions.settings.guaranteedSupplyTemplateId) err(`${template.id}: only the configured guaranteed template may promise a Field Supply`);
+    }
+  }
+  const guaranteedId = content.expeditions.settings.guaranteedSupplyTemplateId;
+  if (guaranteedId) {
+    const guaranteed = content.expeditions.templateById[guaranteedId];
+    if (!guaranteed || guaranteed.enabled === false) err('Guaranteed Field Supply template is missing or disabled');
+    if (guaranteed && (guaranteed.durations?.length !== 1 || guaranteed.durations[0] !== 1)) err(`${guaranteedId}: guaranteed Supply template must last one day`);
+    if (guaranteed && (guaranteed.fixedRewards?.length !== 1 || guaranteed.fixedRewards[0]?.id !== FIELD_SUPPLY_ID || guaranteed.fixedRewards[0]?.qty !== 1)) {
+      err(`${guaranteedId}: guaranteed Supply template needs exactly one fixed Field Supply`);
+    }
+  }
+
+  const crisisIds = new Set();
+  const favoredIds = new Set([...content.worlds.map(world => world.id), ...Object.keys(content.archetypes), ...content.tags.map(tag => tag.id)]);
+  const gradeIds = new Set();
+  for (const grade of content.crises?.settings?.grades ?? []) {
+    if (gradeIds.has(grade.id)) err(`Duplicate Crisis grade ${grade.id}`);
+    gradeIds.add(grade.id);
+    if (!Number.isInteger(grade.minOwned) || grade.minOwned < 1 || !Number.isInteger(grade.minHqRank)
+      || !Number.isInteger(grade.frontCount) || grade.frontCount < 2 || !Number.isInteger(grade.teamSize) || grade.teamSize < 1) err(`${grade.id}: invalid Crisis grade settings`);
+  }
+  for (const definition of content.crises?.definitions ?? []) {
+    if (crisisIds.has(definition.id)) err(`Duplicate Crisis ID: ${definition.id}`);
+    crisisIds.add(definition.id);
+    if (!content.worldById[definition.worldId]) err(`${definition.id}: unknown Crisis world ${definition.worldId}`);
+    if ((definition.fronts?.length ?? 0) < 3) err(`${definition.id}: a Crisis needs at least three Fronts`);
+    const frontIds = new Set();
+    for (const front of definition.fronts ?? []) {
+      if (frontIds.has(front.id)) err(`${definition.id}: duplicate Front ${front.id}`);
+      frontIds.add(front.id);
+      if (!front.name || !front.description) err(`${front.id}: missing Front prose`);
+      if (!front.favoredTagIds?.length || front.favoredTagIds.length > 2) err(`${front.id}: needs one or two favored tags`);
+      for (const id of front.favoredTagIds ?? []) if (!favoredIds.has(id)) err(`${front.id}: unknown favored tag ${id}`);
+      for (const grade of content.crises.settings.grades ?? []) {
+        if (!Number.isInteger(front.recommendedPowerByGrade?.[grade.id]) || front.recommendedPowerByGrade[grade.id] < 1) err(`${front.id}: invalid ${grade.id} recommendation`);
+      }
+    }
+    if (![3, 4].includes(definition.cacheChoices?.length)) err(`${definition.id}: needs three or four Emergency Cache choices`);
+    if (!CRISIS_BOON_TYPES.has(definition.boon?.type)) err(`${definition.id}: unknown boon type ${definition.boon?.type}`);
+    for (const choice of definition.cacheChoices ?? []) for (const reward of choice.rewards ?? []) {
+      if (reward.kind === 'resource' && reward.id !== '@associated_world_asset' && !content.resourceById[reward.id]) err(`${choice.id}: unknown Cache resource ${reward.id}`);
+      if (reward.kind === 'material' && !content.materialById[reward.id]) err(`${choice.id}: unknown Cache material ${reward.id}`);
+      if (!Number.isInteger(reward.qty) || reward.qty < 1) err(`${choice.id}: invalid Cache quantity`);
+    }
+    const boon = definition.boon;
+    if (['free_world_node_runs', 'bonus_world_material_runs'].includes(boon?.type) && (!Number.isInteger(boon.runs) || boon.runs < 1)) err(`${definition.id}: boon needs a positive run count`);
+    if (['bonus_world_material_runs', 'instant_intelligence'].includes(boon?.type) && (!Number.isInteger(boon.qty) || boon.qty < 1)) err(`${definition.id}: boon needs a positive quantity`);
+    if (['world_expedition_renown_bp', 'next_hq_production_bp'].includes(boon?.type) && (!Number.isInteger(boon.bonusBp) || boon.bonusBp < 1)) err(`${definition.id}: boon needs positive basis points`);
   }
 
   // --- characters: exactly one world and one archetype; valid references
@@ -246,7 +299,7 @@ export function validateContent(content) {
 // Save-file validation: every ID the save references must exist in content.
 export function validateSave(content, state) {
   const errors = [];
-  if (![1, 2, 3].includes(state.schemaVersion)) errors.push(`Unsupported save schema ${state.schemaVersion}`);
+  if (![1, 2, 3, 4].includes(state.schemaVersion)) errors.push(`Unsupported save schema ${state.schemaVersion}`);
   if (!state.characters || !state.inventory || !state.nodes || !Array.isArray(state.parties)) {
     return { ok: false, errors: ['Save is missing required gameplay state.'] };
   }
@@ -273,6 +326,37 @@ export function validateSave(content, state) {
       errors.push('Missing Expedition state');
     }
     if (!state.headquarters || typeof state.headquarters.worlds !== 'object') errors.push('Missing Headquarters state');
+  }
+  if (state.schemaVersion >= 4) {
+    const daily = state.energySystems?.daily;
+    if (!daily || !Number.isInteger(daily.day) || !Number.isInteger(daily.suppliesUsed)
+      || !Number.isInteger(daily.momentumRefunded) || daily.suppliesUsed < 0 || daily.momentumRefunded < 0 || daily.momentumRefunded > 30) {
+      errors.push('Invalid daily Energy-system counters');
+    }
+    if (daily?.day !== state.dayNumber) errors.push('Daily Energy-system counters are for the wrong game day');
+    const supply = state.inventory.resources?.[FIELD_SUPPLY_ID] ?? 0;
+    const supplyLimits = fieldSupplyLimits(content, state);
+    if (!Number.isInteger(supply) || supply < 0 || supply > supplyLimits.storageCap) errors.push('Invalid Field Supply quantity');
+    if (supplyLimits.held + supplyLimits.reserved > supplyLimits.storageCap) errors.push('Field Supply promises exceed available storage');
+    if (daily?.suppliesUsed > supplyLimits.dailyUseCap) errors.push('Field Supply uses exceed the daily limit');
+    if (!state.crises || !Array.isArray(state.crises.cycleSeen) || !Array.isArray(state.crises.history)) errors.push('Missing Crisis state');
+    if (state.crises?.lastSpawnDay !== null && (!Number.isInteger(state.crises.lastSpawnDay) || state.crises.lastSpawnDay < 2)) errors.push('Invalid last Crisis spawn day');
+    if (state.crises?.cycleSeen?.some(id => typeof id !== 'string')) errors.push('Invalid Crisis cycle history');
+    const active = state.crises?.active;
+    if (active) {
+      if (!content.crisisById[active.definitionId] || !content.worldById[active.worldId]) errors.push('Active Crisis references stale content');
+      if (!['planning', 'resolved'].includes(active.status)) errors.push('Invalid active Crisis status');
+      if (!Array.isArray(active.frontIds) || active.frontIds.length !== active.fronts?.length || new Set(active.frontIds).size !== active.frontIds.length) errors.push('Invalid active Crisis Front snapshot');
+      for (const frontId of active.frontIds ?? []) {
+        if (!Array.isArray(active.assignments?.[frontId]) || active.assignments[frontId].length !== active.teamSize) errors.push(`Invalid Crisis assignment slots for ${frontId}`);
+      }
+      const assigned = Object.values(active.assignments ?? {}).flat().filter(Boolean);
+      if (new Set(assigned).size !== assigned.length) errors.push('Active Crisis contains duplicate character assignments');
+      for (const id of assigned) if (!content.characterById[id] || !state.characters[id]?.owned) errors.push(`Active Crisis references unavailable character ${id}`);
+      if (active.cacheClaimed && !active.result?.cacheChoiceId) errors.push('Claimed Crisis Cache has no recorded choice');
+      if (active.status === 'resolved' && assigned.length !== active.frontIds.length * active.teamSize) errors.push('Resolved Crisis has an incomplete assignment');
+      if (active.boon && !CRISIS_BOON_TYPES.has(active.boon.type)) errors.push(`Invalid active Crisis boon ${active.boon.type}`);
+    }
   }
   for (const id of Object.keys(state.nodes)) {
     if ((state.nodes[id].attemptsToday ?? 0) < 0) errors.push(`Negative attempt count: ${id}`);

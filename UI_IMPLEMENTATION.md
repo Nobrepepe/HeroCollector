@@ -216,7 +216,7 @@ The current Home is five stacked boxes. The redesign is one intention, then thre
    two numerals coloured (`--text` for required, `--good`/`--bad` for yours). Right-aligned primary
    action "Enter →" with the ⚡ cost beneath.
 4. **Thread: Ready when you are.** Replaces the "Ready now" `<details>` list. A horizontal row of up
-   to three entries; each is a 56px circular portrait with a 1px amber ring pulsing on a 2.6s
+   to three entries; each is a **portrait slot** (§13) at 168×94 whose glow pulses on a 2.6s
    `hc-pulse`, then the name, what is ready, and an inline amber verb ("Finish it →", "Promote →",
    "Craft →") wired to the same handlers `readyPanel()` uses today. If more than three are ready, the
    third slot becomes "and four more →" linking to Collection filtered to `ownership: 'ready'`.
@@ -249,8 +249,8 @@ Blocks are separated by fading rules (Rule 2) at y≈352, 520, 716.
   this is the replacement for the `.ready-dot`.
 - **Let the last card be cut off by the frame.** The row is intentionally wider than the viewport;
   horizontal scroll (or the window edge) implies more collection.
-- Unowned characters move to a "Still out there" strip along the bottom: 38px circular portraits at
-  55% opacity, name, and `74 / 110 shards`.
+- Unowned characters move to a "Still out there" strip along the bottom: the not-yet-met portrait
+  slot (§13) at 132×74, name, and `74 / 110 shards`.
 - The gallery is the **default** density. A second, compact density lives behind a view switch — §11.
 
 ### 3.4 Character — option `1c`
@@ -286,7 +286,7 @@ Blocks are separated by fading rules (Rule 2) at y≈352, 520, 716.
   warm line: *"720 to spare — this clears. No dice, no surprises."* When short:
   *"Short by 480. The attempt cannot start, so no Energy can be lost."* — keep that guarantee, it is
   the best thing about the current node screen.
-- Party: five 66px circular portraits with name and power beneath; to the right, synergy as prose —
+- Party: five portrait slots (§13) at 176×99 with name and power beneath; to the right, synergy as prose —
   active bonuses with `+12%` in `--good`, inactive ones as `Faculty Pair — needs Irina and Aurora
   together`, then `+18% of a possible 25%` in `caption`. This is `evaluateParty()`'s existing output,
   reworded. Preset switching stays a `<select>`, restyled as underlined text.
@@ -681,7 +681,7 @@ existing collapse state key if it is easier, but it should no longer be needed.
   name at `title` 32px, `Collection one · three whole, one half-found` in `caption`, a row of
   **five 74×42 puzzle chips** (`gap:8px`, radius 5px) carrying the same three states as the big
   tiles, a 2px progress bar fading past its fill, `seven of ten fragments` in `caption`, the reward
-  as a 64px circular ghost at `opacity .4` + its name at 22px + `Two relics away`, and
+  as a 112×63 ghost slot (§13) at `opacity .4` + its name at 22px + `Two relics away`, and
   `Open the collection →`. Only the nearest-to-complete collection's link is amber; the others are
   `--muted`.
 - A collection that has not opened yet: name and reward drop to `--muted-2`/`--faint`, the ghost to
@@ -732,24 +732,141 @@ A second density for the same screen, not a new screen. The gallery (§3.3) stay
   `rgba(244,236,225,.34)` fading rule attached to the element — not amber. Amber already means
   "ready" on this screen; two amber underlines in one row make the selection ambiguous.
 - Everything else is identical: same headline, same filters, same sort, same footer semantics.
-- Grid from `y 158`: `repeat(8,1fr)`, `gap:34px 20px`, centred cells. Met character: 112px
-  circular well (character-colour radial at `inset:-8px`, `box-shadow:0 10px 22px rgba(0,0,0,.5)`),
-  name at 20px serif, stars at 10px/2.5px tracking, power as a 19px serif tabular numeral. A ready
-  upgrade adds a 1px amber ring on `hc-pulse 2.8s` and an `a star is ready` caption — still exactly
-  one pulse per screen.
-- **Unmet characters stay in the grid**, in reading order, as the 112px dashed empty well
-  (`1px dashed rgba(244,236,225,.16)`, no glyph) with the name in `--muted-2` and
-  `74 / 110 shards` or `not yet found` beneath. The "Still out there" strip is not needed here —
-  the point of this density is seeing the whole roster, gaps included.
+- Grid from `y 146`: `repeat(5,1fr)`, `gap:14px 26px`, `align-items:start`. Each cell is a
+  **portrait slot** (§13) at 200×112 followed by one caption line: name at 21px serif, stars at
+  9px/2px tracking in amber, power as an 18px serif tabular numeral, laid out as a centred flex row
+  with `gap:9px` (baseline-aligned) — one line, not three. A ready upgrade adds an
+  `a star is ready` caption in amber and puts `hc-pulse 2.8s` on the slot's glow, not on a ring —
+  still exactly one pulse per screen.
+- **Unmet characters stay in the grid**, in reading order, as the not-yet-met slot state (§13): their
+  own tile greyed and dropped to 42%, or the hatch placeholder where no tile exists yet, with the name
+  in `--muted-2` and `74 / 110 shards` / `not yet found` beside it. The "Still out there" strip is
+  not needed here — the point of this density is seeing the whole roster, gaps included.
 - Footer: fading rule, then `Four are one shard-run from joining you.` left and
   `Ten met · ten still out there` right.
 
 ### Acceptance
 
-- Twenty characters fit at 1440×900 with no scroll; the grid reflows by column count, not by cell size.
+- Twenty characters fit at 1440×900 with no scroll (five across, four down); the grid reflows by
+  column count, not by cell size.
 - Every filter and sort behaves identically in both densities.
 - The active view underline is neutral; the active filter underline is amber; both are attached to
   their own label.
+
+---
+
+## 12. Party — option `8a` (built), `8b` (alternative)
+
+Replaces the scrolling party screen entirely. Five characters is the one count in this app that can
+carry full-body art at size, so the party **is** the five bodies.
+
+**The synergy reference list is removed from this screen.** The long "every synergy and what it
+grants" list is a codex, not a decision: move it to the Archive as its own browsable page, reached
+from `Every synergy, itemised ⌄` at the bottom-left of Party. Party answers only two questions —
+what are these five giving me now, and what is the cheapest change that gives me more. Nothing is
+deleted; nothing scrolls.
+
+### 12.1 Layout — `8a` (the one to build), 1440×900
+
+- `y 44`: eyebrow `Party · Starters`; `y 68`: headline at 52px serif, generated —
+  `They are pulling +18% together.` with the percentage in `--good`. Empty-party fallback:
+  `No one is standing with you yet.`
+- Top right: the preset run as text controls (`Starters`, `Party 2`…`Party 6`), active one weight
+  600 with an attached amber fading underline. Beneath it, `Rename · Copy from… · Clear these five`
+  at 12.5px, the last in `--bad`. This replaces the `<select>` and the button row.
+- `y 182`, three eyebrow threads on a `290px 1fr 372px` grid, `gap:52px`:
+  1. **Effective power** — the hero numeral, 88px serif tabular (`7,139`), caption
+     `6,050 raw — 1,089 of it is how they fit.`
+  2. **What they share** — one row per active bonus: `+4%` in `--good` (22px serif, 52px column),
+     the bonus name at 22px serif, then a one-line prose explanation at 13px `--muted`. Fading rules
+     between rows, right-hand stops varied (78% / 61% / 72%). Then `Every synergy, itemised ⌄`.
+  3. **One swap away** — the single best near-miss from `evaluateParty()`, as prose with a 7px amber
+     pulsing dot: *"Bridget is the only one not from Eden. Swap her for any Eden character and
+     Cohesion becomes +7% — about 180 more effective power. Nothing else in the party changes."*
+     Then the primary text action `Find an Eden five →` (26px serif amber on a rule fading right).
+     This is the screen's one pulse.
+- `y 388`: fading rule. `y 412`: the five bodies — `repeat(5,1fr)`, `gap:20px`, each cell 520px
+  tall so the art runs **past the bottom edge** of the frame. Per figure: a character-colour radial
+  (344×372, centred near the head), the 9:16 art masked with
+  `radial-gradient(72% 62% at 50% 38%, #000 58%, transparent 94%)`, and `hc-drift` at 6.8–9s with a
+  different period per figure so the row breathes unevenly.
+- Each figure's label block sits **64px inside the bottom edge** (never `bottom:0` — the art bleeds,
+  the type does not): name at 34px serif, stars, power as a 19px serif tabular numeral in
+  `--text-dim`, plus a `caption` where a character is the reason a bonus is missing
+  (`not from Eden`).
+
+### 12.2 `8b` — bonds drawn instead of listed (alternative)
+
+Kept in the design file as the more radical option. Same five bodies, smaller (470px), with the
+hero numeral top-right at 64px; below them, each active bonus is a **hairline whose horizontal
+extent is exactly the characters it covers** — `World Cohesion +4%` spans columns 1–4,
+`Twin Blades +6%` spans columns 3–4, and `Quiet Watch +8%` spans the full width but goes fully
+transparent over columns 3–4 (the two it skips), so a non-contiguous bond reads correctly. Labels sit
+above the left end of their own line. The near-miss is a dashed amber stub under the offending
+column. Build this only if you want the synergy model to be legible without reading.
+
+### Acceptance
+
+- No vertical scroll at 1440×900, and no synergy reference list on the screen.
+- Character art crosses the bottom frame edge; every name, star row and numeral is fully inside it.
+- Exactly one pulse (the near-miss dot in `8a`, the dashed stub in `8b`).
+- `evaluateParty()` is unchanged — active bonuses, the total, and the near-miss all come from its
+  existing output, reworded.
+
+---
+
+## 13. The portrait slot — options `9a`–`9b` (replaces every circular portrait)
+
+The circular well is **retired everywhere**: Today's ready row, Collection's unowned strip, Node's
+party row, the compact grid, the Creator cast, the Archive reward ghost. A ball with a photo in it
+was the last box in the app.
+
+The replacement is not a shape. Character portrait art is now a **16:9 PNG with its own
+transparency** — a close crop of the eyes tearing through the background — and every character's
+tile tears differently. The UI must therefore supply **only a slot and a blend**, and must never
+clip, mask-to-shape, or ring the art.
+
+### The slot
+
+```
+.portrait-slot            position:relative; 16:9 box (200×112 compact, 420×236 at 2×)
+  .portrait-slot__glow    absolutely centred, 134% × 150% of the box,
+                          radial-gradient(closest-side, <character colour> ~26% alpha, transparent 72%)
+  img                     position:absolute; inset:0; width/height:100%; object-fit:contain;
+                          filter: drop-shadow(0 10px 18px rgba(0,0,0,.55))
+                                  drop-shadow(0 0 24px <character colour ~30% alpha>);
+                          mask-image: linear-gradient(to bottom, #000 76%, rgba(0,0,0,.35));
+```
+
+Why each part: `object-fit:contain` keeps the tile's own alpha as the silhouette; the first
+drop-shadow seats the art on the floor; the second is a coloured bloom that melts the ragged edges
+into `--bg` (drop-shadow follows alpha, `box-shadow` would not); the bottom mask stops the crop
+ending on a hard line. No border, no ring, no circle, at any size.
+
+### States
+
+| State | Treatment | Words |
+| --- | --- | --- |
+| Met | As above | name · stars · power |
+| A star is ready | `hc-pulse 2.8s` on the **glow layer only** — the bloom breathes | `a star is ready` in amber |
+| Not yet met | Her own tile at `opacity:.42`, `grayscale(1) brightness(.62)`, bloom off, shadow softened to `0 8px 14px rgba(0,0,0,.5)` | `74 / 110 shards` / `not yet found` |
+| Hover | Bloom to 34px, art lifts 2px, 160ms ease | power numeral to `--text` |
+| No tile yet | Masked 104° hatch at the same 16:9 (`radial-gradient(72% 64% at 50% 48%, #000 54%, transparent 92%)`) with an `eyes · alpha art` mono caption | — |
+
+### Asset spec (give this to whoever makes the art)
+
+- **16:9, ≥1200×675, PNG with real alpha.** Transparent background — no white, no matte.
+- Close crop on the eyes; the ragged, torn edge is part of the artwork, not applied by the UI.
+- Design against `#12100f`: the bloom is dim, so mid-tones must survive on near-black.
+- The three tiles in `assets/eyes/` (`HDV_C02`, `C06`, `C07`) are the reference — they were keyed
+  from white-background uploads and are exact examples of the intended alpha.
+- The 1:1 portrait size is retired from the commission list; full body 9:16 stays (Party, Character).
+
+### Acceptance
+
+- No `border-radius:50%` on any portrait anywhere in `styles.css`.
+- A tile with a jagged alpha renders with no visible container edge on any screen.
+- Missing art renders the hatch placeholder — never a broken image, never a fallback circle.
 
 ---
 
@@ -767,8 +884,10 @@ A second density for the same screen, not a new screen. The gallery (§3.3) stay
 7. Workshop (§9).
 8. Archive navigation (§10) — the puzzle from §7 stays as built; only the routing and layout change.
 9. Collection compact density (§11).
-10. Party and Settings — not designed here. Apply §1–§4 by analogy: eyebrow labels, fading rules,
-   serif numerals, no boxes. Ask before inventing new layouts for them.
+10. The portrait slot (§13) — do this before Party, it touches six screens and deletes a lot of CSS.
+11. Party (§12).
+12. Settings — not designed here. Apply §1–§4 by analogy: eyebrow labels, fading rules, serif
+   numerals, no boxes. Ask before inventing a new layout for it.
 
 ### Acceptance
 
@@ -784,12 +903,13 @@ A second density for the same screen, not a new screen. The gallery (§3.3) stay
 
 ## Assets
 
-No binary assets ship with this handoff. Needed:
+Three keyed reference tiles ship in `assets/eyes/` (see §13). Otherwise:
 
 - **Fonts:** Instrument Serif 400, Figtree 300–600, as woff2 in `assets/fonts/` (SIL Open Font
   License; redistribution with the app is fine).
 - **Art:** all imagery is placeholder. Sizes to commission — world banner 16:9 (≥1280×720),
-  character portrait 1:1 (≥512), character full body 9:16 (≥720×1280), equipment 1:1 (≥256), relic
+  character eye tile 16:9 with alpha (≥1200×675, §13 — this replaces the 1:1 portrait),
+  character full body 9:16 (≥720×1280), equipment 1:1 (≥256), relic
   16:9 (≥960×540), location/chapter key art 16:9 (≥1920×1080). All import through the existing
   Content Creator art pipeline; no new storage format.
 - Emoji are used as archetype/slot/material icons and as portrait fallbacks. One caution: the mist
@@ -798,7 +918,7 @@ No binary assets ship with this handoff. Needed:
 ## Files
 
 - `Hero Collector Redesign.dc.html` — the design, options `1a`–`1c`, `2a`–`2c`, `3a`–`3d`, `4a`,
-  `5a`–`5c`, `6a`–`6b`, `7a`.
+  `5a`–`5c`, `6a`–`6b`, `7a`, `8a`–`8b`, `9a`–`9b`.
 - `DESIGN_PHILOSOPHY.md` — the durable reasoning behind all of them; read it before designing any
   screen this handoff does not cover.
 - `Current UI (recreation).dc.html` — the before-state.

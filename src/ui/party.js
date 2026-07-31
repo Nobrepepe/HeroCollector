@@ -1,143 +1,219 @@
-// Party Builder (GDD 11.2): five slots, saved presets, active/inactive
-// synergies with explanations, raw power, cap, effective power, node compare.
 import { h, fmt, pct } from './dom.js';
 import { evaluateParty } from '../core/synergy.js';
 import {
-  setPartyMember, renameParty, nodeState, nodeUnlocked,
-  copyParty, clearParty, selectPartyPreset
+  setPartyMember, renameParty, copyParty, clearParty, selectPartyPreset
 } from '../core/state.js';
 import { characterPower } from '../core/power.js';
-import { portrait, starline, campaignLabel, nodeTypeMeta } from './shared.js';
+import { activeSkin, starline } from './shared.js';
 import { openModal } from '../app.js';
 import { openCharacterPicker } from './character-picker.js';
+import { bestPartySwap, partyHeadline } from './presentation.js';
 
-export function renderParty(store, root, arg) {
+export function renderParty(store, root) {
   const { content, state } = store;
   const idx = state.activePartyIndex;
   const party = state.parties[idx];
-  root.appendChild(h('header.utility-head', h('div.eyebrow', 'Five voices, one reading'),
-    h('h1.display-s', 'Build your party.'), h('p.muted', 'Every bonus is visible before you cross a threshold.')));
-
-  // ---------- preset tabs
-  const tabs = h('div.tab-bar');
-  state.parties.forEach((p, i) => {
-    tabs.appendChild(h('button.tab-btn' + (i === idx ? '.active' : ''), {
-      onclick: () => store.tx(() => selectPartyPreset(state, i), { rerender: false })
-        .then(() => renderPartyAgain(store, root))
-    }, p.name));
-  });
-  root.appendChild(tabs);
-
-  // ---------- rename
-  const renameRow = h('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px' } });
-  const nameInput = h('input', { type: 'text', value: party.name, 'aria-label': 'Preset name', maxlength: 30 });
-  renameRow.appendChild(nameInput);
-  renameRow.appendChild(h('button.btn.tiny', {
-    onclick: () => store.tx(() => renameParty(state, idx, nameInput.value))
-  }, 'Rename preset'));
-  renameRow.appendChild(h('button.btn.tiny', {
-    onclick: () => copyPreset(store, idx, () => renderPartyAgain(store, root))
-  }, 'Copy From…'));
-  renameRow.appendChild(h('button.btn.tiny.danger', {
-    onclick: () => confirmClearPreset(store, idx, () => renderPartyAgain(store, root))
-  }, 'Clear Preset'));
-  root.appendChild(renameRow);
-
-  // ---------- slots
-  const slotsPanel = h('div.panel');
-  slotsPanel.appendChild(h('h2', 'Party — five unique owned characters'));
-  const slotsRow = h('div.party-slots');
-  party.members.forEach((memberId, slotIdx) => {
-    const slot = h('button.party-slot' + (memberId ? '.filled' : ''), {
-      onclick: () => pickMember(store, idx, slotIdx, () => renderPartyAgain(store, root)),
-      title: memberId ? 'Change or remove' : 'Add a character'
-    });
-    if (memberId) {
-      const def = content.characterById[memberId];
-      const cs = state.characters[memberId];
-      slot.appendChild(portrait(store, memberId, 'md'));
-      slot.appendChild(h('div.small', def.displayName));
-      slot.appendChild(starline(cs.stars));
-      slot.appendChild(h('div.small.muted', `${fmt(characterPower(content, cs))}`));
-    } else {
-      slot.appendChild(h('div', { style: { fontSize: '2rem', color: 'var(--muted)' } }, '+'));
-      slot.appendChild(h('div.small.muted', 'Empty slot'));
-    }
-    slotsRow.appendChild(slot);
-  });
-  slotsPanel.appendChild(slotsRow);
-  root.appendChild(slotsPanel);
-
-  // ---------- synergy breakdown
   const members = party.members.filter(Boolean);
-  const ev = evaluateParty(content, state, members);
-  const syn = h('div.panel');
-  syn.appendChild(h('h2', 'Effective Party Power'));
-  syn.appendChild(h('table.data',
-    h('tr', h('td', 'Raw Power (sum of five characters)'), h('td', h('b', fmt(ev.rawPower)))),
-    h('tr', h('td', 'Total active synergy'), h('td', h('b' + (ev.capped ? '.warn' : ''), `+${pct(ev.totalBp)}`))),
-    ev.capped ? h('tr', h('td', `Applied synergy (global ${pct(content.balance.synergyCapBp)} cap)`), h('td', h('b.warn', `+${pct(ev.cappedBp)}`))) : null,
-    h('tr', h('td', h('b', 'Effective Power')), h('td', h('b.big-num', fmt(ev.effectivePower))))
-  ));
-  if (members.length < 5) syn.appendChild(h('p.warn.small', `Add ${5 - members.length} more character${5 - members.length > 1 ? 's' : ''} to form a legal party.`));
+  const evaluation = evaluateParty(content, state, members);
+  const recommendation = bestPartySwap(content, state, party.members);
 
-  syn.appendChild(h('h3', 'Active bonuses'));
-  if (ev.active.length === 0) syn.appendChild(h('p.muted.small', 'No synergy bonuses are active.'));
-  for (const a of ev.active.sort((x, y) => y.bonusBp - x.bonusBp)) {
-    syn.appendChild(h('div.synergy-item.on',
-      h('span.bonus', `+${pct(a.bonusBp)}`),
-      h('span', h('b', a.tag.displayName), ' — ', h('span.small.muted', a.tag.explanation))));
-  }
-  syn.appendChild(h('h3', 'Inactive — what would activate them'));
-  for (const i of ev.inactive) {
-    syn.appendChild(h('div.synergy-item.off',
-      h('span.bonus', '—'),
-      h('span', h('b', i.tag.displayName), h('div.small', i.missing))));
-  }
-  root.appendChild(syn);
-
-  // ---------- node comparison
-  const cmp = h('div.panel');
-  cmp.appendChild(h('h2', 'Compare against a node'));
-  const sel = h('select', { 'aria-label': 'Node to compare' });
-  const candidates = content.nodes.filter(n => nodeUnlocked(content, state, n).unlocked);
-  for (const n of candidates) {
-    sel.appendChild(h('option', { value: n.id }, `${campaignLabel(store, n)} ${n.number} — ${n.displayName} (needs ${fmt(n.threshold)})`));
-  }
-  const verdict = h('div', { style: { marginTop: '8px' } });
-  const update = () => {
-    const n = content.nodeById[sel.value];
-    verdict.replaceChildren();
-    if (!n) return;
-    const ok = ev.effectivePower >= n.threshold && members.length === 5;
-    verdict.appendChild(h('p' + (ok ? '.good' : '.bad'),
-      `${fmt(ev.effectivePower)} vs required ${fmt(n.threshold)} — ${ok ? 'this party can clear it.' : members.length < 5 ? 'party is incomplete.' : `short by ${fmt(n.threshold - ev.effectivePower)}.`}`));
-    verdict.appendChild(h('button.btn.tiny', { onclick: () => store.go(`#/node/${n.id}`) }, 'Open node'));
-  };
-  sel.addEventListener('change', update);
-  cmp.appendChild(sel);
-  cmp.appendChild(verdict);
-  update();
-  root.appendChild(cmp);
+  root.classList.add('party-screen');
+  const page = h('div.party-page');
+  page.append(
+    partyHeader(store, idx, party, evaluation, members.length, root),
+    partyReading(store, evaluation, recommendation, idx, root),
+    h('div.fade-rule.party-figure-rule'),
+    partyFigures(store, party, recommendation, idx, root));
+  root.appendChild(page);
 }
 
-function renderPartyAgain(store, root) {
+function partyHeader(store, index, party, evaluation, memberCount, root) {
+  const header = h('header.party-head',
+    h('div.party-heading-copy',
+      h('div.eyebrow', `Party · ${party.name}`),
+      partyHeadlineElement(evaluation, memberCount)));
+  const controls = h('div.party-preset-controls');
+  const tabs = h('div.party-presets', { role: 'tablist', 'aria-label': 'Party presets' });
+  store.state.parties.forEach((preset, presetIndex) => tabs.appendChild(h(
+    'button.party-preset' + (presetIndex === index ? '.active' : ''),
+    {
+      role: 'tab',
+      'aria-selected': presetIndex === index,
+      onclick: () => store.tx(() => selectPartyPreset(store.state, presetIndex), { rerender: false })
+        .then(() => rerenderParty(store, root))
+    },
+    preset.name)));
+  controls.append(
+    tabs,
+    h('div.party-preset-actions',
+      h('button', { onclick: () => renamePreset(store, index, root) }, 'Rename'),
+      h('span', '·'),
+      h('button', { onclick: () => copyPreset(store, index, root) }, 'Copy from…'),
+      h('span', '·'),
+      h('button.danger', { onclick: () => confirmClearPreset(store, index, root) }, 'Clear these five')));
+  header.appendChild(controls);
+  return header;
+}
+
+function partyHeadlineElement(evaluation, memberCount) {
+  if (memberCount < 5) return h('h1.display-s', partyHeadline(evaluation, memberCount));
+  return h('h1.display-s',
+    'They are pulling ',
+    h('span.good', `+${pct(evaluation.cappedBp)}`),
+    evaluation.capped ? ' together — the cap is holding.' : ' together.');
+}
+
+function partyReading(store, evaluation, recommendation, partyIndex, root) {
+  const synergyPower = evaluation.effectivePower - evaluation.rawPower;
+  const reading = h('div.party-reading');
+  reading.appendChild(h('section.party-power-thread',
+    h('div.eyebrow', 'Effective power'),
+    h('div.display-l', fmt(evaluation.effectivePower)),
+    h('p.caption',
+      `${fmt(evaluation.rawPower)} raw — ${fmt(synergyPower)} of it is how they fit.`)));
+
+  const shared = h('section.party-shared', h('div.eyebrow', 'What they share'));
+  if (evaluation.active.length) {
+    evaluation.active
+      .sort((a, b) => b.bonusBp - a.bonusBp)
+      .forEach((item, index) => shared.append(
+        h('div.party-synergy', { style: { '--rule-end': `${[78, 61, 72, 84][index % 4]}%` } },
+          h('span.numeral.good', `+${pct(item.bonusBp)}`),
+          h('div', h('div.party-synergy-name', item.tag.displayName),
+            h('div.caption', item.tag.explanation)))));
+  } else {
+    shared.appendChild(h('p.muted', 'No shared rhythm has taken hold yet.'));
+  }
+  shared.appendChild(h('button.party-codex-link', {
+    onclick: () => store.go('#/archive/synergies')
+  }, 'Every synergy, itemised ⌄'));
+  reading.appendChild(shared);
+  reading.appendChild(recommendationThread(store, recommendation, partyIndex, root));
+  return reading;
+}
+
+function recommendationThread(store, recommendation, partyIndex, root) {
+  const section = h('section.party-near-miss', h('div.eyebrow', 'One swap away'));
+  if (recommendation.kind === 'empty') {
+    section.append(
+      h('p.party-swap-copy', h('i.party-swap-dot'), 'An empty place is the only thing holding this party back. Fill it and their shared power can be read.'),
+      h('button.btn.primary.party-swap-action', {
+        onclick: () => pickMember(store, partyIndex, recommendation.slotIndex, root)
+      }, 'Choose someone →'));
+    return section;
+  }
+  if (recommendation.kind === 'none') {
+    section.appendChild(h('p.party-swap-copy',
+      'No single change improves their effective power. These five are already the strongest fit available.'));
+    return section;
+  }
+  const outgoing = store.content.characterById[recommendation.outgoingId];
+  const incoming = store.content.characterById[recommendation.incomingId];
+  const improved = recommendation.improved[0];
+  const synergyText = improved
+    ? `${improved.tag.displayName} becomes +${pct(improved.bonusBp)}`
+    : `their individual strength raises the total`;
+  section.append(
+    h('p.party-swap-copy',
+      h('i.party-swap-dot'),
+      `Swap ${outgoing.displayName} for ${incoming.displayName}. ${synergyText} — about ${fmt(recommendation.effectiveGain)} more effective power.`),
+    h('button.btn.primary.party-swap-action', {
+      onclick: () => pickMember(store, partyIndex, recommendation.slotIndex, root, recommendation.incomingId)
+    }, `Find ${incoming.displayName} →`));
+  return section;
+}
+
+function partyFigures(store, party, recommendation, partyIndex, root) {
+  const row = h('div.party-figures');
+  party.members.forEach((memberId, slotIndex) => {
+    const isOutgoing = recommendation.kind === 'swap' && recommendation.slotIndex === slotIndex;
+    const button = h('button.party-figure' + (memberId ? '.filled' : '.empty'), {
+      onclick: () => pickMember(store, partyIndex, slotIndex, root,
+        isOutgoing ? recommendation.incomingId : null),
+      'aria-label': memberId
+        ? `Change ${store.content.characterById[memberId].displayName} in party slot ${slotIndex + 1}`
+        : `Choose a character for empty party slot ${slotIndex + 1}`,
+      style: { '--drift-time': `${6.8 + slotIndex * .55}s` }
+    });
+    if (!memberId) {
+      button.append(
+        h('div.party-figure-glow'),
+        h('div.party-body-fallback', '+'),
+        h('div.party-figure-label', h('div.party-name', 'An open place'), h('div.caption', 'choose someone')));
+      row.appendChild(button);
+      return;
+    }
+    const def = store.content.characterById[memberId];
+    const cs = store.state.characters[memberId];
+    const skin = activeSkin(store, memberId);
+    const image = skin?.fullBody ?? store.content.images.fullBody[memberId] ?? null;
+    button.style.setProperty('--character-color', def.color);
+    button.appendChild(h('div.party-figure-glow'));
+    const art = h('div.party-body-art' + (image ? '' : '.art-fallback'));
+    if (image) art.appendChild(h('img', { src: image, alt: '', draggable: 'false' }));
+    else art.appendChild(h('span', def.glyph));
+    button.append(
+      art,
+      h('div.party-figure-label',
+        h('div.party-name', def.displayName),
+        starline(cs.stars),
+        h('div.party-member-power', `${fmt(characterPower(store.content, cs))} power`),
+        isOutgoing ? h('div.caption', swapReason(store, recommendation)) : null));
+    row.appendChild(button);
+  });
+  return row;
+}
+
+function swapReason(store, recommendation) {
+  const improved = recommendation.improved[0];
+  if (!improved) return `${fmt(recommendation.effectiveGain)} power is waiting`;
+  const def = store.content.characterById[recommendation.outgoingId];
+  if (improved.tag.activationRule === 'same_world_count') {
+    const incoming = store.content.characterById[recommendation.incomingId];
+    return def.world === incoming.world ? `the weaker ${store.content.worldById[def.world].displayName} fit` : `not from ${store.content.worldById[incoming.world].displayName}`;
+  }
+  return `the change that opens ${improved.tag.displayName}`;
+}
+
+function rerenderParty(store, root) {
   root.replaceChildren();
-  renderParty(store, root, null);
+  root.className = '';
+  renderParty(store, root);
 }
 
-function pickMember(store, partyIdx, slotIdx, done) {
+function pickMember(store, partyIndex, slotIndex, root, recommendedId = null) {
   openCharacterPicker(store, {
-    partyIndex: partyIdx,
-    slotIndex: slotIdx,
+    partyIndex,
+    slotIndex,
+    recommendedId,
     onSelect: async characterId => {
-      await store.tx(() => setPartyMember(store.content, store.state, partyIdx, slotIdx, characterId), { rerender: false });
-      done();
+      await store.tx(
+        () => setPartyMember(store.content, store.state, partyIndex, slotIndex, characterId),
+        { rerender: false });
+      rerenderParty(store, root);
     }
   });
 }
 
-function copyPreset(store, targetIndex, done) {
+function renamePreset(store, index, root) {
+  openModal((modal, close) => {
+    modal.appendChild(h('h2', 'Rename this party'));
+    const input = h('input', {
+      type: 'text', value: store.state.parties[index].name,
+      'aria-label': 'Preset name', maxlength: 30
+    });
+    modal.append(input, h('div.modal-actions',
+      h('button.btn.primary', {
+        onclick: async () => {
+          const result = await store.tx(() => renameParty(store.state, index, input.value), { rerender: false });
+          if (result.ok !== false) { close(); rerenderParty(store, root); }
+        }
+      }, 'Keep this name →'),
+      h('button.btn', { onclick: close }, 'Cancel')));
+  });
+}
+
+function copyPreset(store, targetIndex, root) {
   openModal((modal, close) => {
     modal.appendChild(h('h2', 'Copy party members from…'));
     const select = h('select', { 'aria-label': 'Source preset' });
@@ -148,24 +224,24 @@ function copyPreset(store, targetIndex, done) {
       h('button.btn.primary', {
         onclick: async () => {
           await store.tx(() => copyParty(store.state, targetIndex, Number(select.value)), { rerender: false });
-          close(); done();
+          close(); rerenderParty(store, root);
         }
-      }, 'Copy members'),
+      }, 'Copy members →'),
       h('button.btn', { onclick: close }, 'Cancel')));
   });
 }
 
-function confirmClearPreset(store, index, done) {
+function confirmClearPreset(store, index, root) {
   openModal((modal, close) => {
     modal.appendChild(h('h2', `Clear ${store.state.parties[index].name}?`));
-    modal.appendChild(h('p.warn', 'All five member slots in this preset will be emptied.'));
+    modal.appendChild(h('p.warn', 'All five places in this preset will be emptied.'));
     modal.appendChild(h('div.modal-actions',
       h('button.btn.danger', {
         onclick: async () => {
           await store.tx(() => clearParty(store.state, index), { rerender: false });
-          close(); done();
+          close(); rerenderParty(store, root);
         }
-      }, 'Clear Preset'),
+      }, 'Clear these five'),
       h('button.btn', { onclick: close }, 'Cancel')));
   });
 }

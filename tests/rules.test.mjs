@@ -121,7 +121,8 @@ test('clear: success consumes energy, awards first-clear once, unlocks sweep', (
   assert.ok(pre.reasons.some(r => /Sweep unlocks/.test(r)));
   const r1 = clearNode(content, s, 'main_1', party, 1, rng, T0);
   assert.ok(r1.ok);
-  assert.equal(s.energy, 120 - 6);
+  assert.equal(s.energy, 120);
+  assert.equal(r1.rewards.energyRefunded, 6);
   assert.ok(r1.rewards.firstClear);
   const node = content.nodeById.main_1;
   const firstClearQty = node.firstClear.materials[0].qty;

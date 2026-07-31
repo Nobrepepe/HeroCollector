@@ -23,6 +23,8 @@ import { renderDev } from './ui/dev.js';
 import { renderCreator } from './ui/creator.js';
 import { renderExpeditions } from './ui/expeditions.js';
 import { renderHeadquarters } from './ui/headquarters.js';
+import { renderCrisis } from './ui/crisis.js';
+import { fieldSupplyLimits, previewFieldSupplyUse, useFieldSupply } from './core/energy.js';
 
 const store = {
   content: null,
@@ -234,7 +236,8 @@ const routes = {
   character: { title: 'Character', render: renderCharacter },
   node: { title: 'Node', render: renderNode },
   dev: { title: 'Developer Panel', icon: '🧪', render: renderDev },
-  creator: { title: 'Content Creator', icon: '🛠️', render: renderCreator }
+  creator: { title: 'Content Creator', icon: '🛠️', render: renderCreator },
+  crisis: { title: 'Crisis Response', render: renderCrisis }
 };
 
 function parseRoute() {
@@ -242,7 +245,7 @@ function parseRoute() {
   return { name: routes[parts[0]] ? parts[0] : 'home', arg: parts.slice(1).join('/') || null };
 }
 
-const GAME_ROUTES = new Set(['home', 'roster', 'party', 'campaign', 'expeditions', 'headquarters', 'inventory', 'archive', 'character', 'node']);
+const GAME_ROUTES = new Set(['home', 'roster', 'party', 'campaign', 'expeditions', 'headquarters', 'inventory', 'archive', 'character', 'node', 'crisis']);
 
 export function render() {
   const { name, arg } = parseRoute();
@@ -343,15 +346,37 @@ function renderSidebar(active) {
   const e = store.state?.energy ?? 0;
   if (b) {
     const reset = String(store.state.settings.resetHour).padStart(2, '0');
-    nav.appendChild(h('div.sidebar-energy',
+    const supplies = fieldSupplyLimits(store.content, store.state);
+    nav.appendChild(h('button.sidebar-energy', { onclick: openRechargeDialog, 'aria-label': `${e} of ${b.energy.storageCap} Energy. ${supplies.held} Field Supplies held; ${supplies.usesRemaining} uses remain today.` },
       h('div.eyebrow', 'Energy'),
       h('div.energy-number', fmt(e), h('span', ` / ${fmt(b.energy.storageCap)}`)),
       h('div.energy-line', h('i', { style: { width: `${Math.min(100, e / b.energy.storageCap * 100)}%` } })),
+      h('div.caption', `${supplies.held} Suppl${supplies.held === 1 ? 'y' : 'ies'} held · ${supplies.usesRemaining} use${supplies.usesRemaining === 1 ? '' : 's'} remain today`),
       h('div.caption', `+${b.energy.dailyGrant} more at ${reset}:00`)));
   }
   nav.appendChild(h('button.nav-btn.settings-link' + (active === 'settings' ? '.active' : ''), {
     onclick: () => store.go('#/settings')
   }, h('span.nav-dot', { 'aria-hidden': 'true' }), 'Settings'));
+}
+
+function openRechargeDialog() {
+  const preview = previewFieldSupplyUse(store.content, store.state);
+  openModal((modal, close) => {
+    modal.classList.add('recharge-modal');
+    modal.appendChild(h('div.eyebrow', 'Field Supplies'));
+    modal.appendChild(h('h2', preview.ok ? `${preview.restored} Energy can return now.` : 'The reserve cannot be opened now.'));
+    modal.appendChild(h('p', preview.ok
+      ? preview.wasted > 0 ? `This Supply restores ${preview.restored} Energy; the remaining ${preview.wasted} cannot fit under the ${store.content.balance.energy.storageCap} cap.`
+        : `This Supply restores ${preview.restored} Energy. It is consumed only when you confirm.`
+      : preview.reasons.join(' ')));
+    modal.appendChild(h('p.caption', `${preview.held} held · ${preview.usesRemaining} use${preview.usesRemaining === 1 ? '' : 's'} remain today · storage ${preview.held + preview.reserved} of ${preview.storageCap} including promised Supplies`));
+    modal.appendChild(h('div.modal-actions',
+      h('button.btn.primary', { disabled: !preview.ok, onclick: async () => {
+        const result = await store.tx(() => useFieldSupply(store.content, store.state), { rerender: false });
+        if (result.ok) { close(); render(); }
+      } }, preview.ok ? `Restore ${preview.restored} Energy →` : 'No restoration available'),
+      h('button.btn', { onclick: close }, 'Leave it stored')));
+  });
 }
 
 function renderTopbar(title) {
@@ -493,15 +518,27 @@ function showDaySummary(summary) {
     modal.appendChild(h('p', `${summary.energyGained} Energy restored. Shard attempts are ready again.`));
     for (const build of summary.construction ?? []) modal.appendChild(h('p.good', `${build.facilityName} reached Level ${build.targetLevel}.`));
     if (summary.production?.length) modal.appendChild(h('p', `${summary.production.length} automatic production entr${summary.production.length === 1 ? 'y was' : 'ies were'} added to inventory.`));
-    for (const report of summary.expeditions ?? []) modal.appendChild(h('div.return-report',
+    let suppliesReturned = 0;
+    for (const report of summary.expeditions ?? []) {
+      suppliesReturned += (report.rewards ?? []).filter(entry => entry.id === 'field_supply').reduce((sum, entry) => sum + entry.qty, 0);
+      modal.appendChild(h('div.return-report',
       h('div.title', report.name), h('p', `${report.tier}. ${report.report}`)));
-    modal.appendChild(h('button.btn.primary', {
+    }
+    if (suppliesReturned) modal.appendChild(h('p.good', `${suppliesReturned} Field Suppl${suppliesReturned === 1 ? 'y has' : 'ies have'} returned and remains stored.`));
+    if (summary.crisis) modal.appendChild(h('p.warn', `${summary.crisis.name} is active in ${store.content.worldById[summary.crisis.worldId]?.displayName}. It costs no Energy, and leaving it alone causes no penalty.`));
+    const finish = async destination => {
+      summary.acknowledged = true;
+      await store.save();
+      close();
+      if (destination) store.go(destination);
+    };
+    modal.appendChild(h('div.modal-actions', summary.crisis ? h('button.btn.primary', {
+      onclick: () => finish('#/crisis')
+    }, 'Review the Crisis →') : h('button.btn.primary', {
       onclick: async () => {
-        summary.acknowledged = true;
-        await store.save();
-        close();
+        await finish();
       }
-    }, 'Begin the day →'));
+    }, 'Begin the day →'), summary.crisis ? h('button.btn', { onclick: () => finish('#/home') }, 'Leave it for later') : null));
   });
 }
 

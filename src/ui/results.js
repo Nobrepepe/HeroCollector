@@ -5,7 +5,7 @@ import { clearNode, checkClear, preferredPartyIndex } from '../core/state.js';
 export function resultIsMeaningful(result) {
   const rewards = result.rewards;
   return !!(rewards.firstClear || rewards.objective || rewards.fragments?.length
-    || rewards.milestones?.length || result.newlyReadyCharacters?.length);
+    || rewards.milestones?.length || rewards.energyRefunded || result.newlyReadyCharacters?.length);
 }
 
 export function resultPresentationMode(store, result) {
@@ -23,7 +23,9 @@ function compactBody(store, result) {
     h('span', `${result.node.displayName} · ${result.rewards.runs} run${result.rewards.runs === 1 ? '' : 's'}`),
     primary ? h('span.numeral', `+${primary[1]} ${store.content.characterById[primary[0]].displayName} shard${primary[1] === 1 ? '' : 's'}`)
       : h('span.numeral', `+${materialCount} materials`),
-    h('span.caption', `⚡${result.rewards.energySpent}`));
+    h('span.caption', result.rewards.energyRefunded
+      ? `⚡${result.rewards.energySpent} spent · ${result.rewards.energyRefunded} returned`
+      : `⚡${result.rewards.energySpent} spent`));
 }
 
 export function compactResult(store, result, { onExpand } = {}) {
@@ -39,7 +41,7 @@ export function showFullResults(store, result, { onClose, members, count } = {})
     const finish = () => { close(); onClose?.(); };
     modal.appendChild(h('div.results-burst', h('i')));
     modal.appendChild(h('div.results-content',
-      h('div.eyebrow', `${result.node.displayName} · ${rewards.runs} run${rewards.runs === 1 ? '' : 's'} · ⚡${rewards.energySpent}`),
+      h('div.eyebrow', `${result.node.displayName} · ${rewards.runs} run${rewards.runs === 1 ? '' : 's'} · ⚡${rewards.energySpent} spent`),
       h('h2.display-l', rewards.firstClear ? 'The ground is yours.' : rewards.runs > 1 ? `${numberWord(rewards.runs)} more runs.` : 'Another step forward.')));
 
     const columns = h('div.reward-columns');
@@ -59,6 +61,8 @@ export function showFullResults(store, result, { onClose, members, count } = {})
     ].filter(Boolean);
     modal.querySelector('.results-content').append(
       h('div.fade-rule'),
+      rewards.energyRefunded ? h('p.good', `Frontier Momentum returned ${rewards.energyRefunded} Energy after this first clear.`) : null,
+      rewards.freeRunsUsed ? h('p.good', `${rewards.freeRunsUsed} run${rewards.freeRunsUsed === 1 ? ' was' : 's were'} carried by the Crisis boon, so no Energy was charged for ${rewards.freeRunsUsed === 1 ? 'it' : 'them'}.`) : null,
       h('p.results-unlocks', unlocks.length ? `${unlocks.join('. ')}.` : 'The materials have been added to your Workshop.'),
       unlocks.length ? h('p.warn', `${unlocks.length} thing${unlocks.length === 1 ? ' is' : 's are'} ready.`) : null);
 
@@ -76,7 +80,7 @@ export function showFullResults(store, result, { onClose, members, count } = {})
           if (next.ok) showResults(store, next, { members: repeatMembers, count: repeatCount });
         }
       }, 'Again →'),
-      h('div.caption', `⚡${rewards.energySpent}`)));
+      h('div.caption', `⚡${repeatCheck.cost} now`)));
     actions.append(
       h('button.btn', { onclick: () => { close(); store.go('#/inventory'); } }, 'Go craft'),
       h('button.btn', { onclick: () => { close(); store.go('#/home'); } }, 'Back to today'),

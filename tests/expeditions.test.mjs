@@ -7,6 +7,7 @@ import {
   cancelExpedition, evaluateRequirement, generateExpeditionBoard, launchExpedition,
   offerFeasibility, previewExpedition, rerollOffer, togglePinOffer
 } from '../src/core/expeditions.js';
+import { fieldSupplyLimits } from '../src/core/energy.js';
 
 const content = loadContent();
 const T0 = Date.parse('2026-07-25T12:00:00');
@@ -36,6 +37,32 @@ test('board persists, has five offers, and fallback keeps offers feasible', () =
   assert.equal(state.expeditions.board, board);
 });
 
+test('every board has exactly one fixed, unscaled Supply offer', () => {
+  for (let seed = 0; seed < 40; seed++) {
+    const state = newPlayerState(content, T0);
+    const board = generateExpeditionBoard(content, state, makeRng(seed), { seed });
+    const offers = board.offers.filter(offer => offer.offerKind === 'supply');
+    assert.equal(offers.length, 1);
+    assert.deepEqual(offers[0].fixedRewards.map(entry => [entry.id, entry.qty]), [['field_supply', 1]]);
+    const ids = offerFeasibility(content, state, offers[0]).party;
+    if (ids) {
+      const preview = previewExpedition(content, state, offers[0], ids);
+      assert.equal(preview.rewards.find(entry => entry.id === 'field_supply').qty, 1);
+    }
+  }
+});
+
+test('Supply launches reserve capacity and cancellation releases it', () => {
+  const state = newPlayerState(content, T0);
+  const offer = state.expeditions.board.offers.find(item => item.offerKind === 'supply');
+  const party = offerFeasibility(content, state, offer).party;
+  const launch = launchExpedition(content, state, offer.id, party);
+  assert.equal(launch.ok, true);
+  assert.equal(fieldSupplyLimits(content, state).reserved, 1);
+  assert.equal(cancelExpedition(state, launch.active.id).ok, true);
+  assert.equal(fieldSupplyLimits(content, state).reserved, 0);
+});
+
 test('launch prevents duplicate assignment, snapshots, and cancellation is launch-day only', () => {
   const state = newPlayerState(content, T0);
   const offer = state.expeditions.board.offers.find(o => offerFeasibility(content, state, o).feasible);
@@ -53,7 +80,7 @@ test('launch prevents duplicate assignment, snapshots, and cancellation is launc
 
 test('reroll usage and pin persistence consume the intended daily actions', () => {
   const state = newPlayerState(content, T0);
-  const first = state.expeditions.board.offers[0];
+  const first = state.expeditions.board.offers.find(offer => offer.offerKind !== 'supply');
   assert.equal(rerollOffer(content, state, first.id, makeRng(8)).ok, true);
   assert.equal(state.expeditions.daily.freeRerollsUsed, 1);
   const pinned = state.expeditions.board.offers[1];

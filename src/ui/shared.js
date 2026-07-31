@@ -12,20 +12,45 @@ export function activeSkin(store, characterId) {
   return { ...skin, ...(store.content.images.skin[skin.id] ?? {}), name: skin.skinName };
 }
 
-export function portrait(store, characterId, size = 'md') {
+export function portraitSlot({
+  src = null, color = 'var(--muted-2)', glyph = '✦', alt = '',
+  size = 'md', state = 'met', pulse = false, decorative = false
+} = {}) {
+  const classes = ['portrait-slot', size, state];
+  if (pulse) classes.push('pulses');
+  const el = h(`div.${classes.join('.')}`, {
+    style: { '--portrait-color': color },
+    'aria-hidden': decorative ? 'true' : null
+  });
+  el.appendChild(h('span.portrait-slot__glow', { 'aria-hidden': 'true' }));
+  if (src) {
+    el.appendChild(h('img.portrait-slot__image', {
+      src, alt: decorative ? '' : alt, draggable: 'false'
+    }));
+  } else {
+    el.appendChild(h('span.portrait-slot__fallback', { 'aria-hidden': 'true' },
+      h('span', glyph),
+      h('small', 'eyes · alpha art')));
+  }
+  return el;
+}
+
+export function portrait(store, characterId, size = 'md', options = {}) {
   const def = store.content.characterById[characterId];
-  const world = store.content.worldById[def.world];
-  const cs = store.state.characters[characterId];
   let src = store.content.images.portrait[characterId] ?? null;
   const skin = activeSkin(store, characterId);
   if (skin?.portrait) src = skin.portrait;
-  const el = h(`div.portrait.${size}`, {
-    style: { '--pc': `linear-gradient(140deg, ${def.color}, ${world.palette.dark})` },
-    title: def.displayName
+  const el = portraitSlot({
+    src,
+    color: def.color,
+    glyph: def.glyph,
+    alt: def.displayName,
+    size,
+    state: options.state ?? 'met',
+    pulse: options.pulse ?? false,
+    decorative: options.decorative ?? false
   });
-  if (src) el.appendChild(h('img.portrait-img', { src, alt: def.displayName }));
-  else el.appendChild(h('span', def.glyph));
-  el.appendChild(h('span.world-badge', world.icon));
+  el.title = options.title ?? def.displayName;
   return el;
 }
 

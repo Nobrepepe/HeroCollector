@@ -126,6 +126,10 @@ export function applyHqProduction(content, state) {
   const produced = [];
   for (const world of content.worlds) {
     if (!world.hq?.enabled) continue;
+    const crisis = state.crises?.active;
+    const productionBoon = crisis?.worldId === world.id && crisis.status === 'resolved'
+      && crisis.result?.outcome === 'mastered' && crisis.boon?.active && !crisis.boon?.consumed
+      && crisis.boon?.type === 'next_hq_production_bp' ? crisis.boon : null;
     for (const facility of world.hq.facilities.filter(f => f.category === 'production')) {
       const level = facilityLevel(state, world.id, facility.id);
       if (!level) continue;
@@ -138,9 +142,11 @@ export function applyHqProduction(content, state) {
       const caretakers = option.resourceId === '@associated_world_asset'
         ? (hs.staff[facility.id] ?? []).filter(id => content.characterById[id]?.archetype === 'caretaker').length : 0;
       const staffBonus = Math.floor((achievers + caretakers) * 2000 * staffScaleBp(content, state, world.id) / 10000);
-      const qty = Math.max(1, Math.floor((option.quantities[level - 1] ?? 0) * (10000 + staffBonus) / 10000));
+      const qty = Math.max(1, Math.floor((option.quantities[level - 1] ?? 0)
+        * (10000 + staffBonus + (productionBoon?.bonusBp ?? 0)) / 10000));
       produced.push(...grantRewardEntries(content, state, [{ kind: option.kind, id: option.resourceId, qty }], world.id));
     }
+    if (productionBoon) productionBoon.consumed = true;
   }
   return produced;
 }

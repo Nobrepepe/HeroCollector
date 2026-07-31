@@ -10,6 +10,7 @@ import { craftEquipmentWithConfirmation, openGearDialog } from './gear.js';
 import {
   campaignFrontiers, rankTodayHook, todayHookText, sceneImage, selectedPartyPower
 } from './presentation.js';
+import { previewFieldSupplyUse } from '../core/energy.js';
 
 export function renderHome(store, root) {
   const { content, state } = store;
@@ -54,6 +55,9 @@ export function renderHome(store, root) {
 }
 
 function routeSentence(store, hook) {
+  if (hook.kind === 'crisis') return hook.crisis.status === 'planning'
+    ? `The response in ${store.content.worldById[hook.crisis.worldId].displayName} costs no Energy and closes at the next reset.`
+    : 'One deterministic reward choice remains before the day closes.';
   if (hook.kind === 'shards') {
     const sources = store.content.shardNodesByCharacter[hook.def.id] ?? [];
     return sources.length ? `The quickest route is ${sources[0].displayName}.` : 'Their next shard source is still waiting to be authored.';
@@ -69,6 +73,7 @@ function continueThread(store, node) {
     wrap.appendChild(h('p.muted', 'Every currently available campaign is complete.'));
     return wrap;
   }
+  const supply = previewFieldSupplyUse(store.content, store.state);
   const scene = sceneImage(store, node);
   const selected = selectedPartyPower(store, node);
   const thresholdClass = selected.effective >= node.threshold ? 'good' : 'bad';
@@ -84,6 +89,10 @@ function continueThread(store, node) {
     h('div.continue-action',
       h('button.btn.primary', { onclick: () => store.go(`#/node/${node.id}`) }, 'Enter →'),
       h('div.caption', `⚡ ${store.content.balance.nodeDefaults[node.type].energy}`))));
+  if (store.state.energy < store.content.balance.nodeDefaults[node.type].energy && supply.ok) {
+    wrap.appendChild(h('p.today-supply', 'The day is spent, but one Field Supply is waiting. ',
+      h('button.link', { onclick: () => document.querySelector('.sidebar-energy')?.click() }, `Restore ${supply.restored} Energy →`)));
+  }
   return wrap;
 }
 
@@ -95,13 +104,13 @@ function readyThread(store, ready) {
   }
   const shown = ready.length > 3 ? ready.slice(0, 2) : ready.slice(0, 3);
   const row = h('div.ready-thread-row');
-  for (const item of shown) {
+  shown.forEach((item, index) => {
     const def = store.content.characterById[item.characterId];
     row.appendChild(h('div.ready-thread-item',
-      h('div.ready-portrait', portrait(store, item.characterId, 'sm')),
+      portrait(store, item.characterId, 'ready', { pulse: index === 0 }),
       h('div', h('div', def.displayName), h('div.caption', item.text.replace(`${def.displayName}: `, '')),
         readyAction(store, item))));
-  }
+  });
   if (ready.length > 3) row.appendChild(h('button.ready-more', {
     onclick: () => {
       Object.assign(store.state.ui.roster, { ownership: 'ready', sort: 'ready', direction: 'desc' });

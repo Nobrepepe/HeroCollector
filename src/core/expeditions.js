@@ -1,6 +1,8 @@
 import { characterPowerForState } from './power.js';
 import { hqExpeditionModifiers } from './hq.js';
 import { addResource, grantRewardEntries, INTELLIGENCE_ID, scaledRewards } from './resources.js';
+import { fieldSupplyLimits, FIELD_SUPPLY_ID } from './energy.js';
+import { activeCrisisBoon } from './crises.js';
 
 const pick = (rng, list) => list[Math.floor(rng.next() * list.length)];
 const shuffle = (rng, list) => {
@@ -79,7 +81,8 @@ export function previewExpedition(content, state, offer, ids) {
   const tier = power < offer.recommendedPower ? 'completed' : optional.met ? 'exceptional' : 'successful';
   const multiplierBp = content.expeditions.settings.resultMultipliersBp[tier];
   return { valid, party, mandatory, optional, power, tier, multiplierBp,
-    rewards: scaledRewards(offer.baseRewards, multiplierBp) };
+    fixedRewards: structuredClone(offer.fixedRewards ?? []),
+    rewards: [...structuredClone(offer.fixedRewards ?? []), ...scaledRewards(offer.baseRewards, multiplierBp)] };
 }
 
 function combinations(list, size, visit, start = 0, chosen = []) {
@@ -134,7 +137,8 @@ function instantiateOffer(content, state, template, rng, day, position) {
     templateId: template.id, name: pick(rng, template.titles), description: pick(rng, template.descriptions),
     world, duration, partySize: template.partySize, requirements, optional,
     recommendedPower: Math.max(1, Math.round(average * template.partySize * sampledRatio / 10000)),
-    baseRewards: rewards, rareReward: rare, rareRevealed: false,
+    offerKind: template.id === content.expeditions.settings.guaranteedSupplyTemplateId ? 'supply' : 'standard',
+    baseRewards: rewards, fixedRewards: (template.fixedRewards ?? []).map(entry => ({ ...structuredClone(entry), fixed: true })), rareReward: rare, rareRevealed: false,
     rareRoll: Math.floor(rng.next() * 10000), pinned: false
   };
 }
@@ -142,9 +146,15 @@ function instantiateOffer(content, state, template, rng, day, position) {
 export function generateExpeditionBoard(content, state, rng, { seed = null, pinned = null } = {}) {
   const settings = content.expeditions.settings;
   const offers = pinned ? [{ ...structuredClone(pinned), pinned: false }] : [];
+  const guaranteed = content.expeditions.templateById?.[settings.guaranteedSupplyTemplateId]
+    ?? content.expeditions.templates.find(template => template.id === settings.guaranteedSupplyTemplateId);
+  if (guaranteed?.enabled !== false && !offers.some(offer => offer.offerKind === 'supply')) {
+    offers.push(instantiateOffer(content, state, guaranteed, rng, state.dayNumber, offers.length));
+  }
   let longCount = offers.filter(o => o.duration === 2).length;
-  const templates = content.expeditions.templates.filter(t => t.enabled !== false);
+  const templates = content.expeditions.templates.filter(t => t.enabled !== false && t.id !== settings.guaranteedSupplyTemplateId);
   for (let position = offers.length; position < settings.offerCount; position++) {
+    if (!templates.length) break;
     let chosen = null;
     for (let attempt = 0; attempt < settings.generationAttempts; attempt++) {
       const weighted = templates.flatMap(t => Array(Math.max(1, t.weight ?? 1)).fill(t));
@@ -161,7 +171,7 @@ export function generateExpeditionBoard(content, state, rng, { seed = null, pinn
   // Replace hard offers until the configured minimum is met where possible.
   let feasible = offers.filter(o => offerFeasibility(content, state, o).feasible).length;
   for (let i = offers.length - 1; i >= 0 && feasible < settings.minimumFeasible; i--) {
-    if (offers[i].id === pinned?.id || offerFeasibility(content, state, offers[i]).feasible) continue;
+    if (offers[i].id === pinned?.id || offers[i].offerKind === 'supply' || offerFeasibility(content, state, offers[i]).feasible) continue;
     const replacement = instantiateOffer(content, state, content.expeditions.fallbackTemplate, rng, state.dayNumber, i);
     offers[i] = replacement;
     if (offerFeasibility(content, state, replacement).feasible) feasible++;
@@ -182,8 +192,15 @@ export function launchExpedition(content, state, offerId, ids) {
   }
   const preview = offer ? previewExpedition(content, state, offer, ids) : null;
   if (preview && !preview.valid) reasons.push('The selected party does not satisfy every mandatory requirement.');
+  const promisedSupplies = (offer?.fixedRewards ?? []).filter(entry => entry.kind === 'resource' && entry.id === FIELD_SUPPLY_ID)
+    .reduce((sum, entry) => sum + entry.qty, 0);
+  if (promisedSupplies > fieldSupplyLimits(content, state).unreservedCapacity) {
+    reasons.push('Held and promised Field Supplies already fill the available storage. Cancel a launch-day Supply Expedition or use a Supply first.');
+  }
   if (reasons.length) return { ok: false, reasons };
   const modifiers = offer.world ? hqExpeditionModifiers(content, state, offer.world) : { renownBp: 0, worldAssetBp: 0, rareChanceBp: 0 };
+  const crisisRenown = offer.world ? activeCrisisBoon(state, 'world_expedition_renown_bp', offer.world) : null;
+  if (crisisRenown) modifiers.renownBp += crisisRenown.bonusBp ?? 0;
   const rewards = scaledRewards(offer.baseRewards, preview.multiplierBp, modifiers);
   const rareChance = Math.min(10000, (offer.rareReward?.chanceBp ?? 0) + (modifiers.rareChanceBp ?? 0));
   if (preview.tier === 'exceptional' && offer.rareReward && offer.rareRoll < rareChance) {
@@ -195,6 +212,7 @@ export function launchExpedition(content, state, offerId, ids) {
     launchDay: state.dayNumber, returnDay: state.dayNumber + offer.duration,
     duration: offer.duration, party: [...ids], snapshot: preview.party,
     tier: preview.tier, optionalMet: preview.optional.met, rewards,
+    fixedRewards: structuredClone(offer.fixedRewards ?? []), offerKind: offer.offerKind ?? 'standard',
     rareReward: offer.rareReward, rareRevealed: offer.rareRevealed,
     sourceOffer: structuredClone(offer)
   };
@@ -219,12 +237,16 @@ export function cancelExpedition(state, expeditionId) {
 export function rerollOffer(content, state, offerId, rng) {
   const index = state.expeditions.board.offers.findIndex(o => o.id === offerId);
   const offer = state.expeditions.board.offers[index];
-  if (!offer || offer.pinned) return { ok: false, reasons: ['Only an unpinned available offer can be rerolled.'] };
+  if (!offer || offer.pinned || offer.offerKind === 'supply') return { ok: false, reasons: [offer?.offerKind === 'supply'
+    ? 'The guaranteed Field Supply route cannot be rerolled.' : 'Only an unpinned available offer can be rerolled.'] };
   const free = state.expeditions.daily.freeRerollsUsed < state.expeditions.daily.freeRerolls;
   if (!free && !addResource(state, INTELLIGENCE_ID, -content.expeditions.settings.intelligenceCosts.reroll)) {
     return { ok: false, reasons: ['Not enough Intelligence.'] };
   }
-  const replacement = instantiateOffer(content, state, pick(rng, content.expeditions.templates), rng, state.dayNumber, index);
+  const pool = content.expeditions.templates.filter(template => template.enabled !== false
+    && template.id !== content.expeditions.settings.guaranteedSupplyTemplateId);
+  if (!pool.length) return { ok: false, reasons: ['No other enabled Expedition template can replace this offer.'] };
+  const replacement = instantiateOffer(content, state, pick(rng, pool), rng, state.dayNumber, index);
   state.expeditions.board.offers[index] = replacement;
   if (free) state.expeditions.daily.freeRerollsUsed++;
   return { ok: true, offer: replacement, free };
@@ -259,7 +281,7 @@ export function resolveDueExpeditions(content, state) {
   const returned = [], remaining = [];
   for (const active of state.expeditions.active) {
     if (active.returnDay > state.dayNumber) { remaining.push(active); continue; }
-    const rewards = grantRewardEntries(content, state, active.rewards, active.world);
+    const rewards = grantRewardEntries(content, state, [...(active.fixedRewards ?? []), ...(active.rewards ?? [])], active.world);
     const pool = content.expeditions.reports[active.tier] ?? ['The party returned with the promised rewards.'];
     const report = { ...active, report: pool[(active.offerId.length + active.returnDay) % pool.length], rewards, acknowledged: false };
     state.expeditions.reports.unshift(report);

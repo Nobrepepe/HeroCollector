@@ -1,5 +1,5 @@
 import { enableMouseDragScroll, h, fmt } from './dom.js';
-import { readyUpgrades, checkUnlockCharacter } from '../core/state.js';
+import { readyUpgrades } from '../core/state.js';
 import { characterPower } from '../core/power.js';
 import { portrait, starline } from './shared.js';
 import { characterFilterBar, filterCharacters } from './character-picker.js';
@@ -44,29 +44,18 @@ export function renderRoster(store, root) {
   const gallery = h('div.collection-gallery');
   enableMouseDragScroll(gallery);
   const compact = h('div.collection-compact-grid');
-  const outThere = h('section.still-out-there', h('div.eyebrow', 'Still out there'));
   const footer = h('footer.collection-compact-footer');
-  root.append(gallery, compact, outThere, footer);
+  root.append(gallery, compact, footer);
 
   function paint() {
     gallery.replaceChildren();
     compact.replaceChildren();
     footer.replaceChildren();
-    outThere.querySelectorAll('.unowned-row').forEach(el => el.remove());
     const rows = filterCharacters(content, state, preferences, ready, search);
     const owned = rows.filter(def => state.characters[def.id].owned);
-    const unowned = rows.filter(def => !state.characters[def.id].owned);
     if (preferences.collectionDensity === 'gallery') {
       owned.forEach((def, index) => gallery.appendChild(characterCard(store, def, ready.has(def.id), index)));
       if (!owned.length) gallery.appendChild(h('p.muted', 'No met characters match these filters.'));
-      for (const def of unowned) {
-        const cs = state.characters[def.id];
-        const need = content.balance.acquisitionTiers[def.tier].cumulativeShards;
-        outThere.appendChild(h('button.unowned-row', { onclick: () => store.go(`#/character/${def.id}`) },
-          portrait(store, def.id, 'sm'), h('span', def.displayName),
-          h('span.caption', `${fmt(cs.shards)} / ${fmt(need)} shards`),
-          checkUnlockCharacter(content, state, def.id).ok ? h('span.good', 'ready') : null));
-      }
     } else {
       let pulseUsed = false;
       rows.forEach(def => {
@@ -84,7 +73,6 @@ export function renderRoster(store, root) {
           h('span', h('b.numeral', fmt(globalOwned)), ` met · ${fmt(content.characters.length - globalOwned)} still out there`)));
     }
     gallery.hidden = preferences.collectionDensity !== 'gallery';
-    outThere.hidden = preferences.collectionDensity !== 'gallery' || unowned.length === 0;
     compact.hidden = preferences.collectionDensity !== 'compact';
     footer.hidden = preferences.collectionDensity !== 'compact';
   }
@@ -159,7 +147,10 @@ function compactCharacter(store, def, isReady, pulses) {
       : `${def.displayName}, not yet met, ${fmt(cs.shards)} of ${fmt(need)} shards`
   });
   const well = h('div.compact-character-well');
-  if (owned) well.appendChild(portrait(store, def.id, 'compact'));
+  well.appendChild(portrait(store, def.id, 'compact', {
+    state: owned ? 'met' : 'unmet',
+    pulse: pulses
+  }));
   card.append(well, h('span.compact-character-name', def.displayName));
   if (owned) card.appendChild(starline(cs.stars));
   card.appendChild(owned

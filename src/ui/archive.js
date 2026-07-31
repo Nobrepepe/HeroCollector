@@ -1,10 +1,14 @@
-import { h, fmt } from './dom.js';
+import { h, fmt, pct } from './dom.js';
 import { archiveStatus, nodeUnlocked, selectSkin } from '../core/state.js';
 import { openModal, toast } from '../app.js';
-import { campaignLabel } from './shared.js';
+import { campaignLabel, portraitSlot } from './shared.js';
 import { relicPieceModel, collectionSummary } from './presentation.js';
 
 export function renderArchive(store, root, arg = null) {
+  if (arg === 'synergies') {
+    renderSynergyCodex(store, root);
+    return;
+  }
   const route = parseArchiveRoute(store.content, arg);
   if (!route) {
     root.appendChild(h('p.muted', 'No published Archive exists yet.'));
@@ -13,6 +17,62 @@ export function renderArchive(store, root, arg = null) {
   root.classList.add('archive-screen');
   if (route.collectionIndex === null) renderWorldArchive(store, root, route.world);
   else renderArchiveCollection(store, root, route.world, route.collectionIndex);
+}
+
+function renderSynergyCodex(store, root) {
+  root.classList.add('archive-screen', 'synergy-codex-screen');
+  const tags = store.content.tags.filter(tag => tag.thresholds?.length);
+  const categories = [...new Set(tags.map(tag => tag.category))];
+  let active = categories[0] ?? null;
+  root.appendChild(h('header.synergy-codex-head',
+    h('div.eyebrow', 'Archive · party codex'),
+    h('h1.display-s', 'Every way a party can fit.'),
+    h('p', `Bonuses add together until the global ${pct(store.content.balance.synergyCapBp)} cap. Colour never changes the rule.`)));
+  const controls = h('nav.synergy-codex-tabs', { 'aria-label': 'Synergy categories' });
+  const grid = h('div.synergy-codex-grid');
+  const paint = () => {
+    controls.replaceChildren();
+    categories.forEach(category => controls.appendChild(h(
+      'button' + (category === active ? '.active' : ''),
+      {
+        onclick: () => { active = category; paint(); },
+        'aria-pressed': category === active
+      },
+      categoryName(category))));
+    grid.replaceChildren();
+    tags.filter(tag => tag.category === active).forEach((tag, index) => {
+      grid.appendChild(h('article.synergy-codex-entry',
+        h('div.eyebrow', categoryName(tag.category)),
+        h('h2', tag.displayName),
+        h('p', tag.explanation),
+        h('div.synergy-thresholds',
+          ...tag.thresholds.map(threshold => h('div',
+            h('span', thresholdWords(store, tag, threshold)),
+            h('span.numeral.good', `+${pct(threshold.bonusBp)}`)))),
+        index < tags.length - 1 ? h('div.fade-rule') : null));
+    });
+  };
+  root.append(controls, grid,
+    h('button.link.synergy-codex-back', { onclick: () => store.go('#/party') }, '← Party'));
+  paint();
+}
+
+function categoryName(category) {
+  return ({
+    world: 'World bonds',
+    archetype: 'Archetype pairs',
+    profession: 'Shared callings',
+    faction: 'Factions'
+  })[category] ?? category;
+}
+
+function thresholdWords(store, tag, threshold) {
+  if (tag.activationRule === 'same_world_count') return `${threshold.count} from one world`;
+  if (tag.activationRule === 'distinct_world_count') return `${threshold.count} different worlds`;
+  if (tag.activationRule === 'archetype_pair') {
+    return tag.pair.map(id => store.content.archetypes[id]?.name ?? id).join(' + ');
+  }
+  return `${threshold.count} ${tag.displayName.toLocaleLowerCase()}`;
 }
 
 function renderWorldArchive(store, root, world) {
@@ -191,13 +251,15 @@ function archiveBackdrop(image, darker = false) {
 
 function rewardGhost(store, reward, image, size) {
   const def = reward ? store.content.characterById[reward.characterId] : null;
-  const ghost = h('div.archive-reward-ghost' + (image ? '' : '.art-fallback'), {
-    style: { width: `${size}px`, height: `${size}px`, '--character-color': def?.color ?? 'var(--muted-2)' },
-    'aria-hidden': 'true'
+  return portraitSlot({
+    src: image,
+    color: def?.color ?? 'var(--muted-2)',
+    glyph: def?.glyph ?? '✦',
+    alt: '',
+    size: 'ghost',
+    state: 'ghost',
+    decorative: true
   });
-  if (image) ghost.appendChild(h('img', { src: image, alt: '' }));
-  else ghost.appendChild(h('span', def?.glyph ?? '✦'));
-  return ghost;
 }
 
 function rewardImageFor(store, reward) {
