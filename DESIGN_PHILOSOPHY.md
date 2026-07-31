@@ -239,10 +239,16 @@ padding: 4px 0`. Textareas auto-grow. Selects are underlined text.
 amber. Secondary = plain `ui` text in `--muted`. Destructive = `--bad`. Disabled = `--faint`, no
 underline, `cursor: not-allowed`. Cost (`⚡ 6 of your 96`) sits beneath the primary in `caption`.
 
-**Circular well.** Portraits and gear as circles — 38px (unowned strip), 56–66px (party, ready row),
-84px (gear node), 104px (creator cast). Filled = art on a dark-warm radial with a soft drop shadow;
-ready = amber-tinted with a 1px pulsing ring, lifted `translateY(-6px)`; empty = 1px dashed
-`rgba(244,236,225,.16)` with no glyph.
+**Portrait slot.** *(Replaced the circular well — no portrait is a circle anywhere in the app.)*
+Character portrait art is a 16:9 PNG whose **own transparency is the silhouette** (a torn crop of the
+eyes). The UI supplies a 16:9 box, `object-fit: contain`, and a blend: a character-colour radial glow
+behind at ~26% alpha, then two alpha-following drop-shadows on the image —
+`0 10px 18px rgba(0,0,0,.55)` to seat it on the floor and a `0 0 24px` coloured bloom to melt the
+ragged edge into `--bg` — plus `mask-image: linear-gradient(to bottom, #000 76%, rgba(0,0,0,.35))`.
+Ready pulses the **glow layer**, never a ring. Not-yet-met is the same tile at 42%,
+`grayscale(1) brightness(.62)`, bloom off. No tile yet = masked hatch at the same ratio with a mono
+caption. Never clip, ring, or shape the art — if a treatment needs a defined edge, it is wrong.
+Gear still uses a circular well (84px node); it is an object, not a face.
 
 **Dot path.** Any sequence — campaign nodes, publish gates, chapter completion — is drawn as dots on a
 single fading hairline rather than listed as rows: done = 12px solid at 50% opacity, current/frontier
@@ -327,10 +333,12 @@ When building something new, find the closest existing screen and inherit its sh
 | A set of sets (worlds → collections) | **Archive world / collection** | Two screens that each fit, big art behind each level, never one long scroll |
 | The same content at two densities | **Collection gallery / compact** | One default display case plus a text-switch density; the switch's underline is neutral, not amber |
 | An authoring tool | **Creator** | Density permitted, but eyebrows/underlined inputs/text tabs still apply; validation drawn as a path |
+| A party or fixed small squad | **Party `8a`** | Five full bodies bleeding off the bottom, numbers and threads above, the reference table exiled to a codex |
+| A screen with a long reference table | **Party** | A codex is not a decision — move it to the Archive and leave the active state plus the one near-miss |
 | An inventory / making surface | **Workshop** | Lead with what can be done now; the inventory is a shelf of serif numerals with em-dash zeros, and the full grid hides behind disclosure |
 | A blocked or empty state | **Workshop, cold** | Same skeleton as the ready state, ghosted art, disabled action, and the shortfall drawn as a path to the way out |
 
-**Not yet designed:** Party, Settings. Apply §1–§7 by analogy — eyebrow labels,
+**Not yet designed:** Settings. Apply §1–§7 by analogy — eyebrow labels,
 fading rules, serif numerals, no boxes — and **ask before inventing a new layout archetype for them.**
 
 ---
@@ -350,6 +358,8 @@ fading rules, serif numerals, no boxes — and **ask before inventing a new layo
 - **No CDNs, no web fonts over the network, no new dependencies.** CSP is `default-src 'self'`.
 - **Layout is ratios, not absolutes.** The window resizes; express the 1440×900 mockup coordinates as
   flex/grid with the stated gutters and column widths and let the content column grow.
+- **Portrait art carries its own alpha.** Eye tiles are 16:9 PNGs with real transparency; the UI never
+  supplies the silhouette. Commission against `#12100f`.
 - **Art is placeholder until commissioned.** Build the element at the stated aspect ratio and make the
   no-art fallback deliberate: masked hatch or the deterministic glyph, never a broken image.
 

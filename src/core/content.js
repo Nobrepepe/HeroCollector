@@ -24,22 +24,24 @@ export function buildContent(raw) {
         resultMultipliersBp: { completed: 10000, successful: 12500, exceptional: 15000 } },
       requirements: [], optionalObjectives: [], rewardPackages: [], templates: [], reports: {}, fallbackTemplate: null
     },
+    crises: raw.crises ?? { settings: { spawnChanceBp: 2500, grades: [] }, definitions: [] },
 
     worldById: {}, resourceById: {}, materialById: {}, componentById: {}, characterById: {},
     tagById: {}, nodeById: {}, templateByKey: {}, tierProfileByTier: {},
-    archiveByWorld: {}, fragmentById: {}, skinById: {},
+    archiveByWorld: {}, fragmentById: {}, skinById: {}, crisisById: {}, crisesByWorld: {},
     nodesByCampaign: {}, shardNodesByCharacter: {}, nodesByMaterial: {},
     maxMaterialGradeRank: -1,
     maxGearTier: 0,
     // Imported art (data URLs), filled in by the custom-content merge.
     images: {
-      world: {}, headquarters: {}, expedition: {}, chapter: {}, portrait: {},
+      world: {}, headquarters: {}, expedition: {}, crisis: {}, chapter: {}, portrait: {},
       fullBody: {}, equipment: {}, relic: {}, skin: {}, hq: {}, facility: {}
     }
   };
   c.resources = [
     { id: 'renown', displayName: 'Renown', description: 'Shared influence used to develop Headquarters.', icon: '✧' },
-    { id: 'intelligence', displayName: 'Intelligence', description: 'Information used to shape Expedition offers.', icon: '◈' }
+    { id: 'intelligence', displayName: 'Intelligence', description: 'Information used to shape Expedition offers.', icon: '◈' },
+    { id: 'field_supply', displayName: 'Field Supply', description: 'Stored provisions used only to restore up to 30 Energy.', icon: '▰' }
   ];
   for (const w of c.worlds) {
     c.worldById[w.id] = w;
@@ -81,6 +83,11 @@ export function buildContent(raw) {
   c.expeditions.requirementById = Object.fromEntries((c.expeditions.requirements ?? []).map(x => [x.id, x]));
   c.expeditions.optionalById = Object.fromEntries((c.expeditions.optionalObjectives ?? []).map(x => [x.id, x]));
   c.expeditions.rewardById = Object.fromEntries((c.expeditions.rewardPackages ?? []).map(x => [x.id, x]));
+  c.expeditions.templateById = Object.fromEntries((c.expeditions.templates ?? []).map(x => [x.id, x]));
+  for (const definition of c.crises.definitions ?? []) {
+    c.crisisById[definition.id] = definition;
+    (c.crisesByWorld[definition.worldId] ??= []).push(definition);
+  }
   return c;
 }
 

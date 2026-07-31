@@ -6,11 +6,12 @@
 import { h, fmt } from './dom.js';
 import { openModal, toast, render } from '../app.js';
 import { imageWell } from './images.js';
+import { portraitSlot } from './shared.js';
 import { exportJson, importJson, loadSamplePack } from '../platform.js';
 import {
   emptyCustomDB, upgradeCustomDB, newCustomWorld, newCustomCharacter,
   newCustomFaction, addCampaignChapter, canPublishWorld, characterShardAssignments,
-  scaffoldWorldHq, sampleExpeditionLibrary
+  scaffoldWorldHq, sampleExpeditionLibrary, newCrisisDefinition
 } from '../core/custom.js';
 
 export function renderCreator(store, root, arg) {
@@ -50,6 +51,14 @@ function textArea(obj, key, store) {
   input.addEventListener('input', grow);
   input.addEventListener('change', () => { obj[key] = input.value; commit(store); });
   queueMicrotask(grow);
+  return input;
+}
+function arrayInput(obj, key, store) {
+  const input = h('input', { type: 'text', value: (obj[key] ?? []).join(', '), placeholder: 'id_one, id_two' });
+  input.addEventListener('change', () => {
+    obj[key] = input.value.split(',').map(value => value.trim()).filter(Boolean);
+    commit(store, true);
+  });
   return input;
 }
 function numInput(obj, key, store, { min = 0, step = 50 } = {}) {
@@ -153,7 +162,7 @@ function overview(store, root) {
     });
     const row = h('div.creator-list-row');
     row.appendChild(h('div.grow',
-      h('div', h('b', `Chapter ${i + 1}`), h('span.small.muted', ` — nodes ${i * 10 + 1}–${i * 10 + 10}`)),
+      h('div', h('b', ch.title || `Main Chapter ${i + 1}`), h('span.small.muted', ` — nodes ${i * 10 + 1}–${i * 10 + 10}`)),
       h('div.small.muted', `Shadow assignments: ${shardChars.filter(x => x !== '—').length}/10`)));
     row.appendChild(h('div.chapter-dots',
       h('div', h('span.caption', 'Main'), ...ch.nodes.map(() => h('i.filled'))),
@@ -279,7 +288,41 @@ function expeditionEditor(store, root) {
   for (const [key, label] of [['offerCount', 'Offers per board'], ['slotCount', 'Active slots'], ['freeRerolls', 'Free rerolls'], ['minimumFeasible', 'Minimum feasible'], ['maxLongOffers', 'Long-offer limit'], ['generationAttempts', 'Attempt limit']]) {
     sg.append(...field(label, numInput(lib.settings, key, store, { min: 0, step: 1 })));
   }
+  const supplySelect = h('select', { 'aria-label': 'Guaranteed Field Supply template' },
+    h('option', { value: '', selected: !lib.settings.guaranteedSupplyTemplateId }, '— none configured —'),
+    lib.templates.map(template => h('option', { value: template.id, selected: template.id === lib.settings.guaranteedSupplyTemplateId }, template.titles?.[0] ?? template.id)));
+  supplySelect.addEventListener('change', () => {
+    lib.settings.guaranteedSupplyTemplateId = supplySelect.value || null;
+    const template = lib.templates.find(item => item.id === supplySelect.value);
+    if (template) {
+      template.durations = [1];
+      template.fixedRewards = [{ kind: 'resource', id: 'field_supply', qty: 1 }];
+    }
+    commit(store, true);
+  });
+  sg.append(...field('Guaranteed Field Supply template', supplySelect));
   settings.appendChild(sg); root.appendChild(settings);
+
+  const guaranteed = lib.templates.find(template => template.id === lib.settings.guaranteedSupplyTemplateId);
+  if (guaranteed) {
+    const supplyEditor = h('div.panel', h('h2', 'Guaranteed Supply route'),
+      h('p.small.muted', 'This route is fixed to one game day and exactly one unscaled Field Supply. Its secondary package still follows the result tier.'));
+    const grid = h('div.form-grid');
+    const title = h('input', { type: 'text', value: guaranteed.titles?.[0] ?? '', maxlength: 80 });
+    title.addEventListener('change', () => { guaranteed.titles = [title.value]; commit(store); });
+    const description = h('textarea', guaranteed.descriptions?.[0] ?? '');
+    description.addEventListener('change', () => { guaranteed.descriptions = [description.value]; commit(store); });
+    grid.append(...field('Offer title', title));
+    grid.append(...field('Description', description));
+    grid.append(...field('Associated world', selectInput(guaranteed, 'world', store,
+      [['', 'Across worlds'], ['@any', 'Any published world'], ...store.customDB.worlds.map(world => [world.id, world.displayName])], { structural: true })));
+    grid.append(...field('Party size', numInput(guaranteed, 'partySize', store, { min: 1, step: 1 })));
+    grid.append(...field('Mandatory requirement IDs', arrayInput(guaranteed, 'requirementIds', store)));
+    grid.append(...field('Optional objective IDs', arrayInput(guaranteed, 'optionalIds', store)));
+    grid.append(...field('Secondary reward package', selectInput(guaranteed, 'rewardPackageId', store,
+      lib.rewardPackages.map(pack => [pack.id, pack.displayName || pack.id]))));
+    supplyEditor.appendChild(grid); root.appendChild(supplyEditor);
+  }
 
   const req = h('div.panel', h('h2', 'Requirement definitions'));
   for (const item of [...lib.requirements, ...lib.optionalObjectives]) {
@@ -305,7 +348,8 @@ function expeditionEditor(store, root) {
     const row = h('div.creator-list-row');
     row.append(h('span.caption', template.id), h('div.grow',
       h('div', template.titles?.[0] ?? 'Untitled'),
-      h('div.caption', `${template.world ?? 'global'} · ${template.partySize} characters · ${template.durations.join('/')} day`)),
+      h('div.caption', `${template.world ?? 'global'} · ${template.partySize} characters · ${template.durations.join('/')} day`),
+      template.fixedRewards?.length ? h('div.good.small', 'Fixed reward · one Field Supply, never multiplied') : null),
     numInput(template, 'weight', store, { min: 1, step: 1 }),
     selectInput(template, 'rewardPackageId', store, lib.rewardPackages.map(p => [p.id, p.displayName || p.id])));
     templates.appendChild(row);
@@ -420,6 +464,8 @@ function worldEditor(store, root, worldId) {
   }
   root.appendChild(hqp);
 
+  root.appendChild(crisisAuthoringPanel(store, w));
+
   // ---- characters
   root.appendChild(characterListPanel(store, w.id));
 
@@ -433,6 +479,19 @@ function worldEditor(store, root, worldId) {
   ];
   for (let ch = 0; ch < 3; ch++) {
     np.appendChild(h('h3', `Chapter ${ch + 1}`));
+    const chapterTitle = h('input', {
+      type: 'text',
+      value: w.campaignChapterTitles?.[ch] ?? '',
+      placeholder: `${w.displayName} · Chapter ${ch + 1}`,
+      maxlength: 60,
+      'aria-label': `Chapter ${ch + 1} name`
+    });
+    chapterTitle.addEventListener('change', () => {
+      w.campaignChapterTitles ??= ['', '', ''];
+      w.campaignChapterTitles[ch] = chapterTitle.value;
+      commit(store);
+    });
+    np.appendChild(h('div.chapter-name-field', h('label', 'Chapter name'), chapterTitle));
     np.appendChild(imageWell('chapter', `Chapter ${ch + 1} key art (16:9)`,
       () => w.campaignChapterImages[ch],
       value => { w.campaignChapterImages[ch] = value; },
@@ -465,7 +524,7 @@ function worldEditor(store, root, worldId) {
     cg.append(...field('Reward skin name', textInput(col.rewardSkin, 'name', store, { maxlength: 80 })));
     ap.appendChild(cg);
     ap.appendChild(h('div.wells', { style: { marginTop: '10px' } },
-      imageWell('portrait', 'Reward skin portrait (square)', () => col.rewardSkin.portrait, v => { col.rewardSkin.portrait = v; }, () => commit(store, true)),
+      imageWell('portrait', 'Reward skin eye tile (16:9, transparent)', () => col.rewardSkin.portrait, v => { col.rewardSkin.portrait = v; }, () => commit(store, true)),
       imageWell('fullBody', 'Reward skin full body (9:16)', () => col.rewardSkin.fullBody, v => { col.rewardSkin.fullBody = v; }, () => commit(store, true))));
     const shelf = h('div.wells', { style: { marginTop: '8px' } });
     col.relics.forEach((relic, r) => {
@@ -486,9 +545,83 @@ function worldEditor(store, root, worldId) {
   sg.append(...field('Skin name', textInput(w.archive.fullSkin, 'name', store, { maxlength: 80 })));
   ap.appendChild(sg);
   ap.appendChild(h('div.wells', { style: { marginTop: '10px' } },
-    imageWell('portrait', 'Skin portrait (square)', () => w.archive.fullSkin.portrait, v => { w.archive.fullSkin.portrait = v; }, () => commit(store, true)),
+    imageWell('portrait', 'Skin eye tile (16:9, transparent)', () => w.archive.fullSkin.portrait, v => { w.archive.fullSkin.portrait = v; }, () => commit(store, true)),
     imageWell('fullBody', 'Skin full body (9:16)', () => w.archive.fullSkin.fullBody, v => { w.archive.fullSkin.fullBody = v; }, () => commit(store, true))));
   root.appendChild(ap);
+}
+
+function crisisAuthoringPanel(store, world) {
+  const library = store.customDB.crises;
+  const panel = h('div.panel.creator-crises', h('h2', 'Crises'),
+    h('p.small.muted', 'Crises are optional, deterministic roster puzzles for this world. Each live definition needs at least three authored Fronts.'));
+  const definitions = library.definitions.filter(definition => definition.worldId === world.id);
+  for (const definition of definitions) {
+    const details = h('details.crisis-authoring');
+    details.appendChild(h('summary', `${definition.name} · ${definition.enabled === false ? 'disabled' : `${definition.fronts.length} Fronts`}`));
+    const grid = h('div.form-grid');
+    grid.append(...field('Name', textInput(definition, 'name', store)));
+    grid.append(...field('Opening description', textArea(definition, 'openingDescription', store)));
+    grid.append(...field('Weight', numInput(definition, 'weight', store, { min: 1, step: 1 })));
+    grid.append(...field('Minimum cleared world nodes', numInput(definition, 'minimumClearedNodes', store, { min: 0, step: 1 })));
+    grid.append(...field('Consolation Renown', numInput(definition.consolationReward[0], 'qty', store, { min: 1, step: 1 })));
+    grid.append(...field('Mastery boon', selectInput(definition.boon, 'type', store, [
+      ['free_world_node_runs', 'Free world node runs'], ['bonus_world_material_runs', 'Bonus world materials'],
+      ['world_expedition_renown_bp', 'World Expedition Renown'], ['next_hq_production_bp', 'Next HQ production'],
+      ['instant_intelligence', 'Instant Intelligence']
+    ], { structural: true })));
+    grid.append(...field('Boon prose', textInput(definition.boon, 'prose', store, { maxlength: 140 })));
+    grid.append(...field('Boon runs', numInput(definition.boon, 'runs', store, { min: 0, step: 1 })));
+    grid.append(...field('Boon quantity', numInput(definition.boon, 'qty', store, { min: 0, step: 1 })));
+    grid.append(...field('Boon basis points', numInput(definition.boon, 'bonusBp', store, { min: 0, step: 100 })));
+    details.appendChild(grid);
+    details.appendChild(imageWell('crisis', 'Optional Crisis key art (16:9)', () => definition.artwork,
+      value => { definition.artwork = value; }, () => commit(store, true)));
+    definition.fronts.forEach((front, index) => {
+      const row = h('div.crisis-front-editor', h('h3', `Front ${index + 1}`));
+      const fg = h('div.form-grid');
+      fg.append(...field('Name', textInput(front, 'name', store)));
+      fg.append(...field('Description', textInput(front, 'description', store, { maxlength: 140 })));
+      fg.append(...field('Favored IDs (one or two)', arrayInput(front, 'favoredTagIds', store)));
+      for (const grade of library.settings.grades) fg.append(...field(`${grade.displayName} Power`, numInput(front.recommendedPowerByGrade, grade.id, store, { min: 1, step: 50 })));
+      fg.append(...field('Struggle prose', textInput(front, 'struggleText', store, { maxlength: 140 })));
+      fg.append(...field('Success prose', textInput(front, 'successText', store, { maxlength: 140 })));
+      fg.append(...field('Excel prose', textInput(front, 'excelText', store, { maxlength: 140 })));
+      row.appendChild(fg);
+      if (definition.fronts.length > 3) row.appendChild(h('button.btn.tiny.danger', {
+        onclick: () => { definition.fronts.splice(index, 1); commit(store, true); }
+      }, 'Delete Front'));
+      details.appendChild(row);
+    });
+    details.appendChild(h('h3', 'Emergency Cache choices'));
+    definition.cacheChoices.forEach(choice => details.appendChild(h('div.creator-list-row',
+      h('div.grow', textInput(choice, 'name', store), textInput(choice, 'description', store, { maxlength: 140 })),
+      h('span.caption', choice.rewards[0]?.id ?? 'reward'), choice.rewards[0]
+        ? numInput(choice.rewards[0], 'qty', store, { min: 1, step: 1 }) : null)));
+    details.appendChild(h('div.creator-row-actions',
+      h('button.btn.tiny', { onclick: () => {
+        const source = definition.fronts.at(-1);
+        definition.fronts.push({ ...structuredClone(source), id: `${definition.id}_front_${Date.now().toString(36)}`, name: 'New Front' });
+        commit(store, true);
+      } }, 'Add Front'),
+      h('button.btn.tiny', { onclick: () => { definition.enabled = definition.enabled === false; commit(store, true); } }, definition.enabled === false ? 'Enable' : 'Disable'),
+      h('button.btn.tiny', { onclick: () => {
+        const copy = structuredClone(definition);
+        copy.id = `${definition.id}_copy_${Date.now().toString(36)}`;
+        copy.name = `${definition.name} Copy`;
+        copy.fronts.forEach((front, index) => { front.id = `${copy.id}_front_${index + 1}`; });
+        copy.cacheChoices.forEach((choice, index) => { choice.id = `${copy.id}_cache_${index + 1}`; });
+        library.definitions.push(copy); commit(store, true);
+      } }, 'Duplicate'),
+      h('button.btn.tiny.danger', { onclick: () => confirmModal(store, `Delete “${definition.name}”?`,
+        'The authored Crisis is removed. An active occurrence expires without penalty when content synchronizes.', () => {
+          library.definitions = library.definitions.filter(item => item.id !== definition.id); commit(store, true);
+        }) }, 'Delete')));
+    panel.appendChild(details);
+  }
+  panel.appendChild(h('button.btn.primary', { onclick: () => {
+    library.definitions.push(newCrisisDefinition(world)); commit(store, true);
+  } }, 'Create Crisis →'));
+  return panel;
 }
 
 function characterListPanel(store, worldId) {
@@ -500,9 +633,10 @@ function characterListPanel(store, worldId) {
   for (const c of chars) {
     const sources = characterShardAssignments(db, c.id);
     const row = h('div.creator-list-row');
-    row.appendChild(c.portrait
-      ? h('img', { src: c.portrait, style: { width: '44px', height: '44px', borderRadius: '10px', objectFit: 'cover' }, alt: '' })
-      : h('div.portrait.sm', { style: { '--pc': c.color } }, h('span', c.glyph)));
+    row.appendChild(portraitSlot({
+      src: c.portrait, color: c.color, glyph: c.glyph,
+      alt: c.displayName, size: 'creator'
+    }));
     row.appendChild(h('div.grow',
       h('div', h('b', c.displayName),
         h('span.small.muted', ` · ${store.content.archetypes[c.archetype]?.name ?? c.archetype} · ${c.tier}`),
@@ -613,7 +747,7 @@ function charEditor(store, root, charId) {
   const imp = h('div.panel');
   imp.appendChild(h('h2', 'Character art'));
   imp.appendChild(h('div.wells',
-    imageWell('portrait', 'Portrait (square)', () => c.portrait, v => { c.portrait = v; }, () => commit(store, true)),
+    imageWell('portrait', 'Eye tile (16:9, transparent PNG)', () => c.portrait, v => { c.portrait = v; }, () => commit(store, true)),
     imageWell('fullBody', 'Full body (9:16, taller than wide)', () => c.fullBody, v => { c.fullBody = v; }, () => commit(store, true))));
   root.appendChild(imp);
 
@@ -671,6 +805,12 @@ function chapterEditor(store, root, campaign, idx) {
   panel.appendChild(h('p.small.muted', isShadow
     ? 'Every node requires a shard character and allows five runs per day. Each unlocks when the corresponding Main node is cleared; Shadow nodes do not gate one another.'
     : 'All nodes are freely repeatable material sources. Thresholds never decrease along the campaign; positions 5 and 10 are checkpoints with larger first-clear rewards.'));
+  panel.appendChild(h('div.chapter-name-field',
+    h('label', 'Chapter name'),
+    textInput(ch, 'title', store, {
+      placeholder: `${isShadow ? 'Shadow' : 'Main'} Chapter ${chapterNum}`,
+      maxlength: 60
+    })));
   panel.appendChild(h('div.chapter-art-editor',
     imageWell('chapter', `${isShadow ? 'Shadow' : 'Main'} Chapter ${chapterNum} key art (16:9)`,
       () => ch.image,

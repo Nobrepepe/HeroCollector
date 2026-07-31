@@ -5,7 +5,7 @@ import { h } from './dom.js';
 
 // Canonical image kinds and their target aspect/size.
 export const IMAGE_KINDS = {
-  portrait:  { w: 512,  h: 512,  label: 'Portrait (square)' },
+  portrait:  { w: 1200, h: 675, label: 'Eye tile (16:9 PNG with transparency)', contain: true, preserveAlpha: true },
   fullBody:  { w: 576,  h: 1024, label: 'Full body (9:16, taller than wide)' },
   world:     { w: 1024, h: 576,  label: 'World banner (16:9, wider than tall)' },
   chapter:   { w: 1280, h: 720,  label: 'Chapter key art (16:9, wider than tall)' },
@@ -13,7 +13,8 @@ export const IMAGE_KINDS = {
   relic:     { w: 1024, h: 576,  label: 'Relic (16:9, wider than tall)' },
   hq:        { w: 1280, h: 720,  label: 'Headquarters background (16:9)' },
   facility:  { w: 1024, h: 576,  label: 'Headquarters building art (16:9)' },
-  expedition: { w: 660, h: 860, label: 'Expedition offer art (33:43, taller than wide)' }
+  expedition: { w: 660, h: 860, label: 'Expedition offer art (33:43, taller than wide)' },
+  crisis: { w: 1280, h: 720, label: 'Crisis key art (16:9, wider than tall)' }
 };
 
 export function pickAndProcessImage(kind) {
@@ -39,13 +40,20 @@ async function processImageFile(kind, file) {
     canvas.width = spec.w;
     canvas.height = spec.h;
     const ctx = canvas.getContext('2d');
-    const scale = Math.max(spec.w / bitmap.width, spec.h / bitmap.height);
+    const scale = (spec.contain ? Math.min : Math.max)(spec.w / bitmap.width, spec.h / bitmap.height);
     const sw = spec.w / scale, sh = spec.h / scale;
-    const sx = (bitmap.width - sw) / 2, sy = (bitmap.height - sh) / 2;
-    ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, spec.w, spec.h);
+    if (spec.contain) {
+      const dw = bitmap.width * scale, dh = bitmap.height * scale;
+      ctx.drawImage(bitmap, (spec.w - dw) / 2, (spec.h - dh) / 2, dw, dh);
+    } else {
+      const sx = (bitmap.width - sw) / 2, sy = (bitmap.height - sh) / 2;
+      ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, spec.w, spec.h);
+    }
     bitmap.close();
     let url = canvas.toDataURL('image/webp', 0.82);
-    if (!url.startsWith('data:image/webp')) url = canvas.toDataURL('image/jpeg', 0.85);
+    if (!url.startsWith('data:image/webp')) {
+      url = spec.preserveAlpha ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.85);
+    }
     return url;
   } catch {
     return null;

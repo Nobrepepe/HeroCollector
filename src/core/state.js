@@ -9,8 +9,13 @@ import { makeRng } from './rng.js';
 import { grantRewardEntries } from './resources.js';
 import { generateExpeditionBoard, resolveDueExpeditions } from './expeditions.js';
 import { applyHqProduction, completeDueConstruction, dailyExpeditionAllowances } from './hq.js';
+import { FIELD_SUPPLY_ID, fieldSupplyLimits, frontierMomentumPreview, resetDailyEnergySystems } from './energy.js';
+import {
+  consumeCrisisNodeBoons, crisisDayRng, crisisNodeRunModifiers,
+  expireActiveCrisis, generateCrisisForDay
+} from './crises.js';
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 // ------------------------------------------------------------- new state
 export function newPlayerState(content, now = Date.now()) {
@@ -46,7 +51,7 @@ export function newPlayerState(content, now = Date.now()) {
     lastResetKey: null,
     rng: null, // { seed, state } when a dev seed is set
     characters,
-    inventory: { materials: {}, components: {}, resources: { intelligence: 2 } },
+    inventory: { materials: {}, components: {}, resources: { intelligence: 2, field_supply: 0 } },
     nodes: {},
     parties,
     activePartyIndex: 0,
@@ -72,7 +77,9 @@ export function newPlayerState(content, now = Date.now()) {
       board: null, active: [], reports: [],
       daily: { day: 1, freeRerolls: 1, freeRerollsUsed: 0, freePins: 0, freePinsUsed: 0 }
     },
-    headquarters: { worlds: {}, construction: null }
+    headquarters: { worlds: {}, construction: null },
+    energySystems: { daily: { day: 1, suppliesUsed: 0, momentumRefunded: 0 } },
+    crises: { active: null, lastSpawnDay: null, cycleSeen: [], history: [] }
   };
   applyDailyReset(content, state, now); // establishes the reset-day key
   ensureExpeditionBoard(content, state);
@@ -189,6 +196,39 @@ export function syncSaveWithContent(content, state) {
   }
   if (!Number.isInteger(state.activePartyIndex)
     || state.activePartyIndex < 0 || state.activePartyIndex >= state.parties.length) state.activePartyIndex = 0;
+  state.energySystems ??= { daily: { day: state.dayNumber, suppliesUsed: 0, momentumRefunded: 0 } };
+  state.crises ??= { active: null, lastSpawnDay: null, cycleSeen: [], history: [] };
+  const crisis = state.crises.active;
+  if (crisis && (!content.worldById[crisis.worldId] || !content.crisisById[crisis.definitionId])) {
+    expireActiveCrisis(state, 'The authored Crisis content left the game, so the response expired without penalty.');
+    report.push('Expired a Crisis whose authored world or definition is no longer live.');
+  } else if (crisis?.status === 'planning') {
+    for (const [frontId, slots] of Object.entries(crisis.assignments ?? {})) {
+      slots.forEach((characterId, index) => {
+        if (characterId && (!content.characterById[characterId] || !state.characters[characterId]?.owned)) {
+          crisis.assignments[frontId][index] = null;
+          report.push(`Opened a Crisis assignment after ${characterId} left the live roster.`);
+        }
+      });
+    }
+  }
+  let supplyLimits = fieldSupplyLimits(content, state);
+  if (supplyLimits.held > supplyLimits.storageCap) {
+    state.inventory.resources[FIELD_SUPPLY_ID] = supplyLimits.storageCap;
+    report.push(`Field Supply storage fell to ${supplyLimits.storageCap}; ${supplyLimits.held - supplyLimits.storageCap} excess Suppl${supplyLimits.held - supplyLimits.storageCap === 1 ? 'y was' : 'ies were'} removed explicitly.`);
+  }
+  supplyLimits = fieldSupplyLimits(content, state);
+  if (supplyLimits.held + supplyLimits.reserved > supplyLimits.storageCap) {
+    for (let index = state.expeditions.active.length - 1; index >= 0; index--) {
+      const currentLimits = fieldSupplyLimits(content, state);
+      if (currentLimits.held + currentLimits.reserved <= currentLimits.storageCap) break;
+      const expedition = state.expeditions.active[index];
+      if (!(expedition.fixedRewards ?? []).some(entry => entry.id === FIELD_SUPPLY_ID)) continue;
+      state.expeditions.active.splice(index, 1);
+      if (expedition.sourceOffer && state.expeditions.board?.day === state.dayNumber) state.expeditions.board.offers.push(expedition.sourceOffer);
+      report.push(`Cancelled ${expedition.name} because changed Training capacity could no longer hold its promised Field Supply.`);
+    }
+  }
   return report;
 }
 
@@ -234,10 +274,12 @@ export function applyDailyReset(content, state, now = Date.now()) {
     state.dayNumber++;
     state.energy = Math.min(b.energy.storageCap, state.energy + b.energy.dailyGrant);
     for (const ns of Object.values(state.nodes)) ns.attemptsToday = 0;
+    resetDailyEnergySystems(state);
     const built = completeDueConstruction(content, state);
     if (built) construction.push(built);
     production.push(...applyHqProduction(content, state));
     expeditions.push(...resolveDueExpeditions(content, state));
+    if (state.crises?.active) expireActiveCrisis(state);
     const pinned = state.expeditions.board?.offers.find(offer => offer.pinned) ?? null;
     const allowances = dailyExpeditionAllowances(content, state);
     state.expeditions.daily = {
@@ -249,12 +291,13 @@ export function applyDailyReset(content, state, now = Date.now()) {
       state.expeditions.board = null;
     }
   }
+  const crisis = generateCrisisForDay(content, state, crisisDayRng(state));
   state.lastResetKey = key;
   const summary = {
     days,
     energyGained: state.energy - before,
     energy: state.energy,
-    attemptsReset: true, construction, production, expeditions, acknowledged: false
+    attemptsReset: true, construction, production, expeditions, crisis, acknowledged: false
   };
   state.lastResetSummary = summary;
   return summary;
@@ -350,17 +393,20 @@ export function checkClear(content, state, nodeId, members, count = 1) {
       reasons.push(`Effective Power ${fmt(evalResult.effectivePower)} is below the required ${fmt(node.threshold)}. No Energy is spent on attempts that cannot succeed.`);
     }
   }
-  const cost = nodeEnergyCost(content, node) * count;
+  const boon = crisisNodeRunModifiers(state, node, count);
+  const paidRuns = count - boon.freeRuns;
+  const cost = nodeEnergyCost(content, node) * paidRuns;
   if (state.energy < cost) reasons.push(`Not enough Energy (${state.energy}/${cost}). Energy refreshes at the daily reset.`);
   const attempts = shardAttemptsLeft(content, state, node);
   if (count > attempts) reasons.push(`Only ${attempts} shard attempt${attempts === 1 ? '' : 's'} left today (${content.balance.shardAttemptsPerDay} per day).`);
-  return { ok: reasons.length === 0, reasons, evalResult, cost, node };
+  return { ok: reasons.length === 0, reasons, evalResult, cost, node, paidRuns, freeRuns: boon.freeRuns, boon };
 }
 
 export function maxSweepCount(content, state, nodeId) {
   const node = content.nodeById[nodeId];
   if (!node) return 0;
-  const byEnergy = Math.floor(state.energy / nodeEnergyCost(content, node));
+  const free = crisisNodeRunModifiers(state, node, Number.MAX_SAFE_INTEGER).freeRuns;
+  const byEnergy = free + Math.floor(state.energy / nodeEnergyCost(content, node));
   const byAttempts = shardAttemptsLeft(content, state, node);
   return Math.max(0, Math.min(byEnergy, byAttempts === Infinity ? byEnergy : byAttempts));
 }
@@ -384,7 +430,8 @@ export function clearNode(content, state, nodeId, members, count, rng, now = Dat
   state.energy -= check.cost;
   if (node.shardCharacter) ns.attemptsToday += count;
 
-  const rewards = { materials: {}, shards: {}, fragments: [], milestones: [], firstClear: false, objective: false, pity: null, energySpent: check.cost, runs: count };
+  const rewards = { materials: {}, shards: {}, fragments: [], milestones: [], firstClear: false, objective: false, pity: null,
+    energySpent: check.cost, energyRefunded: 0, paidRuns: check.paidRuns, freeRunsUsed: check.freeRuns, runs: count };
   const gainMat = (id, qty) => { rewards.materials[id] = (rewards.materials[id] ?? 0) + qty; };
   const shardChar = node.shardCharacter ? state.characters[node.shardCharacter] : null;
 
@@ -404,6 +451,10 @@ export function clearNode(content, state, nodeId, members, count, rng, now = Dat
         shardChar.pity = true;
       }
     }
+  }
+  if (check.boon.bonusMaterialRuns > 0 && check.boon.bonusMaterialQty > 0) {
+    gainMat(node.material, check.boon.bonusMaterialRuns * check.boon.bonusMaterialQty);
+    rewards.bonusMaterialRuns = check.boon.bonusMaterialRuns;
   }
 
   if (!ns.firstClearClaimed && node.firstClear) {
@@ -443,6 +494,14 @@ export function clearNode(content, state, nodeId, members, count, rng, now = Dat
       : `Normal ${b.shardChanceBp / 100}% shard chance on the next attempt.`;
   }
   ns.cleared = true;
+  consumeCrisisNodeBoons(state, node, check.boon);
+  const momentum = frontierMomentumPreview(state, { firstClear: !wasCleared, energySpent: check.cost });
+  if (momentum.energyRefunded > 0) {
+    state.energy = Math.min(b.energy.storageCap, state.energy + momentum.energyRefunded);
+    state.energySystems.daily.momentumRefunded += momentum.energyRefunded;
+    rewards.energyRefunded = momentum.energyRefunded;
+    logProgress(state, `Frontier Momentum returned ${momentum.energyRefunded} Energy after the first clear of ${node.displayName}.`, now);
+  }
   if (!wasCleared) {
     logProgress(state, `First clear: ${node.displayName}${rewards.firstClear ? ' (first-clear rewards claimed)' : ''}`, now);
   }

@@ -38,8 +38,10 @@ export function renderCampaign(store, root, arg) {
   }));
   const header = h('header.journey-head',
     h('div.eyebrow', `${campaignName(content, current)} · chapter ${chapter} of ${chapters.length || 1}`),
-    h('h1.display-s', chapterTitle(world, current, chapter)),
+    h('h1.display-s', chapterTitle(chapterNodes, world, current, chapter)),
     h('p', chapterDescription(world, current, chapter)));
+  if (world && state.crises?.active?.worldId === world.id) header.appendChild(h('p.warn', 'Crisis today · no Energy is required. ',
+    h('button.link', { onclick: () => store.go('#/crisis') }, 'Review the response →')));
   const tabBar = h('div.tab-bar');
   for (const [id, label] of tabs) tabBar.appendChild(h('button.tab-btn' + (id === current ? '.active' : ''), {
     onclick: () => {
@@ -145,7 +147,8 @@ function campaignName(content, id) {
   return content.worlds.find(world => world.campaignId === id)?.displayName ?? 'Journey';
 }
 
-function chapterTitle(world, campaign, chapter) {
+function chapterTitle(nodes, world, campaign, chapter) {
+  if (nodes[0]?.chapterTitle) return nodes[0].chapterTitle;
   if (world) return `${world.displayName} · Chapter ${chapter}`;
   return campaign === 'shadow' ? `Shadow Chapter ${chapter}` : `Main Chapter ${chapter}`;
 }

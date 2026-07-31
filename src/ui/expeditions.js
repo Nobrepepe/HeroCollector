@@ -64,7 +64,7 @@ function offerCard(store, offer) {
     style: image ? { backgroundImage: `url("${image}")` } : {},
     'aria-label': `${offer.name}, ${offer.duration} day Expedition`
   }, h('span.expedition-offer-scrim'), h('span.expedition-offer-copy',
-    h('span.eyebrow', `${world?.displayName ?? 'Across worlds'} · ${offer.duration === 1 ? 'standard' : 'long'}`),
+    h('span.eyebrow', offer.offerKind === 'supply' ? 'Guaranteed Field Supply route' : `${world?.displayName ?? 'Across worlds'} · ${offer.duration === 1 ? 'standard' : 'long'}`),
     h('span.title', offer.name),
     h('span.caption', `${offer.partySize} characters · recommends ${fmt(offer.recommendedPower)} Power${offer.pinned ? ' · pinned' : ''}`)));
 }
@@ -83,7 +83,7 @@ function renderOffer(store, root, offerId) {
   }));
   page.appendChild(h('button.link.expedition-back', { onclick: () => store.go('#/expeditions') }, '← Expeditions'));
   page.appendChild(h('header.expedition-detail-head',
-    h('div.eyebrow', `${world?.displayName ?? 'Across worlds'} · returns in ${offer.duration} day${offer.duration > 1 ? 's' : ''}`),
+    h('div.eyebrow', offer.offerKind === 'supply' ? `Guaranteed Supply · returns in one day` : `${world?.displayName ?? 'Across worlds'} · returns in ${offer.duration} day${offer.duration > 1 ? 's' : ''}`),
     h('h1.display-m', offer.name), h('p', offer.description)));
   const dynamic = h('div.expedition-builder');
   page.appendChild(dynamic);
@@ -117,12 +117,13 @@ function renderOffer(store, root, offerId) {
           paint();
         },
         title: away ? `Away on ${away.name} until day ${away.returnDay}` : on ? 'Remove' : 'Add'
-      }, portrait(store, def.id, 'md'), h('span', def.displayName), starline(state.characters[def.id].stars),
+      }, portrait(store, def.id, 'md', { state: away ? 'away' : 'met' }), h('span', def.displayName), starline(state.characters[def.id].stars),
       h('span.caption', `${fmt(characterPowerForState(content, state, def.id))} · ${content.archetypes[def.archetype].name}`)));
     }
     roster.appendChild(row); dynamic.appendChild(roster);
     dynamic.appendChild(h('section.expedition-reward-preview', h('div.eyebrow', 'Expected return'),
-      h('p', rewardText(content, preview.rewards)),
+      offer.fixedRewards?.length ? h('p.good', `${rewardText(content, offer.fixedRewards)} is guaranteed and never multiplied by the result tier.`) : null,
+      h('p', rewardText(content, preview.rewards.filter(entry => !entry.fixed))),
       h('p.caption', offer.rareRevealed && offer.rareReward
         ? `Rare lead: ${rewardText(content, [offer.rareReward])}`
         : 'The exact rare lead remains concealed.')));
@@ -131,7 +132,7 @@ function renderOffer(store, root, offerId) {
         onclick: () => store.tx(() => launchExpedition(content, state, offer.id, selected)).then(r => r.ok && store.go('#/expeditions')) }, 'Send them →'),
       h('button.link', { onclick: () => store.tx(() => togglePinOffer(content, state, offer.id)) }, offer.pinned ? 'Unpin offer' : 'Pin for tomorrow'),
       h('button.link', { onclick: () => store.tx(() => revealRareReward(content, state, offer.id)) }, 'Reveal rare reward'),
-      h('button.link', { disabled: offer.pinned,
+      h('button.link', { disabled: offer.pinned || offer.offerKind === 'supply',
         onclick: () => store.tx(() => rerollOffer(content, state, offer.id, store.rng)).then(r => r.ok && store.go('#/expeditions')) }, 'Reroll this offer')));
   }
   paint();

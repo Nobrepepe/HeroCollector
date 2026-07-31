@@ -67,7 +67,7 @@ test('v2 migration moves legacy Main shards into incomplete paired Shadow chapte
   legacy.mainChapters[0].nodes[5].shardCharacterId = legacy.characters[1].id;
   legacy.mainChapters[0].nodes[8].shardCharacterId = legacy.characters[2].id;
   const upgraded = upgradeCustomDB(legacy);
-  assert.equal(upgraded.version, 7);
+  assert.equal(upgraded.version, 9);
   assert.equal(upgraded.shadowChapters.length, upgraded.mainChapters.length);
   assert.equal(upgraded.shadowChapters[0].nodes[2].shardCharacterId, legacy.characters[0].id);
   assert.equal(upgraded.shadowChapters[0].nodes[0].shardCharacterId, null);
@@ -75,6 +75,11 @@ test('v2 migration moves legacy Main shards into incomplete paired Shadow chapte
   assert.ok(upgraded.mainChapters.every(ch => ch.image === null));
   assert.ok(upgraded.shadowChapters.every(ch => ch.image === null));
   assert.deepEqual(upgraded.worlds[0].campaignChapterImages, [null, null, null]);
+  assert.deepEqual(upgraded.worlds[0].campaignChapterTitles, [
+    'Ember Reach · Chapter 1', 'Ember Reach · Chapter 2', 'Ember Reach · Chapter 3'
+  ]);
+  assert.equal(upgraded.mainChapters[0].title, 'Main Chapter 1');
+  assert.equal(upgraded.shadowChapters[0].title, 'Shadow Chapter 1');
   assert.equal(upgraded.worlds[0].hqImage, null);
   assert.deepEqual(upgraded.expeditions.images, { global: null, worlds: {} });
 });
@@ -151,8 +156,11 @@ test('published custom game merges completely, validates, and is ready', () => {
   const db = makeFullDB();
   db.worlds[0].status = 'published';
   db.mainChapters[0].image = 'data:image/webp;base64,MAIN';
+  db.mainChapters[0].title = 'Embers at the Gate';
   db.shadowChapters[0].image = 'data:image/webp;base64,SHADOW';
+  db.shadowChapters[0].title = 'Ashes After Dark';
   db.worlds[0].campaignChapterImages[1] = 'data:image/webp;base64,WORLD';
+  db.worlds[0].campaignChapterTitles[1] = 'The Caldera Road';
   const merged = mergeContent(systemRaw, db);
   const content = buildContent(merged.raw);
   assert.deepEqual(validateContent(content).errors, []);
@@ -167,9 +175,12 @@ test('published custom game merges completely, validates, and is ready', () => {
   assert.equal(content.nodeById.shadow_3.shardCharacter, db.characters[2].id);
   assert.equal(content.nodeById.main_5.checkpoint, true);
   assert.equal(content.nodeById.main_20.chapter, 2);
+  assert.equal(content.nodeById.main_1.chapterTitle, 'Embers at the Gate');
+  assert.equal(content.nodeById.shadow_1.chapterTitle, 'Ashes After Dark');
   // world campaign + archive
   assert.equal(content.nodesByCampaign[`wc_${w.id}`].length, 30);
   assert.equal(content.nodeById[`wc_${w.id}_1`].shardCharacter, db.characters[0].id);
+  assert.equal(content.nodeById[`wc_${w.id}_11`].chapterTitle, 'The Caldera Road');
   assert.ok(content.shardNodesByCharacter[db.characters[0].id].some(n => n.id === `wc_${w.id}_1`));
   assert.equal(content.archiveByWorld[w.id].collections.reduce((s, c) => s + c.relics.length, 0), 15);
   // imported art flows through

@@ -5,11 +5,12 @@ import {
 } from '../core/state.js';
 import { evaluateParty, objectiveSatisfied } from '../core/synergy.js';
 import { nodeTypeMeta, nodeRepeatText, campaignLabel } from './shared.js';
-import { portrait } from './shared.js';
+import { portrait, portraitSlot } from './shared.js';
 import { characterPower } from '../core/power.js';
 import { showResults } from './results.js';
 import { render } from '../app.js';
 import { sceneImage } from './presentation.js';
+import { frontierMomentumPreview } from '../core/energy.js';
 
 export function renderNode(store, root, nodeId) {
   const { content, state } = store;
@@ -96,7 +97,9 @@ export function renderNode(store, root, nodeId) {
     party.members.forEach(id => faces.appendChild(id
       ? h('div.node-member', portrait(store, id, 'md'), h('span', content.characterById[id].displayName),
         h('span.caption', fmt(characterPower(content, state.characters[id]))))
-      : h('div.node-member.empty', h('span.portrait.md', '+'), h('span', 'empty'))));
+      : h('div.node-member.empty',
+        portraitSlot({ size: 'md', state: 'empty', glyph: '+' }),
+        h('span', 'empty'))));
     const synergy = h('div.node-synergy', h('div.eyebrow', 'Synergy'));
     if (evaluation) {
       evaluation.active.forEach(item => synergy.appendChild(h('div', item.tag.displayName, ' ', h('span.good', `+${pct(item.bonusBp)}`))));
@@ -124,8 +127,15 @@ function actionRow(store, node, ns, members, check, cost) {
     render();
     if (result.ok) showResults(store, result, { members, count });
   };
+  const momentum = frontierMomentumPreview(state, { firstClear: !ns.cleared, energySpent: check.cost });
+  const costLine = check.freeRuns
+    ? `This run is free; ${check.freeRuns} Crisis boon run will be used.` : `⚡ ${check.cost} of your ${state.energy}`;
   wrap.append(h('div', h('button.btn.primary', { disabled: !check.ok, onclick: () => run(1) }, 'Enter →'),
-    h('div.caption', `⚡ ${cost} of your ${state.energy}`)));
+    h('div.caption', costLine), !ns.cleared ? h('div.caption.good', momentum.energyRefunded === check.cost && check.cost > 0
+      ? `First clear — its ${check.cost} Energy returns.`
+      : momentum.energyRefunded > 0 ? `First clear — ${momentum.energyRefunded} of its ${check.cost} Energy returns today.`
+        : check.cost === 0 ? 'First clear — no Energy is spent, so Momentum returns none.'
+          : 'First clear — today’s Momentum allowance is already spent.') : null));
   const max = Math.max(1, maxSweepCount(content, state, node.id));
   const qty = h('input.sweep-inline', { type: 'number', min: 1, max, value: Math.min(6, max), 'aria-label': 'Sweep count' });
   wrap.appendChild(h('div.node-sweep', 'or run it ', qty, ' times at once · ',
@@ -133,7 +143,7 @@ function actionRow(store, node, ns, members, check, cost) {
       disabled: !ns.cleared || !check.ok,
       title: ns.cleared ? 'Resolve several runs instantly' : 'Sweep unlocks after the first clear',
       onclick: () => run(Math.max(1, Math.min(max, Number(qty.value) || 1)))
-    }, `sweep · ⚡ ${cost} each`)));
+    }, `sweep · up to ⚡ ${cost} each`)));
   if (!check.ok) wrap.appendChild(h('div.reasons-inline', check.reasons.join(' ')));
   return wrap;
 }

@@ -42,16 +42,12 @@ export function renderCharacter(store, root, characterId) {
 
   if (cs.owned) body.appendChild(ownedProgress(store, def, cs, power));
   else body.appendChild(unownedProgress(store, def, cs));
-  body.appendChild(h('p.character-description', def.description));
   if (cs.owned) body.appendChild(gearPanel(store, characterId));
 
   const disclosures = h('div.character-disclosures');
-  if (cs.owned) disclosures.appendChild(powerDisclosure(store, def, cs, power));
-  disclosures.appendChild(h('details', h('summary', 'Her story ⌄'), h('p', def.lore || 'Her story has not been written yet.')));
-  disclosures.appendChild(h('details', h('summary', 'Equipment lines ⌄'),
-    ...content.characterMeta.slotOrder.map(slot => h('button.link.equipment-line-link', {
-      onclick: () => openGearDialog(store, characterId, slot)
-    }, `${content.characterMeta.slots[slot].name} · ${def.equipmentLines[slot]}`))));
+  disclosures.appendChild(h('section.character-story',
+    h('div.eyebrow', 'Their Story'),
+    h('p', def.lore || 'Their story has not been written yet.')));
   disclosures.appendChild(skinDisclosure(store, def, cs));
   if (cs.owned) disclosures.appendChild(h('button.link.add-party', { onclick: () => store.go('#/party') }, 'Add to party →'));
   body.appendChild(disclosures);
@@ -107,18 +103,6 @@ function pinButton(store, characterId) {
   return h('button.link', {
     onclick: () => store.tx(() => togglePin(store.state, { type: 'character', characterId }, store.content))
   }, pinned ? 'Unpin goal' : 'Track this');
-}
-
-function powerDisclosure(store, def, cs, bd) {
-  return h('details', h('summary', 'Power, itemised ⌄'), h('div.power-breakdown',
-    row('Base', bd.base), row(`Stars (${cs.stars})`, bd.stars),
-    row(`Completed gear (tier ${cs.gearTier})`, bd.gearPermanent),
-    row(`Equipped pieces (${bd.equippedCount}/6)`, bd.gearEquipped),
-    row('Total', bd.total, true)));
-}
-
-function row(label, value, total = false) {
-  return h('div.power-row' + (total ? '.total' : ''), h('span', label), h('span.numeral', fmt(value)));
 }
 
 function skinDisclosure(store, def, cs) {

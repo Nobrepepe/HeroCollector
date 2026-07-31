@@ -9,6 +9,10 @@ save.json.bak
 test_playthrough.json
 AGENT_README.md
 
+# Portable canonical exports (the exact files below are intentionally versioned)
+!default_content.json
+!test_playthrough.json
+
 # Logs and platform noise
 *.log
 .DS_Store

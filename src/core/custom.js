@@ -8,7 +8,7 @@
 // instead of producing invalid content. The game itself stays in setup mode
 // until the content meets the minimum prerequisites to start a game.
 
-export const CUSTOM_DB_VERSION = 7;
+export const CUSTOM_DB_VERSION = 9;
 
 export function emptyCustomDB() {
   return {
@@ -18,7 +18,8 @@ export function emptyCustomDB() {
     factions: [],
     mainChapters: [],
     shadowChapters: [],
-    expeditions: emptyExpeditionLibrary()
+    expeditions: emptyExpeditionLibrary(),
+    crises: emptyCrisisLibrary()
   };
 }
 
@@ -31,6 +32,8 @@ export function upgradeCustomDB(db) {
     worlds: (db.worlds ?? []).map(w => ({
       ...w,
       campaignChapterImages: Array.from({ length: 3 }, (_, i) => w.campaignChapterImages?.[i] ?? null),
+      campaignChapterTitles: Array.from({ length: 3 }, (_, i) =>
+        w.campaignChapterTitles?.[i] ?? `${w.displayName || 'World'} · Chapter ${i + 1}`),
       campaignNodes: (w.campaignNodes ?? []).map(nd => ({ ...nd })),
       archive: w.archive ? {
         ...w.archive,
@@ -51,7 +54,8 @@ export function upgradeCustomDB(db) {
     shadowChapters: (db.shadowChapters ?? []).map(ch => ({
       ...ch, nodes: (ch.nodes ?? []).map(nd => ({ ...nd }))
     })),
-    expeditions: structuredClone(db.expeditions ?? emptyExpeditionLibrary())
+    expeditions: structuredClone(db.expeditions ?? emptyExpeditionLibrary()),
+    crises: structuredClone(db.crises ?? emptyCrisisLibrary())
   };
   // v1 -> v2: base-content overrides and removals no longer exist; chapters
   // now form the whole Main Campaign starting at Chapter 1.
@@ -148,6 +152,23 @@ export function upgradeCustomDB(db) {
     out.expeditions.images ??= { global: null, worlds: {} };
     out.expeditions.images.worlds ??= {};
   }
+  if (oldVersion < 8) {
+    for (const chapter of out.mainChapters) chapter.title ??= `Main Chapter ${out.mainChapters.indexOf(chapter) + 1}`;
+    for (const chapter of out.shadowChapters) chapter.title ??= `Shadow Chapter ${out.shadowChapters.indexOf(chapter) + 1}`;
+    for (const world of out.worlds) {
+      world.campaignChapterTitles = Array.from({ length: 3 }, (_, i) =>
+        world.campaignChapterTitles?.[i] ?? `${world.displayName} · Chapter ${i + 1}`);
+    }
+  }
+  if (oldVersion < 9) {
+    out.crises = structuredClone(db.crises ?? emptyCrisisLibrary());
+    const village = out.worlds.find(world => world.id === 'world_hidden_village');
+    const academy = out.worlds.find(world => world.id === 'world_magic_academy');
+    if (!out.crises.definitions.length && village && academy) {
+      out.crises = sampleCrisisLibrary([village, academy]);
+    }
+    out.expeditions.settings.guaranteedSupplyTemplateId ??= null;
+  }
   out.version = CUSTOM_DB_VERSION;
   return out;
 }
@@ -197,6 +218,7 @@ export function newCustomWorld(name) {
     image: null,
     hqImage: null,
     campaignChapterImages: [null, null, null],
+    campaignChapterTitles: Array.from({ length: 3 }, (_, i) => `${name || 'New World'} · Chapter ${i + 1}`),
     campaignNodes,
     description: '', displayOrder: 0,
     worldAsset: { id: `asset_${id}`, displayName: `${name || 'New World'} Asset`, description: '', icon: '◆' },
@@ -232,6 +254,86 @@ export function emptyExpeditionLibrary() {
         'Breadth and preparation turned ordinary work into an uncommon return.'
       ]
     }
+  };
+}
+
+export function emptyCrisisLibrary() {
+  return {
+    settings: {
+      spawnChanceBp: 2500,
+      grades: [
+        { id: 'local', displayName: 'Local Disturbance', minOwned: 5, minHqRank: 1, allowNoHq: true, frontCount: 2, teamSize: 2 },
+        { id: 'major', displayName: 'Major Crisis', minOwned: 8, minHqRank: 2, allowNoHq: false, frontCount: 3, teamSize: 2 },
+        { id: 'world', displayName: 'World Crisis', minOwned: 12, minHqRank: 3, allowNoHq: false, frontCount: 3, teamSize: 3 }
+      ]
+    },
+    definitions: []
+  };
+}
+
+function sampleFront(id, name, favoredTagIds, powers, description) {
+  return {
+    id, name, description, favoredTagIds,
+    recommendedPowerByGrade: { local: powers[0], major: powers[1], world: powers[2] },
+    struggleText: `${name} held longer than the response could safely reach. Nothing was lost.`,
+    successText: `${name} steadied under a measured response.`,
+    excelText: `${name} was secured before the danger could spread.`
+  };
+}
+
+export function sampleCrisisLibrary(worlds) {
+  const lib = emptyCrisisLibrary();
+  const village = worlds.find(world => world.id === 'world_hidden_village');
+  const academy = worlds.find(world => world.id === 'world_magic_academy');
+  const definition = (world, id, name, openingDescription, fronts, boon) => ({
+    id, enabled: true, worldId: world.id, name, openingDescription, artwork: null,
+    weight: 1, minimumClearedNodes: 0, fronts,
+    consolationReward: [{ kind: 'resource', id: 'renown', qty: 12 }],
+    cacheChoices: [
+      { id: `${id}_supply`, name: 'Field Supply', description: 'One more measured extension to the day.', rewards: [{ kind: 'resource', id: 'field_supply', qty: 1 }] },
+      { id: `${id}_intel`, name: 'Intelligence Brief', description: 'The response leaves useful knowledge behind.', rewards: [{ kind: 'resource', id: 'intelligence', qty: 2 }] },
+      { id: `${id}_assets`, name: `${world.worldAsset.displayName}`, description: 'The affected world keeps the recovered reserve.', rewards: [{ kind: 'resource', id: '@associated_world_asset', qty: 8 }] },
+      { id: `${id}_materials`, name: 'Material Bundle', description: 'Practical salvage returns to the Workshop.', rewards: [{ kind: 'material', id: 'mat_metal_basic', qty: 8 }] }
+    ],
+    boon
+  });
+  if (village) lib.definitions.push(definition(village, 'crisis_invasion_dawn', 'Invasion at Dawn',
+    'Signals move along the ridge before sunrise. Three approaches need quiet, decisive hands.', [
+      sampleFront('dawn_north_gate', 'The north gate', [village.id, 'leader'], [2600, 4300, 6800], 'Hold the narrow approach without drawing the village into open ground.'),
+      sampleFront('dawn_rooftops', 'The eastern rooftops', ['rebel', 'freespirit'], [2500, 4200, 6600], 'Cross the roofline and break the signal chain.'),
+      sampleFront('dawn_courtyard', 'The lantern courtyard', ['caretaker', village.id], [2700, 4500, 7000], 'Move the families below the courtyards before the first clash.'),
+      sampleFront('dawn_river', 'The river crossing', ['achiever', 'leader'], [2800, 4600, 7200], 'Secure the shallow crossing before reinforcements arrive.'),
+      sampleFront('dawn_watch', 'The old watchtower', ['dreamer', village.id], [2600, 4400, 6900], 'Restore the watchtower signal and keep the routes joined.')
+    ], { type: 'free_world_node_runs', runs: 3, prose: 'The next three successful runs here cost no Energy.' }));
+  if (academy) lib.definitions.push(definition(academy, 'crisis_wild_magic', 'Wild Magic Surge',
+    'A current of unbound magic crosses the Academy grounds. Each break in the pattern needs a different answer.', [
+      sampleFront('surge_library', 'The moving library', [academy.id, 'dreamer'], [2600, 4300, 6800], 'Anchor the stacks before the corridors fold again.'),
+      sampleFront('surge_laboratory', 'The lower laboratory', ['achiever', 'caretaker'], [2700, 4500, 7000], 'Contain the volatile reagents without losing the research.'),
+      sampleFront('surge_courtyard', 'The glass courtyard', ['leader', academy.id], [2800, 4600, 7200], 'Give the scattered students one clear route home.'),
+      sampleFront('surge_observatory', 'The observatory', ['dreamer', 'freespirit'], [2500, 4200, 6700], 'Realign the instruments before the surge reaches the dome.'),
+      sampleFront('surge_archive', 'The sealed archive', ['caretaker', academy.id], [2700, 4400, 7000], 'Keep the oldest wards from answering the wrong call.')
+    ], { type: 'bonus_world_material_runs', runs: 3, qty: 1, prose: 'The next three successful runs here return one additional normal material.' }));
+  return lib;
+}
+
+export function newCrisisDefinition(world) {
+  const id = newId('crisis');
+  return {
+    id, enabled: true, worldId: world.id, name: 'New Crisis', openingDescription: '', artwork: null,
+    weight: 1, minimumClearedNodes: 0,
+    fronts: Array.from({ length: 3 }, (_, index) => ({
+      id: `${id}_front_${index + 1}`, name: `Front ${index + 1}`, description: '',
+      favoredTagIds: [world.id], recommendedPowerByGrade: { local: 3000, major: 5000, world: 7500 },
+      struggleText: 'The Front held beyond the response. Nothing was lost.',
+      successText: 'The Front was secured.', excelText: 'The Front was secured with room to spare.'
+    })),
+    consolationReward: [{ kind: 'resource', id: 'renown', qty: 10 }],
+    cacheChoices: [
+      { id: `${id}_supply`, name: 'Field Supply', description: 'One stored extension to the day.', rewards: [{ kind: 'resource', id: 'field_supply', qty: 1 }] },
+      { id: `${id}_intel`, name: 'Intelligence', description: 'Useful knowledge from the response.', rewards: [{ kind: 'resource', id: 'intelligence', qty: 2 }] },
+      { id: `${id}_asset`, name: world.worldAsset.displayName, description: 'Resources recovered for this world.', rewards: [{ kind: 'resource', id: '@associated_world_asset', qty: 8 }] }
+    ],
+    boon: { type: 'instant_intelligence', qty: 2, prose: 'The response yields two Intelligence immediately.' }
   };
 }
 
@@ -318,6 +420,16 @@ export function sampleExpeditionLibrary(worlds) {
       titles: titles.map(t => `${t}${i ? ` ${i + 1}` : ''}`), descriptions
     });
   }
+  const supply = {
+    id: 'exp_template_field_supply', enabled: true, world: null, weight: 1,
+    durations: [1], partySize: 2, requirementIds: ['req_two_arch'], requirementCount: 1,
+    optionalIds: ['opt_two_worlds'], rewardPackageId: 'development', powerRatioBp: [9000, 10000],
+    titles: ['A Field Cache Beyond the Gate'],
+    descriptions: ['A reliable route to the provisions that can carry one day a little further.'],
+    fixedRewards: [{ kind: 'resource', id: 'field_supply', qty: 1 }]
+  };
+  lib.templates.push(supply);
+  lib.settings.guaranteedSupplyTemplateId = supply.id;
   return lib;
 }
 
@@ -383,11 +495,12 @@ export function newMainChapter(db) {
       grade
     };
   });
-  return { image: null, nodes };
+  return { title: `Main Chapter ${idx + 1}`, image: null, nodes };
 }
 
 export function newShadowChapter(mainChapter, chapterIndex) {
   return {
+    title: `Shadow Chapter ${chapterIndex + 1}`,
     image: null,
     nodes: mainChapter.nodes.map((nd, i) => ({
       name: `Shadow — ${nd.name || `Chapter ${chapterIndex + 1} — Node ${i + 1}`}`,
@@ -538,6 +651,7 @@ export function mergeContent(systemRaw, db) {
       const material = matId(nd.family, nd.grade);
       const node = {
         id: `main_${num}`, campaign: 'main', chapter: chapterNum, position: i + 1, number: num,
+        chapterTitle: ch.title || `Main Chapter ${chapterNum}`,
         displayName: nd.name || `Node ${num}`,
         type: i >= 6 ? 'advanced' : 'ordinary',
         threshold: nd.threshold,
@@ -589,6 +703,7 @@ export function mergeContent(systemRaw, db) {
       const material = matId(nd.family, nd.grade);
       shadowNodes.push({
         id: `shadow_${num}`, campaign: 'shadow', chapter: chapterNum, position: i + 1, number: num,
+        chapterTitle: ch.title || `Shadow Chapter ${chapterNum}`,
         displayName: nd.name || `Shadow Node ${num}`,
         type: 'shard',
         threshold: nd.threshold,
@@ -657,6 +772,8 @@ export function mergeContent(systemRaw, db) {
         id: `wc_${w.id}_${num}`,
         campaign: `wc_${w.id}`, world: w.id,
         chapter: Math.floor(idx / 10) + 1, position: (idx % 10) + 1, number: num,
+        chapterTitle: w.campaignChapterTitles?.[Math.floor(idx / 10)]
+          || `${w.displayName} · Chapter ${Math.floor(idx / 10) + 1}`,
         displayName: nd.name || `Node ${num}`,
         type: 'world',
         threshold: nd.threshold,
@@ -734,7 +851,7 @@ export function mergeContent(systemRaw, db) {
 
   // --- images from the database
   const images = {
-    world: {}, headquarters: {}, expedition: {}, chapter: {}, portrait: {},
+    world: {}, headquarters: {}, expedition: {}, crisis: {}, chapter: {}, portrait: {},
     fullBody: {}, equipment: {}, relic: {}, skin: {}, hq: {}, facility: {}
   };
   db.mainChapters.forEach((chapter, index) => {
@@ -771,6 +888,9 @@ export function mergeContent(systemRaw, db) {
   for (const [worldId, image] of Object.entries(db.expeditions?.images?.worlds ?? {})) {
     if (image) images.expedition[worldId] = image;
   }
+  for (const definition of db.crises?.definitions ?? []) {
+    if (definition.artwork) images.crisis[definition.id] = definition.artwork;
+  }
   for (const c of db.characters) {
     if (c.portrait) images.portrait[c.id] = c.portrait;
     if (c.fullBody) images.fullBody[c.id] = c.fullBody;
@@ -790,9 +910,23 @@ export function mergeContent(systemRaw, db) {
     recipes: systemRaw.recipes,
     nodes: [...mainNodes, ...shadowNodes, ...wcNodes],
     archives,
-    expeditions: normalizeExpeditionLibrary(db.expeditions)
+    expeditions: normalizeExpeditionLibrary(db.expeditions),
+    crises: normalizeCrisisLibrary(db.crises, new Set(finalWorlds.map(world => world.id)), health)
   };
   return { raw, images, health };
+}
+
+function normalizeCrisisLibrary(value, liveWorldIds, health) {
+  const lib = structuredClone(value ?? emptyCrisisLibrary());
+  lib.definitions = (lib.definitions ?? []).filter(definition => {
+    if (!liveWorldIds.has(definition.worldId)) return false;
+    if ((definition.fronts?.length ?? 0) < 3) {
+      health.push({ level: 'warn', text: `Crisis “${definition.name || definition.id}” is held back until it has at least three Fronts.` });
+      return false;
+    }
+    return true;
+  });
+  return lib;
 }
 
 function normalizeExpeditionLibrary(value) {

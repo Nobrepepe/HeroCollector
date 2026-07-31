@@ -1,5 +1,5 @@
 import { h, fmt } from './dom.js';
-import { characterPower } from '../core/power.js';
+import { characterPower, characterPowerForState } from '../core/power.js';
 import { evaluateParty } from '../core/synergy.js';
 import { portrait, starline } from './shared.js';
 import { openModal } from '../app.js';
@@ -79,7 +79,7 @@ function synergyChanges(before, after) {
   return { activated, lost, changed };
 }
 
-export function openCharacterPicker(store, { partyIndex, slotIndex, onSelect }) {
+export function openCharacterPicker(store, { partyIndex, slotIndex, onSelect, recommendedId = null }) {
   return openModal((modal, close) => {
     let search = '';
     const preferences = store.ui.pickerPreferences;
@@ -116,7 +116,8 @@ export function openCharacterPicker(store, { partyIndex, slotIndex, onSelect }) 
           nextSlots[slotIndex] = def.id;
           const after = evaluateParty(store.content, store.state, nextSlots.filter(Boolean));
           const changes = synergyChanges(before, after);
-          const card = h('button.picker-card', {
+          const recommended = def.id === recommendedId;
+          const card = h('button.picker-card' + (recommended ? '.recommended' : ''), {
             disabled: unavailable,
             onclick: async () => {
               await onSelect(def.id);
@@ -140,7 +141,8 @@ export function openCharacterPicker(store, { partyIndex, slotIndex, onSelect }) 
                 changes.lost.length ? h('div.warn',
                   `Lost: ${changes.lost.map(item => store.content.tagById[item.id]?.displayName ?? item.id).join(', ')}`) : null,
                 changes.changed.length ? h('div',
-                  `Changed: ${changes.changed.map(item => store.content.tagById[item.id]?.displayName ?? item.id).join(', ')}`) : null)));
+                  `Changed: ${changes.changed.map(item => store.content.tagById[item.id]?.displayName ?? item.id).join(', ')}`) : null,
+                recommended ? h('div.good', 'Best one-swap improvement') : null)));
           grid.appendChild(card);
         }
       };
@@ -148,5 +150,40 @@ export function openCharacterPicker(store, { partyIndex, slotIndex, onSelect }) 
       modal.appendChild(h('div.modal-actions', h('button.btn', { onclick: close }, 'Cancel')));
     };
     renderPicker();
+  });
+}
+
+export function openCrisisCharacterPicker(store, { currentId = null, excludedIds = new Set(), favoredTagIds = [], onSelect }) {
+  return openModal((modal, close) => {
+    let search = '';
+    const preferences = store.ui.pickerPreferences;
+    preferences.ownership = 'owned';
+    const paint = () => {
+      modal.replaceChildren();
+      modal.appendChild(h('h2', 'Choose who answers this Front.'));
+      modal.appendChild(characterFilterBar(store, preferences, paint, {
+        search, onSearch: value => { search = value; paint(); }, ownership: false
+      }));
+      if (currentId) modal.appendChild(h('button.link.bad', { onclick: async () => { await onSelect(null); close(); } }, 'Leave this place open'));
+      const grid = h('div.picker-grid');
+      const candidates = filterCharacters(store.content, store.state, preferences, new Set(), search)
+        .filter(def => store.state.characters[def.id].owned);
+      for (const def of candidates) {
+        const unavailable = excludedIds.has(def.id) && def.id !== currentId;
+        const tags = new Set([def.world, def.archetype, def.faction, ...(def.extraTags ?? [])].filter(Boolean));
+        const matches = favoredTagIds.filter(id => tags.has(id));
+        grid.appendChild(h('button.picker-card', {
+          disabled: unavailable,
+          'aria-label': unavailable ? `${def.displayName}, already assigned to another Crisis Front` : `Assign ${def.displayName}`,
+          onclick: async () => { await onSelect(def.id); close(); }
+        }, portrait(store, def.id, 'sm'), h('div.grow', h('b', def.displayName),
+          h('div.small.muted', `${store.content.worldById[def.world].displayName} · ${store.content.archetypes[def.archetype].name}`),
+          h('div.numeral', `${fmt(characterPowerForState(store.content, store.state, def.id))} Power`),
+          unavailable ? h('div.small.bad', 'Already answering another Front.')
+            : h('div.small.good', matches.length ? `Favored here: ${matches.map(id => store.content.tagById[id]?.displayName ?? store.content.worldById[id]?.displayName ?? store.content.archetypes[id]?.name ?? id).join(', ')}` : 'No favored tag here.'))));
+      }
+      modal.append(grid, h('div.modal-actions', h('button.btn', { onclick: close }, 'Return to the Front')));
+    };
+    paint();
   });
 }

@@ -5,6 +5,7 @@ import {
   hqState, setProduction, staffingCapacity, startConstruction, unassignHqStaff
 } from '../core/hq.js';
 import { portrait } from './shared.js';
+import { fieldSupplyLimits } from '../core/energy.js';
 
 export function renderHeadquarters(store, root, arg) {
   const worlds = store.content.worlds.filter(w => w.hq?.enabled);
@@ -31,6 +32,8 @@ export function renderHeadquarters(store, root, arg) {
   page.appendChild(h('header.hq-head', h('div.eyebrow', 'World Headquarters'),
     h('h1.display-m', `${world.displayName} stands at Rank ${rank}.`),
     h('p', next ? `${next.totalLevels - total} more facility levels open the next chapter.` : 'Every facility path is fully open.'),
+    store.state.crises?.active?.worldId === world.id ? h('p.warn', 'Crisis today · the response remains optional and costs no Energy. ',
+      h('button.link', { onclick: () => store.go('#/crisis') }, 'Review it →')) : null,
     tabs));
   const resources = h('section.hq-resources', h('div.eyebrow', 'Development reserves'),
     h('div', h('span.numeral', fmt(resourceQty(store.state, 'renown'))), ' Renown · ',
@@ -72,6 +75,14 @@ function facilityView(store, root, world, facilityId) {
   }));
   root.appendChild(h('header.utility-head.facility-head', h('div.eyebrow', `${facility.category} · level ${level}`),
     h('h1.display-m', facility.displayName), h('p.muted', facility.description)));
+  if (facility.category === 'training') {
+    const limits = fieldSupplyLimits(store.content, store.state);
+    const localPower = [0, 25, 50, 100][level] ?? 0;
+    root.appendChild(h('section.facility-effects', h('div.eyebrow', 'What this changes'),
+      h('p', level ? `Every character from ${world.displayName} carries ${localPower} additional Power from this Training path.`
+        : `Characters from ${world.displayName} gain their first Training Power when this path opens.`),
+      h('p', `Across the whole collection, the highest Training path now allows ${limits.storageCap} Field Supplies to be stored and ${limits.dailyUseCap} to be used each day. Training levels from different worlds do not add together.`)));
+  }
   root.appendChild(h('section.facility-next', h('div.eyebrow', next ? 'The next level' : 'Development complete'),
     next ? h('div', h('p', `Construction takes ${next.buildDays ?? 1} day.`),
       h('p.caption', costText(store, world, next.cost)),

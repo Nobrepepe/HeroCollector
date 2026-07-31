@@ -1,0 +1,1690 @@
+{
+  "schemaVersion": 4,
+  "contentVersion": "1.0.0",
+  "createdAt": "2026-07-24T22:17:19.710Z",
+  "energy": 4,
+  "lastResetKey": "2026-07-31",
+  "rng": null,
+  "characters": {
+    "char_fern": {
+      "owned": true,
+      "stars": 1,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false
+    },
+    "char_bram": {
+      "owned": true,
+      "stars": 1,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false
+    },
+    "char_isolde": {
+      "owned": true,
+      "stars": 1,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false
+    },
+    "char_thorn": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false
+    },
+    "char_maren": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false
+    },
+    "char_oberon": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false
+    },
+    "char_juno": {
+      "owned": true,
+      "stars": 1,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false
+    },
+    "char_axel": {
+      "owned": true,
+      "stars": 1,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false
+    },
+    "char_vela": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false
+    },
+    "char_cassia": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false
+    },
+    "char_rook": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false
+    },
+    "char_sable": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false
+    },
+    "char_suzume": {
+      "owned": true,
+      "stars": 2,
+      "shards": 2,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": true,
+        "accessory": true,
+        "keepsake": true,
+        "emblem": true,
+        "signature": true
+      },
+      "pity": true,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    },
+    "char_hoshi": {
+      "owned": true,
+      "stars": 1,
+      "shards": 3,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": true,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    },
+    "char_ayame": {
+      "owned": true,
+      "stars": 2,
+      "shards": 3,
+      "gearTier": 1,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    },
+    "char_mei": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    },
+    "char_tsubaki": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    },
+    "char_genjiro": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    },
+    "char_kaguya": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    },
+    "char_yuki": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    },
+    "char_kimiko": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    },
+    "char_sakura": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    },
+    "char_ashley": {
+      "owned": true,
+      "stars": 1,
+      "shards": 10,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": true,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    },
+    "char_bridget": {
+      "owned": true,
+      "stars": 1,
+      "shards": 7,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    },
+    "char_elian": {
+      "owned": false,
+      "stars": 0,
+      "shards": 3,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    },
+    "char_tix": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    },
+    "char_carol": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    },
+    "char_kin": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    },
+    "char_liadriel": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    },
+    "char_malefia": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    },
+    "char_aurora": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    },
+    "char_irina": {
+      "owned": false,
+      "stars": 0,
+      "shards": 0,
+      "gearTier": 0,
+      "slots": {
+        "attire": false,
+        "tool": false,
+        "accessory": false,
+        "keepsake": false,
+        "emblem": false,
+        "signature": false
+      },
+      "pity": false,
+      "skinUnlocked": false,
+      "selectedSkinId": null
+    }
+  },
+  "inventory": {
+    "materials": {
+      "mat_fiber_basic": 5,
+      "mat_essence_basic": 1,
+      "mat_metal_basic": 10,
+      "mat_mineral_basic": 1
+    },
+    "components": {},
+    "resources": {
+      "intelligence": 1,
+      "clan_seals": 24,
+      "renown": 95,
+      "arcane_sigils": 14,
+      "field_supply": 0
+    }
+  },
+  "nodes": {
+    "main_1": {
+      "cleared": true,
+      "firstClearClaimed": true,
+      "objectiveClaimed": false,
+      "attemptsToday": 0
+    },
+    "main_2": {
+      "cleared": true,
+      "firstClearClaimed": true,
+      "objectiveClaimed": false,
+      "attemptsToday": 0
+    },
+    "main_3": {
+      "cleared": true,
+      "firstClearClaimed": true,
+      "objectiveClaimed": false,
+      "attemptsToday": 0
+    },
+    "main_4": {
+      "cleared": true,
+      "firstClearClaimed": true,
+      "objectiveClaimed": false,
+      "attemptsToday": 0
+    },
+    "main_5": {
+      "cleared": true,
+      "firstClearClaimed": true,
+      "objectiveClaimed": true,
+      "attemptsToday": 0
+    },
+    "shadow_1": {
+      "cleared": true,
+      "firstClearClaimed": true,
+      "objectiveClaimed": false,
+      "attemptsToday": 5
+    },
+    "shadow_2": {
+      "cleared": true,
+      "firstClearClaimed": true,
+      "objectiveClaimed": false,
+      "attemptsToday": 4
+    },
+    "shadow_5": {
+      "cleared": true,
+      "firstClearClaimed": true,
+      "objectiveClaimed": false,
+      "attemptsToday": 0
+    },
+    "shadow_4": {
+      "cleared": true,
+      "firstClearClaimed": true,
+      "objectiveClaimed": false,
+      "attemptsToday": 0
+    },
+    "main_6": {
+      "cleared": true,
+      "firstClearClaimed": true,
+      "objectiveClaimed": false,
+      "attemptsToday": 0
+    },
+    "shadow_3": {
+      "cleared": true,
+      "firstClearClaimed": true,
+      "objectiveClaimed": false,
+      "attemptsToday": 0
+    },
+    "shadow_6": {
+      "cleared": true,
+      "firstClearClaimed": true,
+      "objectiveClaimed": false,
+      "attemptsToday": 0
+    },
+    "main_7": {
+      "cleared": true,
+      "firstClearClaimed": true,
+      "objectiveClaimed": false,
+      "attemptsToday": 0
+    },
+    "main_8": {
+      "cleared": true,
+      "firstClearClaimed": true,
+      "objectiveClaimed": false,
+      "attemptsToday": 0
+    },
+    "main_9": {
+      "cleared": true,
+      "firstClearClaimed": true,
+      "objectiveClaimed": false,
+      "attemptsToday": 0
+    }
+  },
+  "parties": [
+    {
+      "name": "Starters",
+      "members": [
+        "char_suzume",
+        "char_hoshi",
+        "char_ayame",
+        "char_ashley",
+        "char_bridget"
+      ]
+    },
+    {
+      "name": "Party 2",
+      "members": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "name": "Party 3",
+      "members": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "name": "Party 4",
+      "members": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "name": "Party 5",
+      "members": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "name": "Party 6",
+      "members": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    }
+  ],
+  "activePartyIndex": 0,
+  "pins": [
+    {
+      "type": "equipment",
+      "characterId": "char_suzume",
+      "slot": "attire"
+    }
+  ],
+  "archive": {
+    "fragments": {}
+  },
+  "settings": {
+    "resetHour": 4,
+    "textScale": 1,
+    "reducedMotion": false,
+    "confirmBulk": true,
+    "devPanel": true,
+    "farmingResults": "full"
+  },
+  "progressLog": [
+    {
+      "at": "2026-07-31T15:01:07.493Z",
+      "text": "Suzume equipped Kimiko Movement Notes (+10 Power)"
+    },
+    {
+      "at": "2026-07-31T14:56:23.898Z",
+      "text": "Suzume equipped Training Bells (+10 Power)"
+    },
+    {
+      "at": "2026-07-31T14:53:35.298Z",
+      "text": "First clear: Corruption Beneath the Torii (first-clear rewards claimed)"
+    },
+    {
+      "at": "2026-07-31T14:51:36.356Z",
+      "text": "First clear: Mist-Lost Library (first-clear rewards claimed)"
+    },
+    {
+      "at": "2026-07-31T14:50:16.240Z",
+      "text": "Suzume promoted to 2 Stars (+150 Power)"
+    },
+    {
+      "at": "2026-07-30T11:19:19.255Z",
+      "text": "Hoshi equipped Iron Palm Wrappings (+10 Power)"
+    },
+    {
+      "at": "2026-07-30T11:18:18.525Z",
+      "text": "Ayame promoted to 2 Stars (+150 Power)"
+    },
+    {
+      "at": "2026-07-29T13:39:05.077Z",
+      "text": "Ashley equipped Overcharged Fire Wand (+10 Power)"
+    },
+    {
+      "at": "2026-07-29T13:05:24.509Z",
+      "text": "Suzume equipped Measure of Absolute Silence (+10 Power)"
+    },
+    {
+      "at": "2026-07-28T14:58:50.618Z",
+      "text": "Suzume equipped Unseen Aspirant Mark (+10 Power)"
+    },
+    {
+      "at": "2026-07-28T14:56:04.837Z",
+      "text": "Suzume equipped Vibration Kunai (+10 Power)"
+    },
+    {
+      "at": "2026-07-27T12:09:27.655Z",
+      "text": "First clear: Masks at the Moonlit Tea House (first-clear rewards claimed)"
+    },
+    {
+      "at": "2026-07-27T12:08:06.114Z",
+      "text": "Ayame completed Gear Tier 1 (+40 Power)"
+    },
+    {
+      "at": "2026-07-27T12:08:02.331Z",
+      "text": "Ayame equipped Names of the Fallen (+10 Power)"
+    },
+    {
+      "at": "2026-07-27T12:07:48.689Z",
+      "text": "First clear: Rules Written in Ice (first-clear rewards claimed)"
+    },
+    {
+      "at": "2026-07-27T12:06:05.786Z",
+      "text": "First clear: Beads of the Bound Spirit (first-clear rewards claimed)"
+    },
+    {
+      "at": "2026-07-26T20:02:50.337Z",
+      "text": "Ayame equipped Handmade Guard Ribbons (+10 Power)"
+    },
+    {
+      "at": "2026-07-26T20:00:27.105Z",
+      "text": "Ayame equipped Sanctuary of the Pure Soul (+10 Power)"
+    },
+    {
+      "at": "2026-07-26T20:00:25.754Z",
+      "text": "Ayame equipped Luminous Lotus Crest (+10 Power)"
+    },
+    {
+      "at": "2026-07-26T19:59:53.324Z",
+      "text": "Ayame equipped Ornate Prayer Mirror (+10 Power)"
+    },
+    {
+      "at": "2026-07-26T19:59:09.751Z",
+      "text": "Ayame equipped Highborn Beacon Silks (+10 Power)"
+    },
+    {
+      "at": "2026-07-26T19:57:31.194Z",
+      "text": "First clear: Detention in the Moving Greenhouse (first-clear rewards claimed)"
+    },
+    {
+      "at": "2026-07-26T19:56:46.728Z",
+      "text": "First clear: Stone Beneath the Flame (first-clear rewards claimed)"
+    },
+    {
+      "at": "2026-07-26T19:56:33.320Z",
+      "text": "First clear: The Beacon Draws the Dark (first-clear rewards claimed)"
+    },
+    {
+      "at": "2026-07-26T19:56:18.743Z",
+      "text": "First clear: Spark in the First-Year Hall (first-clear rewards claimed)"
+    },
+    {
+      "at": "2026-07-26T19:55:52.343Z",
+      "text": "First clear: Bells Without Sound (first-clear rewards claimed)"
+    },
+    {
+      "at": "2026-07-26T19:55:10.822Z",
+      "text": "First clear: Shrine Road Under Lanterns (first-clear rewards claimed)"
+    },
+    {
+      "at": "2026-07-26T19:54:47.669Z",
+      "text": "First clear: A Spark in the Alchemy Wing (first-clear rewards claimed)"
+    },
+    {
+      "at": "2026-07-26T19:54:37.557Z",
+      "text": "First clear: Bell-Silent Training Yard (first-clear rewards claimed)"
+    },
+    {
+      "at": "2026-07-26T19:54:27.797Z",
+      "text": "First clear: First-Year Arrival Gate (first-clear rewards claimed)"
+    }
+  ],
+  "lastResetSummary": {
+    "days": 1,
+    "energyGained": 120,
+    "energy": 122,
+    "attemptsReset": true,
+    "construction": [],
+    "production": [],
+    "expeditions": [
+      {
+        "id": "exp_offer_2_4_kypdq0",
+        "offerId": "offer_2_4_kypdq0",
+        "templateId": "exp_template_12",
+        "name": "Work Beyond the Gate 12",
+        "description": "The work asks for breadth rather than battle.",
+        "world": "world_magic_academy",
+        "launchDay": 2,
+        "returnDay": 3,
+        "duration": 1,
+        "party": [
+          "char_suzume",
+          "char_hoshi",
+          "char_ayame",
+          "char_ashley"
+        ],
+        "snapshot": [
+          {
+            "id": "char_suzume",
+            "power": 1180,
+            "stars": 1,
+            "world": "world_hidden_village",
+            "archetype": "achiever",
+            "tags": [
+              "faction_village_shadows"
+            ]
+          },
+          {
+            "id": "char_hoshi",
+            "power": 1160,
+            "stars": 1,
+            "world": "world_hidden_village",
+            "archetype": "caretaker",
+            "tags": [
+              "faction_spiritwardens"
+            ]
+          },
+          {
+            "id": "char_ayame",
+            "power": 1400,
+            "stars": 2,
+            "world": "world_hidden_village",
+            "archetype": "leader",
+            "tags": [
+              "faction_spiritwardens"
+            ]
+          },
+          {
+            "id": "char_ashley",
+            "power": 1160,
+            "stars": 1,
+            "world": "world_magic_academy",
+            "archetype": "freespirit",
+            "tags": [
+              "faction_spark_stone"
+            ]
+          }
+        ],
+        "tier": "completed",
+        "optionalMet": false,
+        "rewards": [
+          {
+            "kind": "resource",
+            "id": "renown",
+            "min": 70,
+            "max": 95,
+            "qty": 79
+          },
+          {
+            "kind": "resource",
+            "id": "arcane_sigils",
+            "min": 14,
+            "max": 20,
+            "qty": 14
+          }
+        ],
+        "rareReward": {
+          "kind": "resource",
+          "id": "intelligence",
+          "qty": 2,
+          "chanceBp": 8000
+        },
+        "rareRevealed": false,
+        "sourceOffer": {
+          "id": "offer_2_4_kypdq0",
+          "templateId": "exp_template_12",
+          "name": "Work Beyond the Gate 12",
+          "description": "The work asks for breadth rather than battle.",
+          "world": "world_magic_academy",
+          "duration": 1,
+          "partySize": 4,
+          "requirements": [
+            {
+              "type": "party_size",
+              "count": 4,
+              "text": "Send 4 characters."
+            },
+            {
+              "id": "req_same_world",
+              "type": "same_world",
+              "count": 2,
+              "text": "Send two characters from the same world."
+            }
+          ],
+          "optional": {
+            "id": "opt_power",
+            "type": "power_over_recommended",
+            "percentBp": 1000,
+            "count": 1,
+            "text": "Exceed the recommendation by ten percent."
+          },
+          "recommendedPower": 5280,
+          "baseRewards": [
+            {
+              "kind": "resource",
+              "id": "renown",
+              "min": 70,
+              "max": 95,
+              "qty": 79
+            },
+            {
+              "kind": "resource",
+              "id": "@associated_world_asset",
+              "min": 14,
+              "max": 20,
+              "qty": 14
+            }
+          ],
+          "rareReward": {
+            "kind": "resource",
+            "id": "intelligence",
+            "qty": 2,
+            "chanceBp": 8000
+          },
+          "rareRevealed": false,
+          "rareRoll": 4486,
+          "pinned": false
+        },
+        "report": "The route proved demanding, but the agreed supplies came home intact.",
+        "acknowledged": true
+      }
+    ],
+    "acknowledged": true
+  },
+  "ui": {
+    "roster": {
+      "world": "all",
+      "archetype": "all",
+      "faction": "all",
+      "ownership": "all",
+      "sort": "ready",
+      "direction": "desc",
+      "collectionDensity": "gallery"
+    },
+    "campaignId": "main",
+    "archiveCollapsed": {
+      "worlds": {
+        "world_hidden_village": false,
+        "world_magic_academy": false
+      },
+      "collections": {
+        "world_hidden_village_col_1": false,
+        "world_hidden_village_col_2": false,
+        "world_hidden_village_col_3": false,
+        "world_magic_academy_col_1": false,
+        "world_magic_academy_col_2": false,
+        "world_magic_academy_col_3": false
+      }
+    },
+    "nodePartyById": {}
+  },
+  "dayNumber": 3,
+  "expeditions": {
+    "board": {
+      "day": 3,
+      "seed": 3,
+      "offers": [
+        {
+          "id": "offer_3_0_vi7o6o",
+          "templateId": "exp_template_13",
+          "name": "A Map Left Unfinished 13",
+          "description": "A measured route with a useful answer waiting at its end.",
+          "world": null,
+          "duration": 1,
+          "partySize": 2,
+          "requirements": [
+            {
+              "type": "party_size",
+              "count": 2,
+              "text": "Send 2 characters."
+            },
+            {
+              "id": "req_stars",
+              "type": "combined_stars",
+              "count": 4,
+              "text": "Bring at least four combined stars."
+            },
+            {
+              "id": "req_two_worlds",
+              "type": "distinct_worlds",
+              "count": 2,
+              "text": "Bring knowledge from two worlds."
+            }
+          ],
+          "optional": {
+            "id": "opt_two_arch",
+            "type": "distinct_archetypes",
+            "count": 2,
+            "text": "Bring two different archetypes."
+          },
+          "recommendedPower": 2209,
+          "baseRewards": [
+            {
+              "kind": "material",
+              "id": "mat_metal_basic",
+              "min": 4,
+              "max": 8,
+              "qty": 7
+            },
+            {
+              "kind": "resource",
+              "id": "intelligence",
+              "min": 1,
+              "max": 1,
+              "qty": 1
+            }
+          ],
+          "rareReward": null,
+          "rareRevealed": false,
+          "rareRoll": 8065,
+          "pinned": false
+        },
+        {
+          "id": "offer_3_1_29vhxr",
+          "templateId": "exp_template_11",
+          "name": "A Map Left Unfinished 11",
+          "description": "A measured route with a useful answer waiting at its end.",
+          "world": "world_hidden_village",
+          "duration": 1,
+          "partySize": 3,
+          "requirements": [
+            {
+              "type": "party_size",
+              "count": 3,
+              "text": "Send 3 characters."
+            },
+            {
+              "id": "req_associated",
+              "type": "world_count",
+              "world": "@associated",
+              "count": 1,
+              "text": "Include someone who knows this world."
+            }
+          ],
+          "optional": {
+            "id": "opt_star",
+            "type": "star_character",
+            "stars": 3,
+            "count": 1,
+            "text": "Include someone at three stars or above."
+          },
+          "recommendedPower": 3842,
+          "baseRewards": [
+            {
+              "kind": "resource",
+              "id": "renown",
+              "min": 18,
+              "max": 28,
+              "qty": 19
+            },
+            {
+              "kind": "shards",
+              "characterId": "char_genjiro",
+              "qty": 4
+            }
+          ],
+          "rareReward": {
+            "kind": "resource",
+            "id": "intelligence",
+            "qty": 1,
+            "chanceBp": 7000
+          },
+          "rareRevealed": false,
+          "rareRoll": 9514,
+          "pinned": false
+        },
+        {
+          "id": "offer_3_3_1pibhn8",
+          "templateId": "exp_template_14",
+          "name": "A Map Left Unfinished 14",
+          "description": "The work asks for breadth rather than battle.",
+          "world": "world_hidden_village",
+          "duration": 1,
+          "partySize": 3,
+          "requirements": [
+            {
+              "type": "party_size",
+              "count": 3,
+              "text": "Send 3 characters."
+            },
+            {
+              "id": "req_associated",
+              "type": "world_count",
+              "world": "@associated",
+              "count": 1,
+              "text": "Include someone who knows this world."
+            }
+          ],
+          "optional": {
+            "id": "opt_two_arch",
+            "type": "distinct_archetypes",
+            "count": 2,
+            "text": "Bring two different archetypes."
+          },
+          "recommendedPower": 3688,
+          "baseRewards": [
+            {
+              "kind": "resource",
+              "id": "@associated_world_asset",
+              "min": 10,
+              "max": 16,
+              "qty": 11
+            },
+            {
+              "kind": "resource",
+              "id": "renown",
+              "min": 10,
+              "max": 15,
+              "qty": 13
+            }
+          ],
+          "rareReward": null,
+          "rareRevealed": false,
+          "rareRoll": 8325,
+          "pinned": false
+        },
+        {
+          "id": "offer_3_4_1m8rmf",
+          "templateId": "exp_template_3",
+          "name": "Quiet Roads, Useful Rumours 3",
+          "description": "The work asks for breadth rather than battle.",
+          "world": "world_magic_academy",
+          "duration": 1,
+          "partySize": 4,
+          "requirements": [
+            {
+              "type": "party_size",
+              "count": 4,
+              "text": "Send 4 characters."
+            },
+            {
+              "id": "req_two_worlds",
+              "type": "distinct_worlds",
+              "count": 2,
+              "text": "Bring knowledge from two worlds."
+            }
+          ],
+          "optional": {
+            "id": "opt_power",
+            "type": "power_over_recommended",
+            "percentBp": 1000,
+            "count": 1,
+            "text": "Exceed the recommendation by ten percent."
+          },
+          "recommendedPower": 5137,
+          "baseRewards": [
+            {
+              "kind": "material",
+              "id": "mat_metal_basic",
+              "min": 4,
+              "max": 8,
+              "qty": 6
+            },
+            {
+              "kind": "resource",
+              "id": "intelligence",
+              "min": 1,
+              "max": 1,
+              "qty": 1
+            }
+          ],
+          "rareReward": null,
+          "rareRevealed": false,
+          "rareRoll": 4007,
+          "pinned": false
+        }
+      ]
+    },
+    "active": [
+      {
+        "id": "exp_offer_3_2_1c7dxw2",
+        "offerId": "offer_3_2_1c7dxw2",
+        "templateId": "exp_template_12",
+        "name": "Work Beyond the Gate 12",
+        "description": "The work asks for breadth rather than battle.",
+        "world": "world_magic_academy",
+        "launchDay": 3,
+        "returnDay": 4,
+        "duration": 1,
+        "party": [
+          "char_suzume",
+          "char_ayame",
+          "char_ashley",
+          "char_hoshi"
+        ],
+        "snapshot": [
+          {
+            "id": "char_suzume",
+            "power": 1350,
+            "stars": 2,
+            "world": "world_hidden_village",
+            "archetype": "achiever",
+            "tags": [
+              "faction_village_shadows"
+            ]
+          },
+          {
+            "id": "char_ayame",
+            "power": 1400,
+            "stars": 2,
+            "world": "world_hidden_village",
+            "archetype": "leader",
+            "tags": [
+              "faction_spiritwardens"
+            ]
+          },
+          {
+            "id": "char_ashley",
+            "power": 1160,
+            "stars": 1,
+            "world": "world_magic_academy",
+            "archetype": "freespirit",
+            "tags": [
+              "faction_spark_stone"
+            ]
+          },
+          {
+            "id": "char_hoshi",
+            "power": 1160,
+            "stars": 1,
+            "world": "world_hidden_village",
+            "archetype": "caretaker",
+            "tags": [
+              "faction_spiritwardens"
+            ]
+          }
+        ],
+        "tier": "completed",
+        "optionalMet": false,
+        "rewards": [
+          {
+            "kind": "resource",
+            "id": "renown",
+            "min": 70,
+            "max": 95,
+            "qty": 81
+          },
+          {
+            "kind": "resource",
+            "id": "@associated_world_asset",
+            "min": 14,
+            "max": 20,
+            "qty": 16
+          }
+        ],
+        "rareReward": {
+          "kind": "resource",
+          "id": "intelligence",
+          "qty": 2,
+          "chanceBp": 8000
+        },
+        "rareRevealed": true,
+        "sourceOffer": {
+          "id": "offer_3_2_1c7dxw2",
+          "templateId": "exp_template_12",
+          "name": "Work Beyond the Gate 12",
+          "description": "The work asks for breadth rather than battle.",
+          "world": "world_magic_academy",
+          "duration": 1,
+          "partySize": 4,
+          "requirements": [
+            {
+              "type": "party_size",
+              "count": 4,
+              "text": "Send 4 characters."
+            },
+            {
+              "id": "req_same_world",
+              "type": "same_world",
+              "count": 2,
+              "text": "Send two characters from the same world."
+            }
+          ],
+          "optional": {
+            "id": "opt_power",
+            "type": "power_over_recommended",
+            "percentBp": 1000,
+            "count": 1,
+            "text": "Exceed the recommendation by ten percent."
+          },
+          "recommendedPower": 5092,
+          "baseRewards": [
+            {
+              "kind": "resource",
+              "id": "renown",
+              "min": 70,
+              "max": 95,
+              "qty": 81
+            },
+            {
+              "kind": "resource",
+              "id": "@associated_world_asset",
+              "min": 14,
+              "max": 20,
+              "qty": 16
+            }
+          ],
+          "rareReward": {
+            "kind": "resource",
+            "id": "intelligence",
+            "qty": 2,
+            "chanceBp": 8000
+          },
+          "rareRevealed": true,
+          "rareRoll": 3698,
+          "pinned": false
+        }
+      }
+    ],
+    "reports": [
+      {
+        "id": "exp_offer_2_4_kypdq0",
+        "offerId": "offer_2_4_kypdq0",
+        "templateId": "exp_template_12",
+        "name": "Work Beyond the Gate 12",
+        "description": "The work asks for breadth rather than battle.",
+        "world": "world_magic_academy",
+        "launchDay": 2,
+        "returnDay": 3,
+        "duration": 1,
+        "party": [
+          "char_suzume",
+          "char_hoshi",
+          "char_ayame",
+          "char_ashley"
+        ],
+        "snapshot": [
+          {
+            "id": "char_suzume",
+            "power": 1180,
+            "stars": 1,
+            "world": "world_hidden_village",
+            "archetype": "achiever",
+            "tags": [
+              "faction_village_shadows"
+            ]
+          },
+          {
+            "id": "char_hoshi",
+            "power": 1160,
+            "stars": 1,
+            "world": "world_hidden_village",
+            "archetype": "caretaker",
+            "tags": [
+              "faction_spiritwardens"
+            ]
+          },
+          {
+            "id": "char_ayame",
+            "power": 1400,
+            "stars": 2,
+            "world": "world_hidden_village",
+            "archetype": "leader",
+            "tags": [
+              "faction_spiritwardens"
+            ]
+          },
+          {
+            "id": "char_ashley",
+            "power": 1160,
+            "stars": 1,
+            "world": "world_magic_academy",
+            "archetype": "freespirit",
+            "tags": [
+              "faction_spark_stone"
+            ]
+          }
+        ],
+        "tier": "completed",
+        "optionalMet": false,
+        "rewards": [
+          {
+            "kind": "resource",
+            "id": "renown",
+            "min": 70,
+            "max": 95,
+            "qty": 79
+          },
+          {
+            "kind": "resource",
+            "id": "arcane_sigils",
+            "min": 14,
+            "max": 20,
+            "qty": 14
+          }
+        ],
+        "rareReward": {
+          "kind": "resource",
+          "id": "intelligence",
+          "qty": 2,
+          "chanceBp": 8000
+        },
+        "rareRevealed": false,
+        "sourceOffer": {
+          "id": "offer_2_4_kypdq0",
+          "templateId": "exp_template_12",
+          "name": "Work Beyond the Gate 12",
+          "description": "The work asks for breadth rather than battle.",
+          "world": "world_magic_academy",
+          "duration": 1,
+          "partySize": 4,
+          "requirements": [
+            {
+              "type": "party_size",
+              "count": 4,
+              "text": "Send 4 characters."
+            },
+            {
+              "id": "req_same_world",
+              "type": "same_world",
+              "count": 2,
+              "text": "Send two characters from the same world."
+            }
+          ],
+          "optional": {
+            "id": "opt_power",
+            "type": "power_over_recommended",
+            "percentBp": 1000,
+            "count": 1,
+            "text": "Exceed the recommendation by ten percent."
+          },
+          "recommendedPower": 5280,
+          "baseRewards": [
+            {
+              "kind": "resource",
+              "id": "renown",
+              "min": 70,
+              "max": 95,
+              "qty": 79
+            },
+            {
+              "kind": "resource",
+              "id": "@associated_world_asset",
+              "min": 14,
+              "max": 20,
+              "qty": 14
+            }
+          ],
+          "rareReward": {
+            "kind": "resource",
+            "id": "intelligence",
+            "qty": 2,
+            "chanceBp": 8000
+          },
+          "rareRevealed": false,
+          "rareRoll": 4486,
+          "pinned": false
+        },
+        "report": "The route proved demanding, but the agreed supplies came home intact.",
+        "acknowledged": true
+      },
+      {
+        "id": "exp_offer_1_1_6usn1k",
+        "offerId": "offer_1_1_6usn1k",
+        "templateId": "exp_template_2",
+        "name": "A Map Left Unfinished 2",
+        "description": "The work asks for breadth rather than battle.",
+        "world": "world_hidden_village",
+        "launchDay": 1,
+        "returnDay": 2,
+        "duration": 1,
+        "party": [
+          "char_suzume",
+          "char_ayame",
+          "char_ashley"
+        ],
+        "snapshot": [
+          {
+            "id": "char_suzume",
+            "power": 1180,
+            "stars": 1,
+            "world": "world_hidden_village",
+            "archetype": "achiever",
+            "tags": [
+              "faction_village_shadows"
+            ]
+          },
+          {
+            "id": "char_ayame",
+            "power": 1250,
+            "stars": 1,
+            "world": "world_hidden_village",
+            "archetype": "leader",
+            "tags": [
+              "faction_spiritwardens"
+            ]
+          },
+          {
+            "id": "char_ashley",
+            "power": 1160,
+            "stars": 1,
+            "world": "world_magic_academy",
+            "archetype": "freespirit",
+            "tags": [
+              "faction_spark_stone"
+            ]
+          }
+        ],
+        "tier": "exceptional",
+        "optionalMet": true,
+        "rewards": [
+          {
+            "kind": "resource",
+            "id": "clan_seals",
+            "min": 10,
+            "max": 16,
+            "qty": 24
+          },
+          {
+            "kind": "resource",
+            "id": "renown",
+            "min": 10,
+            "max": 15,
+            "qty": 16
+          }
+        ],
+        "rareReward": null,
+        "rareRevealed": false,
+        "sourceOffer": {
+          "id": "offer_1_1_6usn1k",
+          "templateId": "exp_template_2",
+          "name": "A Map Left Unfinished 2",
+          "description": "The work asks for breadth rather than battle.",
+          "world": "world_hidden_village",
+          "duration": 1,
+          "partySize": 3,
+          "requirements": [
+            {
+              "type": "party_size",
+              "count": 3,
+              "text": "Send 3 characters."
+            },
+            {
+              "id": "req_same_world",
+              "type": "same_world",
+              "count": 2,
+              "text": "Send two characters from the same world."
+            }
+          ],
+          "optional": {
+            "id": "opt_two_arch",
+            "type": "distinct_archetypes",
+            "count": 2,
+            "text": "Bring two different archetypes."
+          },
+          "recommendedPower": 3569,
+          "baseRewards": [
+            {
+              "kind": "resource",
+              "id": "@associated_world_asset",
+              "min": 10,
+              "max": 16,
+              "qty": 16
+            },
+            {
+              "kind": "resource",
+              "id": "renown",
+              "min": 10,
+              "max": 15,
+              "qty": 11
+            }
+          ],
+          "rareReward": null,
+          "rareRevealed": false,
+          "rareRoll": 1742,
+          "pinned": false
+        },
+        "report": "The party found more than the route promised and brought the rare lead home.",
+        "acknowledged": true
+      }
+    ],
+    "daily": {
+      "day": 3,
+      "freeRerolls": 1,
+      "freePins": 0,
+      "freeRerollsUsed": 0,
+      "freePinsUsed": 0
+    }
+  },
+  "headquarters": {
+    "worlds": {
+      "world_hidden_village": {
+        "facilities": {},
+        "production": {},
+        "staff": {},
+        "claimedRanks": []
+      },
+      "world_magic_academy": {
+        "facilities": {},
+        "production": {},
+        "staff": {},
+        "claimedRanks": []
+      }
+    },
+    "construction": null
+  },
+  "energySystems": {
+    "daily": {
+      "day": 3,
+      "suppliesUsed": 0,
+      "momentumRefunded": 0
+    }
+  },
+  "crises": {
+    "active": null,
+    "lastSpawnDay": null,
+    "cycleSeen": [],
+    "history": []
+  }
+}

@@ -33,7 +33,52 @@ export function selectedPartyPower(store, node) {
   };
 }
 
+export function partyHeadline(evaluation, memberCount) {
+  if (memberCount === 0) return 'No one is standing with you yet.';
+  if (memberCount < 5) return `${memberCount} of five are standing together.`;
+  if (evaluation.capped) return `They are pulling +${evaluation.cappedBp / 100}% together — the cap is holding.`;
+  return `They are pulling +${evaluation.cappedBp / 100}% together.`;
+}
+
+export function bestPartySwap(content, state, slots) {
+  const members = slots.filter(Boolean);
+  if (members.length < content.balance.partySize) {
+    return { kind: 'empty', slotIndex: slots.findIndex(id => !id) };
+  }
+  const before = evaluateParty(content, state, members);
+  const current = new Set(members);
+  const candidates = [];
+  slots.forEach((outgoingId, slotIndex) => {
+    content.characters.forEach((incoming, contentOrder) => {
+      if (!state.characters[incoming.id]?.owned || current.has(incoming.id)) return;
+      const next = [...slots];
+      next[slotIndex] = incoming.id;
+      const after = evaluateParty(content, state, next);
+      const effectiveGain = after.effectivePower - before.effectivePower;
+      if (effectiveGain <= 0) return;
+      const beforeActive = new Map(before.active.map(item => [item.tag.id, item.bonusBp]));
+      const improved = after.active.filter(item => item.bonusBp > (beforeActive.get(item.tag.id) ?? 0));
+      candidates.push({
+        kind: 'swap', slotIndex, outgoingId, incomingId: incoming.id,
+        before, after, effectiveGain,
+        synergyGainBp: after.cappedBp - before.cappedBp,
+        improved, contentOrder
+      });
+    });
+  });
+  candidates.sort((a, b) =>
+    b.effectiveGain - a.effectiveGain
+    || b.synergyGainBp - a.synergyGainBp
+    || a.slotIndex - b.slotIndex
+    || a.contentOrder - b.contentOrder);
+  return candidates[0] ?? { kind: 'none', before };
+}
+
 export function rankTodayHook(content, state, readyItems, frontiers) {
+  const crisis = state.crises?.active;
+  if (crisis && (crisis.status === 'planning' || (crisis.status === 'resolved' && crisis.result?.outcome !== 'endured' && !crisis.cacheClaimed))) {
+    return { kind: 'crisis', crisis, def: content.crisisById[crisis.definitionId] };
+  }
   const shardCandidates = content.characters.flatMap((def, order) => {
     const cs = state.characters[def.id];
     const need = cs.owned
@@ -51,6 +96,11 @@ export function rankTodayHook(content, state, readyItems, frontiers) {
 }
 
 export function todayHookText(hook) {
+  if (hook.kind === 'crisis') return {
+    headline: hook.crisis.status === 'planning'
+      ? `${hook.crisis.name} is asking for an answer.` : 'An Emergency Cache is still waiting.',
+    route: '#/crisis'
+  };
   if (hook.kind === 'shards') {
     const goal = hook.cs.owned ? `${hook.cs.stars + 1}${ordinal(hook.cs.stars + 1)} star` : 'unlock';
     return {
