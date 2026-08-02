@@ -99,6 +99,12 @@ function renderOffer(store, root, offerId) {
       h('p', clears
         ? `${fmt(preview.power - offer.recommendedPower)} to spare — this predicts a ${preview.tier} return.`
         : `Short of the ${fmt(offer.recommendedPower)} recommendation, but a valid party still completes the work.`)));
+    dynamic.appendChild(h('section.expedition-reward-preview', h('div.eyebrow', 'Expected return'),
+      offer.fixedRewards?.length ? h('p.good', `${rewardText(content, offer.fixedRewards)} is guaranteed and never multiplied by the result tier.`) : null,
+      h('p', rewardText(content, preview.rewards.filter(entry => !entry.fixed))),
+      h('p.caption', offer.rareRevealed && offer.rareReward
+        ? `Rare lead: ${rewardText(content, [offer.rareReward])}`
+        : 'The exact rare lead remains concealed.')));
     const requirements = h('section.requirement-reading', h('div.eyebrow', 'What the route asks'));
     preview.mandatory.forEach(item => requirements.appendChild(h(`p.${item.met ? 'good' : 'bad'}`, `${item.met ? 'Ready' : 'Still needed'} · ${item.text} (${item.current}/${item.target})`)));
     requirements.appendChild(h(`p.${preview.optional.met ? 'good' : 'muted'}`,
@@ -121,12 +127,6 @@ function renderOffer(store, root, offerId) {
       h('span.caption', `${fmt(characterPowerForState(content, state, def.id))} · ${content.archetypes[def.archetype].name}`)));
     }
     roster.appendChild(row); dynamic.appendChild(roster);
-    dynamic.appendChild(h('section.expedition-reward-preview', h('div.eyebrow', 'Expected return'),
-      offer.fixedRewards?.length ? h('p.good', `${rewardText(content, offer.fixedRewards)} is guaranteed and never multiplied by the result tier.`) : null,
-      h('p', rewardText(content, preview.rewards.filter(entry => !entry.fixed))),
-      h('p.caption', offer.rareRevealed && offer.rareReward
-        ? `Rare lead: ${rewardText(content, [offer.rareReward])}`
-        : 'The exact rare lead remains concealed.')));
     dynamic.appendChild(h('div.expedition-actions',
       h('button.btn.primary', { disabled: !preview.valid,
         onclick: () => store.tx(() => launchExpedition(content, state, offer.id, selected)).then(r => r.ok && store.go('#/expeditions')) }, 'Send them →'),

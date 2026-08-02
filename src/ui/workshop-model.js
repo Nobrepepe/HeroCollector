@@ -25,7 +25,8 @@ export function buildWorkshopModel(content, state) {
         powerBefore: characterPower(content, cs),
         powerGain: slotPower(content.balance, tier),
         shortfall: Object.values(analysis.totalMaterialMissing).reduce((sum, value) => sum + value, 0),
-        activeParty: activeParty.has(def.id)
+        activeParty: activeParty.has(def.id),
+        pinned: state.pins.some(pin => pin.type === 'equipment' && pin.characterId === def.id && pin.slot === slot)
       });
     }
   }
@@ -39,7 +40,8 @@ export function buildWorkshopModel(content, state) {
   candidates.sort(compare);
 
   const ready = candidates.filter(candidate => candidate.analysis.craftable);
-  const bench = ready[0] ?? candidates[0] ?? null;
+  const pinned = candidates.filter(candidate => candidate.pinned);
+  const bench = pinned[0] ?? ready[0] ?? candidates[0] ?? null;
   const nearby = candidates.filter(candidate => candidate !== bench && !candidate.analysis.craftable)
     .sort((a, b) => a.shortfall - b.shortfall || Number(b.activeParty) - Number(a.activeParty))
     .slice(0, 2);
@@ -50,6 +52,7 @@ export function buildWorkshopModel(content, state) {
 
   return {
     candidates,
+    pinned,
     ready,
     bench,
     nearby,

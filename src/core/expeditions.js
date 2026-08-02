@@ -148,7 +148,7 @@ export function generateExpeditionBoard(content, state, rng, { seed = null, pinn
   const offers = pinned ? [{ ...structuredClone(pinned), pinned: false }] : [];
   const guaranteed = content.expeditions.templateById?.[settings.guaranteedSupplyTemplateId]
     ?? content.expeditions.templates.find(template => template.id === settings.guaranteedSupplyTemplateId);
-  if (guaranteed?.enabled !== false && !offers.some(offer => offer.offerKind === 'supply')) {
+  if (guaranteed && guaranteed.enabled !== false && !offers.some(offer => offer.offerKind === 'supply')) {
     offers.push(instantiateOffer(content, state, guaranteed, rng, state.dayNumber, offers.length));
   }
   let longCount = offers.filter(o => o.duration === 2).length;

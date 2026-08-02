@@ -11,7 +11,7 @@ import { exportJson, importJson, loadSamplePack } from '../platform.js';
 import {
   emptyCustomDB, upgradeCustomDB, newCustomWorld, newCustomCharacter,
   newCustomFaction, addCampaignChapter, canPublishWorld, characterShardAssignments,
-  scaffoldWorldHq, sampleExpeditionLibrary, newCrisisDefinition
+  scaffoldWorldHq, sampleExpeditionLibrary, newCrisisDefinition, newId
 } from '../core/custom.js';
 
 export function renderCreator(store, root, arg) {
@@ -120,11 +120,12 @@ function overview(store, root) {
   root.appendChild(hp);
 
   // ---- worlds
-  const wp = h('div.panel');
+  const wp = h('div.panel.creator-worlds-panel');
   wp.appendChild(h('h2', 'Worlds'));
   if (db.worlds.length === 0) {
     wp.appendChild(h('p.muted.small', 'No worlds yet. Create one from scratch, or import the sample worlds below as an editable starting point.'));
   }
+  const worldGrid = h('div.creator-world-grid');
   for (const w of db.worlds) {
     const gate = canPublishWorld(db, w.id);
     const row = h('div.creator-list-row.creator-world-card' + (w.image ? '' : '.art-fallback'), {
@@ -135,8 +136,9 @@ function overview(store, root) {
       h('div', h('b', w.displayName), ' ', h('span.badge.' + w.status, w.status.toUpperCase())),
       h('div.small.muted', `${db.characters.filter(c => c.worldId === w.id).length} characters` + (w.status === 'draft' && !gate.ok ? ` — ${gate.reasons[0]}` : ''))));
     row.appendChild(h('button.btn.tiny.primary', { onclick: () => store.go(`#/creator/world/${w.id}`) }, 'Edit'));
-    wp.appendChild(row);
+    worldGrid.appendChild(row);
   }
+  wp.appendChild(worldGrid);
   wp.appendChild(h('button.btn.primary', {
     style: { marginTop: '10px' },
     onclick: () => promptName('New world name', name => {
@@ -514,18 +516,34 @@ function worldEditor(store, root, worldId) {
   const ap = h('div.panel');
   ap.appendChild(h('h2', 'World Archive — 3 collections × 5 relics'));
   const chars = db.characters.filter(c => c.worldId === w.id);
-  const skinCharOptions = [['', '— choose character —'], ...chars.map(c => [c.id, c.displayName])];
+  const skinCharOptions = [['', '— choose character —'], ...chars.filter(c => c.skins?.length).map(c => [c.id, c.displayName])];
+  const rewardFields = (reward, label) => {
+    reward ??= { characterId: null, skinId: null };
+    const character = chars.find(c => c.id === reward.characterId);
+    if (reward.skinId && !character?.skins?.some(skin => skin.id === reward.skinId)) reward.skinId = null;
+    const fields = h('div.form-grid');
+    const characterSelect = h('select');
+    for (const [value, text] of skinCharOptions) characterSelect.appendChild(h('option', {
+      value, selected: String(reward.characterId ?? '') === String(value)
+    }, text));
+    characterSelect.addEventListener('change', () => {
+      reward.characterId = characterSelect.value || null;
+      reward.skinId = null;
+      commit(store, true);
+    });
+    fields.append(...field(`${label} character`, characterSelect));
+    fields.append(...field(`${label} skin`, selectInput(reward, 'skinId', store,
+      [['', character ? '— choose skin —' : '— choose a character first —'], ...(character?.skins ?? []).map(skin => [skin.id, skin.name])],
+      { structural: true })));
+    return fields;
+  };
   w.archive.collections.forEach((col, c) => {
     ap.appendChild(h('h3', `Collection ${c + 1}`));
     const cg = h('div.form-grid');
     cg.append(...field('Collection name', textInput(col, 'name', store)));
-    col.rewardSkin ??= { characterId: null, name: '', portrait: null, fullBody: null };
-    cg.append(...field('Reward skin character', selectInput(col.rewardSkin, 'characterId', store, skinCharOptions, { structural: true })));
-    cg.append(...field('Reward skin name', textInput(col.rewardSkin, 'name', store, { maxlength: 80 })));
+    col.rewardSkin ??= { characterId: null, skinId: null };
     ap.appendChild(cg);
-    ap.appendChild(h('div.wells', { style: { marginTop: '10px' } },
-      imageWell('portrait', 'Reward skin eye tile (16:9, transparent)', () => col.rewardSkin.portrait, v => { col.rewardSkin.portrait = v; }, () => commit(store, true)),
-      imageWell('fullBody', 'Reward skin full body (9:16)', () => col.rewardSkin.fullBody, v => { col.rewardSkin.fullBody = v; }, () => commit(store, true))));
+    ap.appendChild(rewardFields(col.rewardSkin, 'Reward'));
     const shelf = h('div.wells', { style: { marginTop: '8px' } });
     col.relics.forEach((relic, r) => {
       const cell = h('div', { style: { width: '200px' } });
@@ -539,14 +557,8 @@ function worldEditor(store, root, worldId) {
     ap.appendChild(shelf);
   });
   ap.appendChild(h('h3', 'Full-Archive skin'));
-  w.archive.fullSkin ??= { characterId: null, name: '', portrait: null, fullBody: null };
-  const sg = h('div.form-grid');
-  sg.append(...field('Skin character', selectInput(w.archive.fullSkin, 'characterId', store, skinCharOptions, { structural: true })));
-  sg.append(...field('Skin name', textInput(w.archive.fullSkin, 'name', store, { maxlength: 80 })));
-  ap.appendChild(sg);
-  ap.appendChild(h('div.wells', { style: { marginTop: '10px' } },
-    imageWell('portrait', 'Skin eye tile (16:9, transparent)', () => w.archive.fullSkin.portrait, v => { w.archive.fullSkin.portrait = v; }, () => commit(store, true)),
-    imageWell('fullBody', 'Skin full body (9:16)', () => w.archive.fullSkin.fullBody, v => { w.archive.fullSkin.fullBody = v; }, () => commit(store, true))));
+  w.archive.fullSkin ??= { characterId: null, skinId: null };
+  ap.appendChild(rewardFields(w.archive.fullSkin, 'Reward'));
   root.appendChild(ap);
 }
 
@@ -650,6 +662,10 @@ function characterListPanel(store, worldId) {
         'The character and their imported images are removed from the creator database. Their shard nodes revert to unassigned.',
         async () => {
           db.characters = db.characters.filter(x => x.id !== c.id);
+          for (const world of db.worlds) {
+            for (const collection of world.archive.collections) if (collection.rewardSkin?.characterId === c.id) collection.rewardSkin = { characterId: null, skinId: null };
+            if (world.archive.fullSkin?.characterId === c.id) world.archive.fullSkin = { characterId: null, skinId: null };
+          }
           for (const ch of db.shadowChapters) for (const nd of ch.nodes) if (nd.shardCharacterId === c.id) nd.shardCharacterId = null;
           for (const wx of db.worlds) for (const nd of wx.campaignNodes) if (nd.shardCharacterId === c.id) nd.shardCharacterId = null;
           const world = db.worlds.find(x => x.id === worldId);
@@ -750,6 +766,33 @@ function charEditor(store, root, charId) {
     imageWell('portrait', 'Eye tile (16:9, transparent PNG)', () => c.portrait, v => { c.portrait = v; }, () => commit(store, true)),
     imageWell('fullBody', 'Full body (9:16, taller than wide)', () => c.fullBody, v => { c.fullBody = v; }, () => commit(store, true))));
   root.appendChild(imp);
+
+  // ---- alternate appearances
+  const skins = h('div.panel');
+  skins.appendChild(h('h2', 'Skins'));
+  skins.appendChild(h('p.small.muted', 'Author alternate appearances here. Archive rewards select from these skins.'));
+  c.skins ??= [];
+  for (const skin of c.skins) {
+    const row = h('div.creator-skin-row');
+    row.appendChild(textInput(skin, 'name', store, { maxlength: 80 }));
+    row.appendChild(h('div.wells',
+      imageWell('portrait', 'Skin eye tile (16:9, transparent)', () => skin.portrait, value => { skin.portrait = value; }, () => commit(store, true)),
+      imageWell('fullBody', 'Skin full body (9:16)', () => skin.fullBody, value => { skin.fullBody = value; }, () => commit(store, true))));
+    row.appendChild(h('button.btn.tiny.danger', { onclick: () => {
+      c.skins = c.skins.filter(item => item.id !== skin.id);
+      for (const world of db.worlds) {
+        for (const collection of world.archive.collections) if (collection.rewardSkin?.skinId === skin.id) collection.rewardSkin = { characterId: null, skinId: null };
+        if (world.archive.fullSkin?.skinId === skin.id) world.archive.fullSkin = { characterId: null, skinId: null };
+      }
+      commit(store, true);
+    } }, 'Delete skin'));
+    skins.appendChild(row);
+  }
+  skins.appendChild(h('button.btn.primary', { onclick: () => {
+    c.skins.push({ id: newId('skin'), name: 'New Skin', portrait: null, fullBody: null });
+    commit(store, true);
+  } }, '+ New Skin'));
+  root.appendChild(skins);
 
   // ---- equipment lines
   const eqp = h('div.panel');

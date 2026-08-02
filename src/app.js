@@ -24,6 +24,7 @@ import { renderCreator } from './ui/creator.js';
 import { renderExpeditions } from './ui/expeditions.js';
 import { renderHeadquarters } from './ui/headquarters.js';
 import { renderCrisis } from './ui/crisis.js';
+import { renderSplash } from './ui/splash.js';
 import { fieldSupplyLimits, previewFieldSupplyUse, useFieldSupply } from './core/energy.js';
 
 const store = {
@@ -45,6 +46,16 @@ const store = {
       sort: 'power', direction: 'desc'
     },
     compactResult: null
+  },
+  async beginDay() {
+    if (this.ui.dayStarted) return;
+    this.ui.dayStarted = true;
+    const summary = applyDailyReset(this.content, this.state, this.now());
+    await this.save();
+    location.hash = '#/home';
+    render();
+    showDaySummary(summary ?? this.state.lastResetSummary);
+    startDayPolling();
   },
   // Dev-only time offset so the developer panel can advance the reset day.
   now() { return Date.now() + (this.state?.devTimeOffsetMs ?? 0); },
@@ -224,6 +235,7 @@ export function clearModals({ restoreFocus = false } = {}) {
 
 // ------------------------------------------------------------- routing
 const routes = {
+  splash: { title: 'Eden', render: renderSplash },
   home: { title: 'Today', icon: '🏠', render: renderHome, nav: true },
   roster: { title: 'Collection', icon: '👥', render: renderRoster, nav: true },
   party: { title: 'Party', icon: '⚔️', render: renderParty, nav: true },
@@ -265,10 +277,12 @@ export function render() {
   store.ui.activeSearchInput = null;
   document.documentElement.className = store.state.settings.reducedMotion ? 'reduced-motion' : '';
   document.documentElement.style.setProperty('--scale', store.state.settings.textScale);
+  document.body.classList.toggle('splash-active', name === 'splash');
   renderSidebar(name);
   const screen = document.getElementById('screen');
   clear(screen);
   screen.className = entering ? 'screen-entering' : '';
+  if (name === 'splash') screen.classList.add('splash-screen-root');
   // Setup mode: until the content meets the minimum prerequisites for a
   // playable game, game screens show the readiness checklist instead.
   if (!store.gameReady.ready && GAME_ROUTES.has(name)) {
@@ -418,6 +432,7 @@ async function boot() {
   store.gameReady = gameReadiness(content);
 
   const loadedState = await loadSave();
+  store.ui.isFreshSave = !loadedState;
   let state = null;
   if (loadedState) {
     try {
@@ -459,20 +474,6 @@ async function boot() {
     store.rng = makeRng(entropySeed());
   }
 
-  const summary = applyDailyReset(store.content, store.state, store.now());
-  await store.save();
-  showDaySummary(summary ?? store.state.lastResetSummary);
-
-  // Re-check the reset every minute while the app stays open.
-  setInterval(async () => {
-    const s = applyDailyReset(store.content, store.state, store.now());
-    if (s) {
-      await store.save();
-      showDaySummary(s);
-      render();
-    }
-  }, 60000);
-
   window.heroStore = store; // debugging convenience for the dev workflow
   window.addEventListener('hashchange', () => {
     rememberScroll();
@@ -484,6 +485,9 @@ async function boot() {
     render();
   });
   window.addEventListener('keydown', ev => {
+    if (parseRoute().name === 'splash') {
+      document.querySelector('.eden-splash')?.classList.add('is-resting');
+    }
     if (ev.key === 'Escape' && store.ui.modalStack.length) {
       ev.preventDefault();
       closeTopModal();
@@ -505,7 +509,22 @@ async function boot() {
       store.save().then(render);
     }
   });
+  const launchRoute = location.hash === '#/splash/rest' ? '#/splash/rest' : '#/splash';
+  history.replaceState(null, '', launchRoute);
   render();
+}
+
+let dayPollingStarted = false;
+function startDayPolling() {
+  if (dayPollingStarted) return;
+  dayPollingStarted = true;
+  setInterval(async () => {
+    const summary = applyDailyReset(store.content, store.state, store.now());
+    if (!summary) return;
+    await store.save();
+    showDaySummary(summary);
+    render();
+  }, 60000);
 }
 
 function showDaySummary(summary) {

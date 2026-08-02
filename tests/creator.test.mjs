@@ -67,7 +67,7 @@ test('v2 migration moves legacy Main shards into incomplete paired Shadow chapte
   legacy.mainChapters[0].nodes[5].shardCharacterId = legacy.characters[1].id;
   legacy.mainChapters[0].nodes[8].shardCharacterId = legacy.characters[2].id;
   const upgraded = upgradeCustomDB(legacy);
-  assert.equal(upgraded.version, 9);
+  assert.equal(upgraded.version, 10);
   assert.equal(upgraded.shadowChapters.length, upgraded.mainChapters.length);
   assert.equal(upgraded.shadowChapters[0].nodes[2].shardCharacterId, legacy.characters[0].id);
   assert.equal(upgraded.shadowChapters[0].nodes[0].shardCharacterId, null);
@@ -96,6 +96,25 @@ test('Expedition and Headquarters artwork survives creator merge under stable wo
   assert.equal(merged.images.expedition[world.id], 'data:image/webp;base64,OFFER');
   assert.equal(merged.images.headquarters[world.id], 'data:image/webp;base64,HQ');
   assert.equal(merged.images.facility[world.hq.facilities[0].id], 'data:image/webp;base64,BUILDING');
+});
+
+test('v10 migration moves archive-authored skins onto their characters', () => {
+  const legacy = makeFullDB();
+  legacy.version = 9;
+  const world = legacy.worlds[0];
+  const character = legacy.characters[0];
+  world.archive.collections[0].rewardSkin = {
+    characterId: character.id, name: 'Ember Regalia',
+    portrait: 'data:image/webp;base64,EYES', fullBody: 'data:image/webp;base64,BODY'
+  };
+
+  const upgraded = upgradeCustomDB(legacy);
+  const reward = upgraded.worlds[0].archive.collections[0].rewardSkin;
+  const skin = upgraded.characters[0].skins.find(item => item.id === reward.skinId);
+  assert.equal(reward.characterId, character.id);
+  assert.equal(skin.name, 'Ember Regalia');
+  assert.equal(skin.portrait, 'data:image/webp;base64,EYES');
+  assert.equal(skin.fullBody, 'data:image/webp;base64,BODY');
 });
 
 test('sample pack merges cleanly into the full shipped game, all editable data', () => {

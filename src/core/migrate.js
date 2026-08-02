@@ -4,7 +4,7 @@ import { activeTier } from './power.js';
 export const DEFAULT_UI_STATE = Object.freeze({
   roster: {
     world: 'all', archetype: 'all', faction: 'all', ownership: 'all',
-    sort: 'name', direction: 'asc'
+    sort: 'power', direction: 'desc'
   },
   campaignId: 'main',
   archiveCollapsed: { worlds: {}, collections: {} },
@@ -135,7 +135,18 @@ function v3ToV4(state) {
     state.energySystems.daily = { day: state.dayNumber ?? 1, suppliesUsed: 0, momentumRefunded: 0 };
   }
   state.crises ??= { active: null, lastSpawnDay: null, cycleSeen: [], history: [] };
-  state.schemaVersion = 4;
+  state.schemaVersion = Math.max(state.schemaVersion ?? 0, 4);
+  return state;
+}
+
+function v4ToV5(state) {
+  // Establish the new collection reading order once for existing saves. The
+  // controls can still change it after migration.
+  if (state.ui?.roster) {
+    state.ui.roster.sort = 'power';
+    state.ui.roster.direction = 'desc';
+  }
+  state.schemaVersion = Math.max(state.schemaVersion ?? 0, 5);
   return state;
 }
 
@@ -154,6 +165,9 @@ export function migratePlayerState(content, inputState) {
     } else if (version === 3) {
       v3ToV4(state);
       version = 4;
+    } else if (version === 4) {
+      v4ToV5(state);
+      version = 5;
     } else {
       throw new Error(`No migration path exists from schema ${version}.`);
     }
@@ -173,5 +187,6 @@ export function migratePlayerState(content, inputState) {
     state.dayNumber ??= 1;
   }
   if (state.schemaVersion >= 4) v3ToV4(state);
+  if (state.schemaVersion >= 5) v4ToV5(state);
   return state;
 }

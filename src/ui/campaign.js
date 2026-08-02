@@ -27,7 +27,9 @@ export function renderCampaign(store, root, arg) {
   remembered[current] = chapter;
   const chapterIndex = chapters.indexOf(chapter);
   const chapterNodes = nodes.filter(node => node.chapter === chapter);
-  const world = chapterNodes[0]?.world ? content.worldById[chapterNodes[0].world] : null;
+  // Main and Shadow nodes still carry world metadata for rewards/artwork. Only
+  // a campaign authored as a world campaign should show its entry lock.
+  const world = content.worlds.find(candidate => candidate.campaignId === current) ?? null;
   const scene = sceneImage(store, chapterNodes[0]);
   const direction = store.ui.journeyDirection;
   store.ui.journeyDirection = null;

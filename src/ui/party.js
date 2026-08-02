@@ -4,7 +4,7 @@ import {
   setPartyMember, renameParty, copyParty, clearParty, selectPartyPreset
 } from '../core/state.js';
 import { characterPower } from '../core/power.js';
-import { activeSkin, starline } from './shared.js';
+import { portrait, starline } from './shared.js';
 import { openModal } from '../app.js';
 import { openCharacterPicker } from './character-picker.js';
 import { bestPartySwap, partyHeadline } from './presentation.js';
@@ -74,22 +74,39 @@ function partyReading(store, evaluation, recommendation, partyIndex, root) {
 
   const shared = h('section.party-shared', h('div.eyebrow', 'What they share'));
   if (evaluation.active.length) {
-    evaluation.active
-      .sort((a, b) => b.bonusBp - a.bonusBp)
+    const active = [...evaluation.active].sort(compareSynergies);
+    active.slice(0, 3)
       .forEach((item, index) => shared.append(
         h('div.party-synergy', { style: { '--rule-end': `${[78, 61, 72, 84][index % 4]}%` } },
           h('span.numeral.good', `+${pct(item.bonusBp)}`),
           h('div', h('div.party-synergy-name', item.tag.displayName),
             h('div.caption', item.tag.explanation)))));
+    shared.appendChild(h('button.party-codex-link', {
+      onclick: () => openPartySynergies(active)
+    }, 'See all'));
   } else {
     shared.appendChild(h('p.muted', 'No shared rhythm has taken hold yet.'));
   }
-  shared.appendChild(h('button.party-codex-link', {
-    onclick: () => store.go('#/archive/synergies')
-  }, 'Every synergy, itemised ⌄'));
   reading.appendChild(shared);
   reading.appendChild(recommendationThread(store, recommendation, partyIndex, root));
   return reading;
+}
+
+function compareSynergies(a, b) {
+  return b.bonusBp - a.bonusBp || a.tag.displayName.localeCompare(b.tag.displayName);
+}
+
+function openPartySynergies(active) {
+  openModal((modal, close) => {
+    modal.append(h('div.eyebrow', 'Current party'), h('h2', 'All active synergies'));
+    const list = h('div.party-synergy-dialog');
+    active.forEach((item, index) => list.appendChild(
+      h('div.party-synergy', { style: { '--rule-end': `${[78, 61, 72, 84][index % 4]}%` } },
+        h('span.numeral.good', `+${pct(item.bonusBp)}`),
+        h('div', h('div.party-synergy-name', item.tag.displayName),
+          h('div.caption', item.tag.explanation)))));
+    modal.append(list, h('div.modal-actions', h('button.btn', { onclick: close }, 'Close')));
+  });
 }
 
 function recommendationThread(store, recommendation, partyIndex, root) {
@@ -133,28 +150,21 @@ function partyFigures(store, party, recommendation, partyIndex, root) {
       'aria-label': memberId
         ? `Change ${store.content.characterById[memberId].displayName} in party slot ${slotIndex + 1}`
         : `Choose a character for empty party slot ${slotIndex + 1}`,
-      style: { '--drift-time': `${6.8 + slotIndex * .55}s` }
+      style: { '--character-color': memberId ? store.content.characterById[memberId].color : 'var(--muted-2)' }
     });
     if (!memberId) {
       button.append(
-        h('div.party-figure-glow'),
-        h('div.party-body-fallback', '+'),
+        h('div.party-eye-tile.empty', h('span', '+')),
         h('div.party-figure-label', h('div.party-name', 'An open place'), h('div.caption', 'choose someone')));
       row.appendChild(button);
       return;
     }
     const def = store.content.characterById[memberId];
     const cs = store.state.characters[memberId];
-    const skin = activeSkin(store, memberId);
-    const image = skin?.fullBody ?? store.content.images.fullBody[memberId] ?? null;
-    button.style.setProperty('--character-color', def.color);
-    button.appendChild(h('div.party-figure-glow'));
-    const art = h('div.party-body-art' + (image ? '' : '.art-fallback'));
-    if (image) art.appendChild(h('img', { src: image, alt: '', draggable: 'false' }));
-    else art.appendChild(h('span', def.glyph));
     button.append(
-      art,
+      h('div.party-eye-tile', portrait(store, memberId, 'party', { decorative: true })),
       h('div.party-figure-label',
+        h('div.eyebrow', store.content.archetypes[def.archetype].name),
         h('div.party-name', def.displayName),
         starline(cs.stars),
         h('div.party-member-power', `${fmt(characterPower(store.content, cs))} power`),

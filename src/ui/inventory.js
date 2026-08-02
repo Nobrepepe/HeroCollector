@@ -38,9 +38,16 @@ function workshopHeader(store, model) {
   const count = model.ready.length;
   let headline;
   let subline;
-  if (count > 0) {
+  if (model.bench?.pinned && !model.bench.analysis.craftable) {
+    headline = `${model.bench.analysis.equipmentName} is the closest tracked goal.`;
+    subline = count > 0
+      ? `${numberWord(count)} unpinned piece${count === 1 ? ' is' : 's are'} ready, but pinned work stays on the bench first.`
+      : 'Pinned work stays on the bench until it is complete.';
+  } else if (count > 0) {
     headline = `${numberWord(count)} piece${count === 1 ? ' is' : 's are'} ready to forge.`;
-    subline = 'The nearest gain is already on the bench. Materials move only when you choose it.';
+    subline = model.bench?.pinned
+      ? 'Your tracked piece is ready on the bench. Materials move only when you choose it.'
+      : 'The nearest gain is already on the bench. Materials move only when you choose it.';
   } else if (model.bench && model.blocking) {
     const familyName = store.content.materialMeta.families[model.blocking.material.family].name;
     headline = `The bench is cold — ${quantityPhrase(model.blocking.qty, familyName)} short.`;
@@ -59,7 +66,9 @@ function workshopHeader(store, model) {
 }
 
 function benchSection(store, model) {
-  const section = h('section.workshop-bench', h('div.eyebrow', model.bench?.analysis.craftable ? 'Ready at the bench' : 'Nearest piece'));
+  const section = h('section.workshop-bench', h('div.eyebrow', model.bench?.pinned
+    ? model.bench.analysis.craftable ? 'Pinned goal · ready at the bench' : 'Closest pinned goal'
+    : model.bench?.analysis.craftable ? 'Ready at the bench' : 'Nearest piece'));
   const candidate = model.bench;
   if (!candidate) {
     section.appendChild(h('p.muted', 'There is nothing left to set on the bench.'));

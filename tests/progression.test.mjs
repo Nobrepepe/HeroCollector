@@ -152,6 +152,9 @@ test('v1 migration preserves gameplay, is immutable/idempotent, and validates', 
   assert.equal(migrated.schemaVersion, SCHEMA_VERSION);
   assert.equal(migrated.energy, 77);
   assert.equal(migrated.inventory.materials.mat_metal_basic, 12);
+  assert.deepEqual(
+    { sort: migrated.ui.roster.sort, direction: migrated.ui.roster.direction },
+    { sort: 'power', direction: 'desc' });
   assert.deepEqual(migratePlayerState(content, migrated), migrated);
   assert.equal(validateSave(content, migrated).ok, true);
   migrated.ui.nodePartyById.main_1 = 99;
