@@ -107,7 +107,10 @@ function readyThread(store, ready) {
   shown.forEach((item, index) => {
     const def = store.content.characterById[item.characterId];
     row.appendChild(h('div.ready-thread-item',
-      portrait(store, item.characterId, 'ready', { pulse: index === 0 }),
+      h('button.ready-character-link', {
+        onclick: () => store.go(`#/character/${item.characterId}`),
+        'aria-label': `Open ${def.displayName}`
+      }, portrait(store, item.characterId, 'ready', { pulse: index === 0, decorative: true })),
       h('div', h('div', def.displayName), h('div.caption', item.text.replace(`${def.displayName}: `, '')),
         readyAction(store, item))));
   });

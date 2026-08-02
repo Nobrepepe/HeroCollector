@@ -15,7 +15,7 @@ import {
   expireActiveCrisis, generateCrisisForDay
 } from './crises.js';
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 // ------------------------------------------------------------- new state
 export function newPlayerState(content, now = Date.now()) {
@@ -64,7 +64,7 @@ export function newPlayerState(content, now = Date.now()) {
     ui: {
       roster: {
         world: 'all', archetype: 'all', faction: 'all', ownership: 'all',
-        sort: 'name', direction: 'asc'
+        sort: 'power', direction: 'desc'
       },
       campaignId: 'main',
       archiveCollapsed: { worlds: {}, collections: {} },
@@ -164,7 +164,7 @@ export function syncSaveWithContent(content, state) {
   });
   if (state.pins.length < beforePins) report.push(`Removed ${beforePins - state.pins.length} pin(s) for missing content.`);
   state.ui ??= {
-    roster: { world: 'all', archetype: 'all', faction: 'all', ownership: 'all', sort: 'name', direction: 'asc' },
+    roster: { world: 'all', archetype: 'all', faction: 'all', ownership: 'all', sort: 'power', direction: 'desc' },
     campaignId: 'main', archiveCollapsed: { worlds: {}, collections: {} }, nodePartyById: {}
   };
   state.ui.nodePartyById ??= {};
@@ -177,7 +177,7 @@ export function syncSaveWithContent(content, state) {
   const campaigns = new Set(['main', 'shadow', ...content.worlds.map(w => w.campaignId)]);
   if (!campaigns.has(state.ui.campaignId)) state.ui.campaignId = 'main';
   const roster = state.ui.roster ??= {
-    world: 'all', archetype: 'all', faction: 'all', ownership: 'all', sort: 'name', direction: 'asc'
+    world: 'all', archetype: 'all', faction: 'all', ownership: 'all', sort: 'power', direction: 'desc'
   };
   if (!new Set(['all', ...content.worlds.map(w => w.id)]).has(roster.world)) roster.world = 'all';
   if (!new Set(['all', ...Object.keys(content.archetypes)]).has(roster.archetype)) roster.archetype = 'all';

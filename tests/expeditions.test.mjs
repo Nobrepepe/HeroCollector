@@ -37,6 +37,17 @@ test('board persists, has five offers, and fallback keeps offers feasible', () =
   assert.equal(state.expeditions.board, board);
 });
 
+test('board generation supports libraries without a guaranteed Supply template', () => {
+  const localContent = loadContent();
+  localContent.expeditions.settings.guaranteedSupplyTemplateId = null;
+  const state = newPlayerState(localContent, T0);
+
+  assert.equal(state.expeditions.board.offers.length, 5);
+  assert.equal(state.expeditions.board.offers.some(offer => offer.offerKind === 'supply'), false);
+  assert.doesNotThrow(() => applyDailyReset(localContent, state, T0 + DAY));
+  assert.equal(state.expeditions.board.day, 2);
+});
+
 test('every board has exactly one fixed, unscaled Supply offer', () => {
   for (let seed = 0; seed < 40; seed++) {
     const state = newPlayerState(content, T0);

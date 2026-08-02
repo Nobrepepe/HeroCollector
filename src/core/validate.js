@@ -299,7 +299,7 @@ export function validateContent(content) {
 // Save-file validation: every ID the save references must exist in content.
 export function validateSave(content, state) {
   const errors = [];
-  if (![1, 2, 3, 4].includes(state.schemaVersion)) errors.push(`Unsupported save schema ${state.schemaVersion}`);
+  if (![1, 2, 3, 4, 5].includes(state.schemaVersion)) errors.push(`Unsupported save schema ${state.schemaVersion}`);
   if (!state.characters || !state.inventory || !state.nodes || !Array.isArray(state.parties)) {
     return { ok: false, errors: ['Save is missing required gameplay state.'] };
   }

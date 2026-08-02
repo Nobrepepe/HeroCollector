@@ -8,7 +8,7 @@
 // instead of producing invalid content. The game itself stays in setup mode
 // until the content meets the minimum prerequisites to start a game.
 
-export const CUSTOM_DB_VERSION = 9;
+export const CUSTOM_DB_VERSION = 10;
 
 export function emptyCustomDB() {
   return {
@@ -46,7 +46,10 @@ export function upgradeCustomDB(db) {
         fullSkin: w.archive.fullSkin ? { ...w.archive.fullSkin } : undefined
       } : undefined
     })),
-    characters: [...(db.characters ?? [])],
+    characters: (db.characters ?? []).map(character => ({
+      ...character,
+      skins: (character.skins ?? []).map(skin => ({ ...skin }))
+    })),
     factions: [...(db.factions ?? [])],
     mainChapters: (db.mainChapters ?? []).map(ch => ({
       ...ch, nodes: (ch.nodes ?? []).map(nd => ({ ...nd }))
@@ -169,6 +172,25 @@ export function upgradeCustomDB(db) {
     }
     out.expeditions.settings.guaranteedSupplyTemplateId ??= null;
   }
+  if (oldVersion < 10) {
+    for (const character of out.characters) character.skins ??= [];
+    const moveSkin = (world, authored, stableId) => {
+      if (!authored?.characterId || !authored.name) return { characterId: null, skinId: null };
+      const character = out.characters.find(item => item.id === authored.characterId && item.worldId === world.id);
+      if (!character) return { characterId: null, skinId: null };
+      character.skins ??= [];
+      if (!character.skins.some(skin => skin.id === stableId)) character.skins.push({
+        id: stableId, name: authored.name, portrait: authored.portrait ?? null, fullBody: authored.fullBody ?? null
+      });
+      return { characterId: character.id, skinId: stableId };
+    };
+    for (const world of out.worlds) {
+      for (const [index, collection] of (world.archive?.collections ?? []).entries()) {
+        collection.rewardSkin = moveSkin(world, collection.rewardSkin, `skin_${world.id}_collection_${index + 1}`);
+      }
+      if (world.archive) world.archive.fullSkin = moveSkin(world, world.archive.fullSkin, `skin_${world.id}_full`);
+    }
+  }
   out.version = CUSTOM_DB_VERSION;
   return out;
 }
@@ -205,7 +227,7 @@ export function newCustomWorld(name) {
   for (let c = 0; c < 3; c++) {
     collections.push({
       name: `Collection ${c + 1}`,
-      rewardSkin: { characterId: null, name: '', portrait: null, fullBody: null },
+      rewardSkin: { characterId: null, skinId: null },
       relics: Array.from({ length: 5 }, (_, r) => ({ name: `Relic ${c * 5 + r + 1}`, lore: '', image: null }))
     });
   }
@@ -223,7 +245,7 @@ export function newCustomWorld(name) {
     description: '', displayOrder: 0,
     worldAsset: { id: `asset_${id}`, displayName: `${name || 'New World'} Asset`, description: '', icon: '◆' },
     hq: null,
-    archive: { collections, fullSkin: { characterId: null, name: '', portrait: null, fullBody: null } }
+    archive: { collections, fullSkin: { characterId: null, skinId: null } }
   };
 }
 
@@ -453,7 +475,8 @@ export function newCustomCharacter(worldId, name, slotOrder, slotMeta) {
     lore: '',
     portrait: null,
     fullBody: null,
-    equipment
+    equipment,
+    skins: []
   };
 }
 
@@ -789,15 +812,17 @@ export function mergeContent(systemRaw, db) {
       }
       wcNodes.push(node);
     });
-    const rewardDef = (authored, id, { fallback = false } = {}) => {
-      if (!authored && !fallback) return null;
-      const skinChar = liveChars.find(d => d.id === authored?.characterId) ?? (fallback ? liveChars[0] : null);
-      if (!skinChar || (!fallback && !authored?.name)) return null;
+    const rewardDef = (authored, fallbackId = null) => {
+      const skinChar = liveChars.find(d => d.id === authored?.characterId);
+      const sourceCharacter = included.find(character => character.id === skinChar?.id);
+      const skin = sourceCharacter?.skins?.find(item => item.id === authored?.skinId);
+      if (skinChar && skin) return {
+        type: 'skin', id: skin.id, characterId: skinChar.id, skinName: skin.name
+      };
+      if (!fallbackId || !liveChars[0]) return null;
       return {
-        type: 'skin',
-        id,
-        characterId: skinChar.id,
-        skinName: authored?.name || `${skinChar.displayName} — Alternate Attire`
+        type: 'skin', id: fallbackId, characterId: liveChars[0].id,
+        skinName: `${liveChars[0].displayName} — Alternate Attire`
       };
     };
     archives.push({
@@ -806,7 +831,7 @@ export function mergeContent(systemRaw, db) {
       collections: w.archive.collections.map((col, c) => ({
         id: `${w.id}_col_${c + 1}`,
         displayName: col.name,
-        rewardSkin: rewardDef(col.rewardSkin, `skin_${w.id}_collection_${c + 1}`),
+        rewardSkin: rewardDef(col.rewardSkin),
         legacyMilestoneText: col.milestoneReward || undefined,
         relics: col.relics.map((relic, r) => {
           const relicIndex = c * 5 + r;
@@ -823,7 +848,7 @@ export function mergeContent(systemRaw, db) {
           };
         })
       })),
-      fullReward: rewardDef(w.archive.fullSkin, `skin_${w.id}_full`, { fallback: true })
+      fullReward: rewardDef(w.archive.fullSkin, `skin_${w.id}_full`)
     });
   }
   const finalWorldIds = new Set(finalWorlds.map(w => w.id));
@@ -875,14 +900,6 @@ export function mergeContent(systemRaw, db) {
     w.archive.collections.forEach((col, c) => col.relics.forEach((relic, r) => {
       if (relic.image) images.relic[`${w.id}_relic_${c * 5 + r + 1}`] = relic.image;
     }));
-    w.archive.collections.forEach((col, c) => {
-      if (col.rewardSkin?.portrait || col.rewardSkin?.fullBody) {
-        images.skin[`skin_${w.id}_collection_${c + 1}`] = { portrait: col.rewardSkin.portrait, fullBody: col.rewardSkin.fullBody };
-      }
-    });
-    if (w.archive.fullSkin?.portrait || w.archive.fullSkin?.fullBody) {
-      images.skin[`skin_${w.id}_full`] = { portrait: w.archive.fullSkin.portrait, fullBody: w.archive.fullSkin.fullBody };
-    }
   }
   if (db.expeditions?.images?.global) images.expedition.global = db.expeditions.images.global;
   for (const [worldId, image] of Object.entries(db.expeditions?.images?.worlds ?? {})) {
@@ -894,6 +911,9 @@ export function mergeContent(systemRaw, db) {
   for (const c of db.characters) {
     if (c.portrait) images.portrait[c.id] = c.portrait;
     if (c.fullBody) images.fullBody[c.id] = c.fullBody;
+    for (const skin of c.skins ?? []) {
+      if (skin.portrait || skin.fullBody) images.skin[skin.id] = { portrait: skin.portrait, fullBody: skin.fullBody };
+    }
     for (const slot of slotOrder) {
       if (c.equipment[slot]?.image) images.equipment[`${c.id}:${slot}`] = c.equipment[slot].image;
     }

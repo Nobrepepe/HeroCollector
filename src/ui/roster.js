@@ -8,7 +8,14 @@ export function renderRoster(store, root) {
   const { content, state } = store;
   const preferences = state.ui.roster;
   preferences.collectionDensity = preferences.collectionDensity === 'compact' ? 'compact' : 'gallery';
-  const ready = new Set(readyUpgrades(content, state).map(item => item.characterId));
+  const readyItems = readyUpgrades(content, state);
+  const ready = new Set(readyItems.map(item => item.characterId));
+  const readyByCharacter = new Map();
+  for (const item of readyItems) {
+    const items = readyByCharacter.get(item.characterId) ?? [];
+    items.push(item);
+    readyByCharacter.set(item.characterId, items);
+  }
   let search = '';
   const ownedCount = content.characters.filter(def => state.characters[def.id].owned).length;
   root.classList.add('collection-screen', `collection-density-${preferences.collectionDensity}`);
@@ -60,7 +67,7 @@ export function renderRoster(store, root) {
       let pulseUsed = false;
       rows.forEach(def => {
         const isReady = ready.has(def.id);
-        compact.appendChild(compactCharacter(store, def, isReady, isReady && !pulseUsed));
+        compact.appendChild(compactCharacter(store, def, readyByCharacter.get(def.id) ?? [], isReady && !pulseUsed));
         if (isReady) pulseUsed = true;
       });
       if (!rows.length) compact.appendChild(h('p.muted', 'No characters match these filters.'));
@@ -133,9 +140,10 @@ function worldSentence(content) {
   return content.worlds.map(world => world.displayName).join(' · ');
 }
 
-function compactCharacter(store, def, isReady, pulses) {
+function compactCharacter(store, def, readyItems, pulses) {
   const cs = store.state.characters[def.id];
   const owned = cs.owned;
+  const isReady = readyItems.length > 0;
   const need = owned
     ? (cs.stars < 7 ? store.content.balance.starShards[cs.stars] : null)
     : store.content.balance.acquisitionTiers[def.tier].cumulativeShards;
@@ -156,8 +164,16 @@ function compactCharacter(store, def, isReady, pulses) {
   card.appendChild(owned
     ? h('span.compact-power', fmt(characterPower(store.content, cs)), h('small', ' power'))
     : h('span.caption', cs.shards ? `${fmt(cs.shards)} / ${fmt(need)} shards` : 'not yet found'));
-  if (isReady) card.appendChild(h('span.compact-ready', cs.owned ? 'a star is ready' : 'ready to join'));
+  if (isReady) card.appendChild(h('span.compact-ready', compactReadyLabel(readyItems, owned)));
   return card;
+}
+
+function compactReadyLabel(items, owned) {
+  if (!owned || items.some(item => item.type === 'unlock')) return 'ready to join';
+  if (items.some(item => item.type === 'promoteStar')) return 'a star is ready';
+  if (items.some(item => item.type === 'completeTier')) return 'gear tier ready';
+  if (items.some(item => item.type === 'craftEquipment')) return 'equipment ready to craft';
+  return 'upgrade ready';
 }
 
 function oneShardRunAway(content, state, def) {

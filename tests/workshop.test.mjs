@@ -32,3 +32,20 @@ test('workshop: stocking the nearest recipe moves it onto the ready bench', () =
   assert.equal(ready.bench.analysis.craftable, true);
   assert.equal(ready.blocking, null);
 });
+
+test('workshop: the closest pinned gear goal outranks unpinned ready gear', () => {
+  const state = newPlayerState(content, NOW);
+  const initial = buildWorkshopModel(content, state);
+  const unpinned = initial.candidates[0];
+  const pinned = initial.candidates.find(candidate => candidate !== unpinned);
+  for (const [id, qty] of Object.entries(unpinned.analysis.totalMaterialDemand)) {
+    state.inventory.materials[id] = qty;
+  }
+  state.pins.push({ type: 'equipment', characterId: pinned.characterId, slot: pinned.slot });
+
+  const model = buildWorkshopModel(content, state);
+  assert.ok(model.ready.some(candidate => !candidate.pinned));
+  assert.equal(model.bench.characterId, pinned.characterId);
+  assert.equal(model.bench.slot, pinned.slot);
+  assert.equal(model.bench.pinned, true);
+});
