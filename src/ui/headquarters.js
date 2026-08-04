@@ -4,7 +4,7 @@ import {
   assignHqStaff, cancelConstruction, facilityLevel, hqBackground, hqRank,
   hqState, setProduction, staffingCapacity, startConstruction, unassignHqStaff
 } from '../core/hq.js';
-import { portrait } from './shared.js';
+import { portrait, selectorWorldName } from './shared.js';
 import { fieldSupplyLimits } from '../core/energy.js';
 
 export function renderHeadquarters(store, root, arg) {
@@ -26,11 +26,13 @@ export function renderHeadquarters(store, root, arg) {
   page.appendChild(h('div.hq-landscape' + (background ? '' : '.art-fallback'), {
     style: background ? { backgroundImage: `url("${background}")` } : {}
   }));
-  const tabs = h('div.tab-bar', worlds.map(w => h('button.tab-btn' + (w.id === world.id ? '.active' : ''), {
+  const tabs = h('div.tab-bar.hq-world-tabs', worlds.map(w => h('button.tab-btn' + (w.id === world.id ? '.active' : ''), {
     onclick: () => store.go(`#/headquarters/${w.id}`)
-  }, w.displayName)));
+  }, h('span', selectorWorldName(w)), h('small', `Rank ${hqRank(store.content, store.state, w.id)}`))));
   page.appendChild(h('header.hq-head', h('div.eyebrow', 'World Headquarters'),
-    h('h1.display-m', `${world.displayName} stands at Rank ${rank}.`),
+    h('h1.hq-title',
+      h('span.hq-title-world', world.displayName),
+      h('span.hq-title-rank', `Rank ${rank}`)),
     h('p', next ? `${next.totalLevels - total} more facility levels open the next chapter.` : 'Every facility path is fully open.'),
     store.state.crises?.active?.worldId === world.id ? h('p.warn', 'Crisis today · the response remains optional and costs no Energy. ',
       h('button.link', { onclick: () => store.go('#/crisis') }, 'Review it →')) : null,

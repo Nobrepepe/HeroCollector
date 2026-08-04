@@ -118,3 +118,9 @@ export function campaignLabel(store, node) {
   if (node.campaign === 'shadow') return 'Shadow';
   return store.content.worldById[node.world].displayName;
 }
+
+// Compact world label used only in navigation selectors. Full headings retain
+// the authored display name.
+export function selectorWorldName(world) {
+  return world.displayName.replace(/^Eden\s+/i, '').trim() || world.displayName;
+}

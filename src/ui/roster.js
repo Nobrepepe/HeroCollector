@@ -59,10 +59,9 @@ export function renderRoster(store, root) {
     compact.replaceChildren();
     footer.replaceChildren();
     const rows = filterCharacters(content, state, preferences, ready, search);
-    const owned = rows.filter(def => state.characters[def.id].owned);
     if (preferences.collectionDensity === 'gallery') {
-      owned.forEach((def, index) => gallery.appendChild(characterCard(store, def, ready.has(def.id), index)));
-      if (!owned.length) gallery.appendChild(h('p.muted', 'No met characters match these filters.'));
+      rows.forEach((def, index) => gallery.appendChild(characterCard(store, def, ready.has(def.id), index)));
+      if (!rows.length) gallery.appendChild(h('p.muted', 'No characters match these filters.'));
     } else {
       let pulseUsed = false;
       rows.forEach(def => {
@@ -114,9 +113,12 @@ function rerenderRoster(store) {
 
 function characterCard(store, def, isReady, index) {
   const cs = store.state.characters[def.id];
-  const need = cs.stars < 7 ? store.content.balance.starShards[cs.stars] : 1;
+  const owned = cs.owned;
+  const need = owned
+    ? cs.stars < 7 ? store.content.balance.starShards[cs.stars] : 1
+    : store.content.balance.acquisitionTiers[def.tier].cumulativeShards;
   const image = store.content.images.fullBody[def.id];
-  const card = h('button.gallery-card' + (isReady ? '.ready' : ''), {
+  const card = h('button.gallery-card' + (owned ? '' : '.unmet') + (isReady ? '.ready' : ''), {
     onclick: () => store.go(`#/character/${def.id}`),
     'aria-label': `${def.displayName}, ${cs.stars} stars, ${fmt(characterPower(store.content, cs))} Power${isReady ? ', upgrade ready' : ''}`,
     style: { '--character-color': def.color, '--gallery-offset': index % 2 ? '26px' : '0px' }
@@ -128,8 +130,10 @@ function characterCard(store, def, isReady, index) {
   card.append(art, h('div.gallery-scrim'), h('div.gallery-meta',
     h('div.eyebrow', arch.name),
     h('div.title', def.displayName),
-    starline(cs.stars),
-    h('div.gallery-power', h('span.numeral', fmt(characterPower(store.content, cs))), h('span.caption', ' power')),
+    owned ? starline(cs.stars) : h('div.caption', 'not yet met'),
+    owned
+      ? h('div.gallery-power', h('span.numeral', fmt(characterPower(store.content, cs))), h('span.caption', ' power'))
+      : h('div.gallery-power', h('span.numeral', fmt(cs.shards)), h('span.caption', ` / ${fmt(need)} shards`)),
     h('div.progressbar', h('div', { style: { width: `${Math.min(100, cs.shards / need * 100)}%` } })),
     isReady ? h('div.gallery-ready', 'ready to grow') : null));
   return card;

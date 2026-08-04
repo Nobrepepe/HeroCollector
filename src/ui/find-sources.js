@@ -1,5 +1,5 @@
 import { h, fmt } from './dom.js';
-import { openModal, toast } from '../app.js';
+import { openModal, toast, render } from '../app.js';
 import { checkClear, clearNode, maxSweepCount } from '../core/state.js';
 import { rankMaterialSources } from '../core/sources.js';
 import { campaignLabel } from './shared.js';
@@ -120,7 +120,7 @@ export function openFindSources(store, target, options = {}) {
         const recommended = rows.find(row => row.sweepable || row.available);
         if (recommended) recommended.recommended = true;
         rows.forEach(row => modal.appendChild(sourceRow(store, row, {
-          onUpdate: result => { options.onUpdate?.(result); renderRows(); },
+          onUpdate: result => { options.onUpdate?.(result); render(); renderRows(); },
           returnContext: options.returnContext
         })));
       } else {
@@ -129,7 +129,7 @@ export function openFindSources(store, target, options = {}) {
           const rows = rankMaterialSources(store.content, store.state, materialId);
           if (!rows.length) modal.appendChild(h('p.muted', 'No published node drops this material.'));
           rows.forEach(row => modal.appendChild(sourceRow(store, row, {
-            onUpdate: result => { options.onUpdate?.(result); renderRows(); },
+            onUpdate: result => { options.onUpdate?.(result); render(); renderRows(); },
             returnContext: options.returnContext
           })));
         }

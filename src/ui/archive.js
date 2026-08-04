@@ -1,7 +1,7 @@
 import { h, fmt, pct } from './dom.js';
 import { archiveStatus, nodeUnlocked, selectSkin } from '../core/state.js';
 import { openModal, toast } from '../app.js';
-import { campaignLabel, portraitSlot } from './shared.js';
+import { campaignLabel, portraitSlot, selectorWorldName } from './shared.js';
 import { relicPieceModel, collectionSummary } from './presentation.js';
 
 export function renderArchive(store, root, arg = null) {
@@ -238,7 +238,7 @@ function worldNavigation(store, world) {
     ...store.content.worlds.map((item, itemIndex) => h('button' + (itemIndex === index ? '.active' : ''), {
       onclick: () => store.go(`#/archive/${item.id}`),
       'aria-current': itemIndex === index ? 'page' : null
-    }, item.displayName)));
+    }, selectorWorldName(item))));
 }
 
 function archiveBackdrop(image, darker = false) {
