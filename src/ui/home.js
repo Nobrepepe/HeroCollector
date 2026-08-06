@@ -28,7 +28,16 @@ export function renderHome(store, root) {
   const featuredId = hook.def?.id ?? ready[0]?.characterId ?? content.characters.find(def => state.characters[def.id].owned)?.id;
   const fullBody = featuredId ? content.images.fullBody[featuredId] : null;
   if (fullBody) page.appendChild(h('img.today-hero.bleed-tall', {
-    src: fullBody, alt: '', 'aria-hidden': 'true'
+    src: fullBody,
+    alt: `Open ${content.characterById[featuredId].displayName}`,
+    role: 'link', tabindex: 0,
+    onclick: () => store.go(`#/character/${featuredId}`),
+    onkeydown: event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        store.go(`#/character/${featuredId}`);
+      }
+    }
   }));
 
   const recent = h('div.today-recent', h('div.eyebrow', 'Recent progress'));

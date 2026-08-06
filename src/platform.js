@@ -85,6 +85,16 @@ export async function writeCustomContent(db) {
   return idbSet('custom-content', JSON.parse(JSON.stringify(db)));
 }
 
+export async function loadActiveCustomContent() {
+  if (isElectron) return window.heroAPI.loadActiveCustom();
+  try { return await idbGet('active-custom-content'); } catch { return null; }
+}
+
+export async function writeActiveCustomContent(db) {
+  if (isElectron) return window.heroAPI.writeActiveCustom(db);
+  return idbSet('active-custom-content', JSON.parse(JSON.stringify(db)));
+}
+
 // ---------------------------------------------------------------- import/export
 export async function exportJson(data, name) {
   if (isElectron) return window.heroAPI.exportJson(data, name);

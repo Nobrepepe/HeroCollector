@@ -1,11 +1,12 @@
 import { enableMouseDragScroll, h, fmt } from './dom.js';
 import { characterPowerForState } from '../core/power.js';
 import {
-  cancelExpedition, characterExpedition, launchExpedition, previewExpedition,
+  cancelExpedition, launchExpedition, previewExpedition,
   revealRareReward, rerollOffer, togglePinOffer
 } from '../core/expeditions.js';
 import { resourceQty } from '../core/resources.js';
 import { portrait, starline } from './shared.js';
+import { openExpeditionCharacterPicker } from './character-picker.js';
 
 export function renderExpeditions(store, root, offerId) {
   if (offerId) return renderOffer(store, root, offerId);
@@ -74,7 +75,7 @@ function renderOffer(store, root, offerId) {
   const offer = state.expeditions.board?.offers.find(o => o.id === offerId);
   if (!offer) { root.appendChild(h('p.bad', 'That Expedition offer is no longer on the board.')); return; }
   const world = offer.world ? content.worldById[offer.world] : null;
-  let selected = [];
+  let selected = Array(5).fill(null);
   const page = h('div.expedition-detail');
   const scene = content.images.expedition[world?.id ?? 'global']
     ?? (world ? content.images.world[world.id] : null);
@@ -91,7 +92,8 @@ function renderOffer(store, root, offerId) {
 
   function paint() {
     dynamic.replaceChildren();
-    const preview = previewExpedition(content, state, offer, selected);
+    const party = selected.slice(0, offer.partySize).filter(Boolean);
+    const preview = previewExpedition(content, state, offer, party);
     const clears = preview.power >= offer.recommendedPower;
     dynamic.appendChild(h('section.expedition-verdict',
       h('div.eyebrow', 'Your party reads'),
@@ -110,26 +112,31 @@ function renderOffer(store, root, offerId) {
     requirements.appendChild(h(`p.${preview.optional.met ? 'good' : 'muted'}`,
       `${preview.optional.met ? 'Bonus ready' : 'Optional'} · ${preview.optional.text}`));
     dynamic.appendChild(requirements);
-    const roster = h('section.expedition-roster', h('div.eyebrow', `Choose ${offer.partySize}`));
-    const row = h('div.expedition-roster-row');
-    for (const def of content.characters.filter(d => state.characters[d.id].owned)) {
-      const away = characterExpedition(state, def.id);
-      const on = selected.includes(def.id);
-      row.appendChild(h('button.expedition-member' + (on ? '.selected' : ''), {
-        disabled: !!away,
-        onclick: () => {
-          selected = on ? selected.filter(id => id !== def.id)
-            : selected.length < offer.partySize ? [...selected, def.id] : selected;
-          paint();
-        },
-        title: away ? `Away on ${away.name} until day ${away.returnDay}` : on ? 'Remove' : 'Add'
-      }, portrait(store, def.id, 'md', { state: away ? 'away' : 'met' }), h('span', def.displayName), starline(state.characters[def.id].stars),
-      h('span.caption', `${fmt(characterPowerForState(content, state, def.id))} · ${content.archetypes[def.archetype].name}`)));
-    }
+    const roster = h('section.expedition-roster', h('div.eyebrow', `Choose ${offer.partySize} expedition members`));
+    const row = h('div.expedition-slots');
+    selected.forEach((characterId, slotIndex) => {
+      const required = slotIndex < offer.partySize;
+      const def = characterId ? content.characterById[characterId] : null;
+      const button = h('button.expedition-slot' + (characterId ? '.filled' : '.empty'), {
+        disabled: !required,
+        onclick: () => openExpeditionCharacterPicker(store, {
+          currentId: characterId, selectedIds: selected, slotIndex,
+          onSelect: nextId => { selected[slotIndex] = nextId; paint(); }
+        }),
+        'aria-label': required
+          ? characterId ? `Change ${def.displayName} in expedition slot ${slotIndex + 1}` : `Choose expedition member ${slotIndex + 1}`
+          : `Expedition slot ${slotIndex + 1} is not required`
+      });
+      if (characterId) button.append(portrait(store, characterId, 'compact'), h('span.title', def.displayName),
+        starline(state.characters[characterId].stars), h('span.caption', `${fmt(characterPowerForState(content, state, characterId))} power`));
+      else button.append(h('div.expedition-slot-empty', required ? '+' : '—'),
+        h('span.title', required ? 'Open place' : 'Not needed'), h('span.caption', required ? 'choose someone' : `This route needs ${offer.partySize}`));
+      row.appendChild(button);
+    });
     roster.appendChild(row); dynamic.appendChild(roster);
     dynamic.appendChild(h('div.expedition-actions',
       h('button.btn.primary', { disabled: !preview.valid,
-        onclick: () => store.tx(() => launchExpedition(content, state, offer.id, selected)).then(r => r.ok && store.go('#/expeditions')) }, 'Send them →'),
+        onclick: () => store.tx(() => launchExpedition(content, state, offer.id, party)).then(r => r.ok && store.go('#/expeditions')) }, 'Send them →'),
       h('button.link', { onclick: () => store.tx(() => togglePinOffer(content, state, offer.id)) }, offer.pinned ? 'Unpin offer' : 'Pin for tomorrow'),
       h('button.link', { onclick: () => store.tx(() => revealRareReward(content, state, offer.id)) }, 'Reveal rare reward'),
       h('button.link', { disabled: offer.pinned || offer.offerKind === 'supply',

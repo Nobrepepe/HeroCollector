@@ -10,17 +10,24 @@ function blockedReason(row) {
   return row.check.reasons[0] ?? (row.status.cleared ? 'Quick sweep is currently unavailable.' : '');
 }
 
-export function sourceRow(store, row, { onUpdate, returnContext } = {}) {
+export function sourceRow(store, row, { onUpdate, onNavigate, returnContext } = {}) {
   const { content, state } = store;
   const node = row.node;
   const material = content.materialById[node.material];
   const wrapper = h('div.source-row');
-  const info = h('div.source-info',
+  const openNode = () => {
+    onNavigate?.();
+    store.go(`#/node/${node.id}`, {
+      returnContext: returnContext ?? { route: location.hash || '#/home' }
+    });
+  };
+  const info = h('button.source-info', { onclick: openNode,
+    'aria-label': `Open ${campaignLabel(store, node)} ${node.number}, ${node.displayName}` },
     h('div', h('b', `${campaignLabel(store, node)} ${node.number} — ${node.displayName}`),
       row.recommended ? h('span.badge.recommended', 'Recommended') : null),
     h('div.small.muted',
       `${material.icon} ${row.guaranteed} × ${material.displayName} guaranteed · ⚡ ${row.energy} per run`,
-      node.shardCharacter ? ` · ${row.attemptsLeft} attempts left` : ''),
+      node.shardCharacter ? ` · ${content.characterById[node.shardCharacter].displayName} shards · ${row.attemptsLeft} attempts left` : ''),
     h('div.small.muted',
       `Required Power ${fmt(node.threshold)} · selected party ${
         row.check.evalResult ? fmt(row.check.evalResult.effectivePower) : 'incomplete'
@@ -60,20 +67,6 @@ export function sourceRow(store, row, { onUpdate, returnContext } = {}) {
       h('button.btn.tiny.primary', { onclick: () => run(input.value) }, 'Sweep'),
       h('button.btn.tiny', { onclick: () => run(max) }, `Max ${max}`));
     wrapper.append(actions, summary);
-  } else if (row.available) {
-    actions.appendChild(h('button.btn.tiny.primary', {
-      onclick: () => store.go(`#/node/${node.id}`, {
-        returnContext: returnContext ?? { route: location.hash || '#/home' }
-      })
-    }, 'Open Node'));
-    wrapper.appendChild(actions);
-  } else if (row.status.cleared || row.unlock.unlocked) {
-    actions.appendChild(h('button.btn.tiny', {
-      onclick: () => store.go(`#/node/${node.id}`, {
-        returnContext: returnContext ?? { route: location.hash || '#/home' }
-      })
-    }, 'Open'));
-    wrapper.appendChild(actions);
   }
   return wrapper;
 }
@@ -121,6 +114,7 @@ export function openFindSources(store, target, options = {}) {
         if (recommended) recommended.recommended = true;
         rows.forEach(row => modal.appendChild(sourceRow(store, row, {
           onUpdate: result => { options.onUpdate?.(result); render(); renderRows(); },
+          onNavigate: close,
           returnContext: options.returnContext
         })));
       } else {
@@ -130,6 +124,7 @@ export function openFindSources(store, target, options = {}) {
           if (!rows.length) modal.appendChild(h('p.muted', 'No published node drops this material.'));
           rows.forEach(row => modal.appendChild(sourceRow(store, row, {
             onUpdate: result => { options.onUpdate?.(result); render(); renderRows(); },
+            onNavigate: close,
             returnContext: options.returnContext
           })));
         }

@@ -41,6 +41,10 @@ function makeFullDB() {
   db.shadowChapters[0].nodes.forEach((nd, i) => { nd.shardCharacterId = db.characters[i % 5].id; });
   addCampaignChapter(db);
   db.shadowChapters[1].nodes.forEach((nd, i) => { nd.shardCharacterId = db.characters[(i + 3) % 5].id; });
+  for (let i = 0; i < db.mainChapters.length; i++) {
+    db.mainChapters[i].status = 'published';
+    db.shadowChapters[i].status = 'published';
+  }
   return db;
 }
 
@@ -67,7 +71,7 @@ test('v2 migration moves legacy Main shards into incomplete paired Shadow chapte
   legacy.mainChapters[0].nodes[5].shardCharacterId = legacy.characters[1].id;
   legacy.mainChapters[0].nodes[8].shardCharacterId = legacy.characters[2].id;
   const upgraded = upgradeCustomDB(legacy);
-  assert.equal(upgraded.version, 10);
+  assert.equal(upgraded.version, 11);
   assert.equal(upgraded.shadowChapters.length, upgraded.mainChapters.length);
   assert.equal(upgraded.shadowChapters[0].nodes[2].shardCharacterId, legacy.characters[0].id);
   assert.equal(upgraded.shadowChapters[0].nodes[0].shardCharacterId, null);
@@ -209,6 +213,42 @@ test('published custom game merges completely, validates, and is ready', () => {
   assert.equal(merged.images.chapter[`wc_${w.id}:2`], 'data:image/webp;base64,WORLD');
   // starting flags survive
   assert.equal(content.characters.filter(d => d.starting).length, 5);
+});
+
+test('an incomplete new chapter pair stays saved as a draft without disturbing live worlds', () => {
+  const db = makeFullDB();
+  db.worlds[0].status = 'published';
+  const liveNodeCount = buildContent(mergeContent(systemRaw, db).raw).nodes.length;
+  const index = addCampaignChapter(db);
+  db.mainChapters[index].nodes.forEach(node => { node.worldId = db.worlds[0].id; });
+  db.shadowChapters[index].nodes[0].worldId = db.worlds[0].id;
+
+  const merged = mergeContent(systemRaw, db);
+  const content = buildContent(merged.raw);
+  assert.ok(validateContent(content).ok);
+  assert.equal(content.worlds.length, 1);
+  assert.equal(content.nodes.length, liveNodeCount);
+  assert.equal(db.mainChapters[index].status, 'draft');
+  assert.ok(merged.health.some(item => /draft/.test(item.text)));
+});
+
+test('v10 recovery migrates an incomplete trailing pair to draft and keeps earlier content live', () => {
+  const legacy = makeFullDB();
+  legacy.worlds[0].status = 'published';
+  legacy.version = 10;
+  const index = addCampaignChapter(legacy);
+  legacy.mainChapters[index].nodes.forEach(node => { node.worldId = legacy.worlds[0].id; });
+  legacy.shadowChapters[index].nodes[0].worldId = legacy.worlds[0].id;
+  for (const chapter of [...legacy.mainChapters, ...legacy.shadowChapters]) delete chapter.status;
+
+  const recovered = upgradeCustomDB(legacy);
+  assert.equal(recovered.mainChapters[0].status, 'published');
+  assert.equal(recovered.mainChapters[index].status, 'draft');
+  assert.equal(recovered.shadowChapters[index].nodes[0].worldId, legacy.worlds[0].id);
+  const content = buildContent(mergeContent(systemRaw, recovered).raw);
+  assert.ok(validateContent(content).ok);
+  assert.equal(content.worlds.length, 1);
+  assert.equal(content.nodesByCampaign.main.length, 20);
 });
 
 test('non-monotonic thresholds hold a chapter (and the chapters after it) back', () => {

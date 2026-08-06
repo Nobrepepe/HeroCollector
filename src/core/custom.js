@@ -8,7 +8,7 @@
 // instead of producing invalid content. The game itself stays in setup mode
 // until the content meets the minimum prerequisites to start a game.
 
-export const CUSTOM_DB_VERSION = 10;
+export const CUSTOM_DB_VERSION = 11;
 
 export function emptyCustomDB() {
   return {
@@ -190,6 +190,18 @@ export function upgradeCustomDB(db) {
       }
       if (world.archive) world.archive.fullSkin = moveSkin(world, world.archive.fullSkin, `skin_${world.id}_full`);
     }
+  }
+  // v10 -> v11: campaign pairs now have an explicit publication boundary.
+  // Complete legacy pairs stay live; incomplete work is preserved as a draft.
+  if (oldVersion < 11) {
+    out.mainChapters.forEach((main, index) => {
+      const shadow = out.shadowChapters[index];
+      const complete = main.nodes?.length === 10 && shadow?.nodes?.length === 10
+        && shadow.nodes.every(node => node.shardCharacterId
+          && out.characters.some(character => character.id === node.shardCharacterId));
+      main.status = complete ? 'published' : 'draft';
+      if (shadow) shadow.status = main.status;
+    });
   }
   out.version = CUSTOM_DB_VERSION;
   return out;
@@ -518,13 +530,13 @@ export function newMainChapter(db) {
       grade
     };
   });
-  return { title: `Main Chapter ${idx + 1}`, image: null, nodes };
+  return { title: `Main Chapter ${idx + 1}`, image: null, status: 'draft', nodes };
 }
 
 export function newShadowChapter(mainChapter, chapterIndex) {
   return {
     title: `Shadow Chapter ${chapterIndex + 1}`,
-    image: null,
+    image: null, status: 'draft',
     nodes: mainChapter.nodes.map((nd, i) => ({
       name: `Shadow — ${nd.name || `Chapter ${chapterIndex + 1} — Node ${i + 1}`}`,
       threshold: nd.threshold,
@@ -533,6 +545,33 @@ export function newShadowChapter(mainChapter, chapterIndex) {
       shardCharacterId: null
     }))
   };
+}
+
+export function canPublishChapterPair(db, index) {
+  const reasons = [];
+  const main = db.mainChapters[index];
+  const shadow = db.shadowChapters[index];
+  if (!main || main.nodes?.length !== 10) reasons.push('Main chapter needs exactly 10 nodes.');
+  if (!shadow || shadow.nodes?.length !== 10) reasons.push('Shadow chapter needs exactly 10 nodes.');
+  let previous = index > 0 ? Math.max(...(db.mainChapters[index - 1]?.nodes ?? []).map(node => Number(node.threshold) || 0), 0) : 0;
+  for (const node of main?.nodes ?? []) {
+    if (!Number.isFinite(node.threshold) || node.threshold < previous) reasons.push('Main thresholds must never decrease.');
+    previous = node.threshold;
+  }
+  for (const [nodeIndex, node] of (shadow?.nodes ?? []).entries()) {
+    if (!node.shardCharacterId) reasons.push(`Shadow node ${nodeIndex + 1} needs a character.`);
+    else {
+      const character = db.characters.find(item => item.id === node.shardCharacterId);
+      if (!character) reasons.push(`Shadow node ${nodeIndex + 1} references a missing character.`);
+      else if (db.worlds.find(world => world.id === character.worldId)?.status !== 'published') reasons.push(`Shadow node ${nodeIndex + 1} uses a character from a draft world.`);
+    }
+    if (node.worldId && db.worlds.find(world => world.id === node.worldId)?.status !== 'published') reasons.push(`Shadow node ${nodeIndex + 1} references a draft or missing world.`);
+  }
+  for (const [nodeIndex, node] of (main?.nodes ?? []).entries()) {
+    if (node.worldId && db.worlds.find(world => world.id === node.worldId)?.status !== 'published') reasons.push(`Main node ${nodeIndex + 1} references a draft or missing world.`);
+  }
+  if (index > 0 && db.mainChapters[index - 1]?.status !== 'published') reasons.push('The previous chapter pair must be published first.');
+  return { ok: reasons.length === 0, reasons: [...new Set(reasons)] };
 }
 
 export function addCampaignChapter(db) {
@@ -654,6 +693,11 @@ export function mergeContent(systemRaw, db) {
   db.mainChapters.forEach((ch, ci) => {
     const chapterNum = ci + 1;
     let reason = null;
+    if (ch.status !== 'published') {
+      chainAlive = false;
+      note('info', `Campaign Chapter Pair ${chapterNum} is a draft — its edits are saved but not live.`);
+      return;
+    }
     if (!chainAlive) reason = 'a previous chapter is held back';
     if (!reason) {
       let t = lastThreshold;
@@ -703,6 +747,7 @@ export function mergeContent(systemRaw, db) {
   const liveMainIds = new Set(mainNodes.map(n => n.id));
   (db.shadowChapters ?? []).forEach((ch, ci) => {
     const chapterNum = ci + 1;
+    if (ch.status !== 'published' || db.mainChapters[ci]?.status !== 'published') return;
     let reason = null;
     if (!db.mainChapters[ci] || !liveMainIds.has(`main_${ci * 10 + 1}`)) reason = 'matching Main Campaign chapter is not live';
     else if (ch.nodes.length !== 10) reason = 'chapter must have exactly 10 nodes';
@@ -854,6 +899,17 @@ export function mergeContent(systemRaw, db) {
   const finalWorldIds = new Set(finalWorlds.map(w => w.id));
   const characters = characterDefs.filter(d => finalWorldIds.has(d.world));
 
+  // Authoring references may temporarily point at a world that is held back.
+  // Keep the authored value in the DB, but never emit a dangling live reference.
+  for (const node of [...mainNodes, ...shadowNodes]) {
+    if (!node.world || finalWorldIds.has(node.world)) continue;
+    const missingWorld = node.world;
+    node.world = null;
+    node.repeatRewards = node.repeatRewards.filter(reward => reward.id !== '@associated_world_asset');
+    node.firstClearRewards = node.firstClearRewards.filter(reward => reward.id !== '@associated_world_asset');
+    note('warn', `${node.id} is live without its draft/held-back world ${missingWorld}; associated World Asset rewards were held back.`);
+  }
+
   // --- pacing sanity: the starting five must be able to clear the first node
   const startingCount = characters.filter(d => d.starting).length;
   if (mainNodes.length > 0 && startingCount >= 5) {
@@ -930,7 +986,7 @@ export function mergeContent(systemRaw, db) {
     recipes: systemRaw.recipes,
     nodes: [...mainNodes, ...shadowNodes, ...wcNodes],
     archives,
-    expeditions: normalizeExpeditionLibrary(db.expeditions),
+    expeditions: normalizeExpeditionLibrary(db.expeditions, finalWorldIds, health),
     crises: normalizeCrisisLibrary(db.crises, new Set(finalWorlds.map(world => world.id)), health)
   };
   return { raw, images, health };
@@ -949,8 +1005,13 @@ function normalizeCrisisLibrary(value, liveWorldIds, health) {
   return lib;
 }
 
-function normalizeExpeditionLibrary(value) {
+function normalizeExpeditionLibrary(value, liveWorldIds, health) {
   const lib = structuredClone(value ?? emptyExpeditionLibrary());
+  lib.templates = (lib.templates ?? []).filter(template => {
+    if (!template.world || template.world === '@any' || liveWorldIds.has(template.world)) return true;
+    health.push({ level: 'warn', text: `Expedition template “${template.id}” is held back with world ${template.world}.` });
+    return false;
+  });
   lib.fallbackTemplate = lib.templates.find(t => t.partySize === 2 && t.durations?.includes(1))
     ?? {
       id: 'fallback_simple', enabled: true, world: null, weight: 1, durations: [1], partySize: 2,

@@ -49,7 +49,6 @@ export function renderCharacter(store, root, characterId) {
     h('div.eyebrow', 'Their Story'),
     h('p', def.lore || 'Their story has not been written yet.')));
   disclosures.appendChild(skinDisclosure(store, def, cs));
-  if (cs.owned) disclosures.appendChild(h('button.link.add-party', { onclick: () => store.go('#/party') }, 'Add to party →'));
   body.appendChild(disclosures);
   page.appendChild(body);
   root.appendChild(page);
