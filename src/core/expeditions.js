@@ -107,7 +107,15 @@ export function offerFeasibility(content, state, offer) {
 function instantiateOffer(content, state, template, rng, day, position) {
   const requirementDefs = content.expeditions.requirementById;
   const optionalDefs = content.expeditions.optionalById;
-  const reqIds = shuffle(rng, template.requirementIds).slice(0, template.requirementCount ?? 1);
+  const world = template.world === '@any'
+    ? pick(rng, content.worlds).id : template.world ?? null;
+  // An across-world route has no associated world, so an @associated
+  // requirement would be impossible by construction.
+  const eligibleRequirementIds = template.requirementIds.filter(id => {
+    const requirement = requirementDefs[id];
+    return world || requirement?.world !== '@associated';
+  });
+  const reqIds = shuffle(rng, eligibleRequirementIds).slice(0, template.requirementCount ?? 1);
   const requirements = [{ type: 'party_size', count: template.partySize, text: `Send ${template.partySize} characters.` },
     ...reqIds.map(id => structuredClone(requirementDefs[id])).filter(Boolean)];
   const optional = structuredClone(optionalDefs[pick(rng, template.optionalIds)]);
@@ -122,8 +130,6 @@ function instantiateOffer(content, state, template, rng, day, position) {
   }));
   const rare = packageDef?.rare?.length ? structuredClone(pick(rng, packageDef.rare)) : null;
   const duration = template.durations.length === 1 ? template.durations[0] : pick(rng, template.durations);
-  const world = template.world === '@any'
-    ? pick(rng, content.worlds).id : template.world ?? null;
   if (packageDef?.shardPool) {
     const candidates = content.characters.filter(def => !world || def.world === world);
     if (candidates.length) {

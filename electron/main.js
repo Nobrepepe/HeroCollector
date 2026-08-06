@@ -11,6 +11,7 @@ const savePath = () => join(app.getPath('userData'), 'save.json');
 const backupPath = () => join(app.getPath('userData'), 'save.backup.json');
 const customPath = () => join(app.getPath('userData'), 'custom-content.json');
 const customBackupPath = () => join(app.getPath('userData'), 'custom-content.backup.json');
+const activeCustomPath = () => join(app.getPath('userData'), 'active-custom-content.json');
 
 const CONTENT_FILES = ['balance', 'worlds', 'archetypes', 'materials', 'components', 'characters', 'tags', 'recipes', 'nodes', 'archives'];
 
@@ -102,6 +103,17 @@ app.whenReady().then(() => {
     mkdirSync(app.getPath('userData'), { recursive: true });
     if (existsSync(customPath())) copyFileSync(customPath(), customBackupPath());
     writeFileSync(customPath(), JSON.stringify(data));
+    return true;
+  });
+
+  ipcMain.handle('custom-active:load', () => {
+    if (!existsSync(activeCustomPath())) return null;
+    try { return JSON.parse(readFileSync(activeCustomPath(), 'utf8')); } catch { return null; }
+  });
+
+  ipcMain.handle('custom-active:save', (_ev, data) => {
+    mkdirSync(app.getPath('userData'), { recursive: true });
+    writeFileSync(activeCustomPath(), JSON.stringify(data));
     return true;
   });
 

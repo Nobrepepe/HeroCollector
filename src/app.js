@@ -8,7 +8,7 @@ import { migratePlayerState } from './core/migrate.js';
 import { characterPower } from './core/power.js';
 import { makeRng, entropySeed } from './core/rng.js';
 import { upgradeCustomDB, mergeContent, gameReadiness } from './core/custom.js';
-import { loadRawContent, loadSave, writeSave, loadCustomContent, writeCustomContent } from './platform.js';
+import { loadRawContent, loadSave, writeSave, loadCustomContent, writeCustomContent, loadActiveCustomContent, writeActiveCustomContent } from './platform.js';
 import { h, clear, fmt } from './ui/dom.js';
 import { renderHome } from './ui/home.js';
 import { renderRoster } from './ui/roster.js';
@@ -117,6 +117,7 @@ const store = {
     this.content = content;
     this.contentHealth = merged.health;
     this.gameReady = gameReadiness(content);
+    await writeActiveCustomContent(this.customDB);
     if (this.state) {
       syncSaveWithContent(content, this.state);
       await this.save();
@@ -413,7 +414,12 @@ async function boot() {
     content.images = merged.images;
     store.contentHealth = merged.health;
   } else {
-    content = buildContent(store.baseRaw);
+    const activeDB = upgradeCustomDB(await loadActiveCustomContent());
+    const activeMerged = mergeContent(store.baseRaw, activeDB);
+    const activeContent = buildContent(activeMerged.raw);
+    const activeCheck = validateContent(activeContent);
+    content = activeCheck.ok ? activeContent : buildContent(store.baseRaw);
+    if (activeCheck.ok) content.images = activeMerged.images;
     const baseCheck = validateContent(content);
     if (!baseCheck.ok) {
       document.getElementById('screen').appendChild(
@@ -428,6 +434,7 @@ async function boot() {
     ];
     setTimeout(() => toast('Creator content could not be loaded — see the Content Creator health panel.', 'error'), 300);
   }
+  if (check.ok) await writeActiveCustomContent(store.customDB);
   store.content = content;
   store.gameReady = gameReadiness(content);
 
@@ -541,7 +548,10 @@ function showDaySummary(summary) {
     for (const report of summary.expeditions ?? []) {
       suppliesReturned += (report.rewards ?? []).filter(entry => entry.id === 'field_supply').reduce((sum, entry) => sum + entry.qty, 0);
       modal.appendChild(h('div.return-report',
-      h('div.title', report.name), h('p', `${report.tier}. ${report.report}`)));
+      h('div.title', report.name), h('p', `${report.tier}. ${report.report}`),
+      h('div.day-return-rewards',
+        h('div.eyebrow', 'Rewards received'),
+        ...(report.rewards ?? []).map(entry => h('span.chip', dayRewardText(entry))))));
     }
     if (suppliesReturned) modal.appendChild(h('p.good', `${suppliesReturned} Field Suppl${suppliesReturned === 1 ? 'y has' : 'ies have'} returned and remains stored.`));
     if (summary.crisis) modal.appendChild(h('p.warn', `${summary.crisis.name} is active in ${store.content.worldById[summary.crisis.worldId]?.displayName}. It costs no Energy, and leaving it alone causes no penalty.`));
@@ -559,6 +569,16 @@ function showDaySummary(summary) {
       }
     }, 'Begin the day →'), summary.crisis ? h('button.btn', { onclick: () => finish('#/home') }, 'Leave it for later') : null));
   });
+}
+
+function dayRewardText(entry) {
+  if (entry.kind === 'material') {
+    const material = store.content.materialById[entry.id];
+    return `${material?.icon ?? '◆'} ${entry.qty} × ${material?.displayName ?? entry.id}`;
+  }
+  if (entry.kind === 'shards') return `🧩 ${entry.qty} × ${store.content.characterById[entry.characterId]?.displayName ?? entry.characterId} shards`;
+  const name = entry.id === '@associated_world_asset' ? 'World Asset' : store.content.resourceById[entry.id]?.displayName ?? entry.id;
+  return `${entry.qty} × ${name}`;
 }
 
 boot();

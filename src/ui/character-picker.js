@@ -187,3 +187,50 @@ export function openCrisisCharacterPicker(store, { currentId = null, excludedIds
     paint();
   });
 }
+
+export function openExpeditionCharacterPicker(store, {
+  currentId = null, selectedIds = [], slotIndex, onSelect
+}) {
+  return openModal((modal, close) => {
+    let search = '';
+    const preferences = store.ui.pickerPreferences;
+    preferences.ownership = 'owned';
+    const paint = () => {
+      modal.replaceChildren();
+      modal.appendChild(h('h2', `Choose expedition member ${slotIndex + 1}`));
+      modal.appendChild(characterFilterBar(store, preferences, paint, {
+        search, onSearch: value => { search = value; paint(); }, ownership: false
+      }));
+      if (currentId) modal.appendChild(h('button.btn.danger.tiny', {
+        onclick: async () => { await onSelect(null); close(); }
+      }, 'Remove from slot'));
+      const grid = h('div.picker-grid');
+      const candidates = filterCharacters(store.content, store.state, preferences, new Set(), search)
+        .filter(def => store.state.characters[def.id].owned);
+      for (const def of candidates) {
+        const away = characterExpeditionForPicker(store.state, def.id);
+        const otherSlot = selectedIds.findIndex((id, index) => id === def.id && index !== slotIndex);
+        const unavailable = !!away || otherSlot >= 0;
+        const cs = store.state.characters[def.id];
+        const reason = away ? `Away on ${away.name} until day ${away.returnDay}`
+          : otherSlot >= 0 ? `Already in slot ${otherSlot + 1}` : null;
+        grid.appendChild(h('button.picker-card', {
+          disabled: unavailable,
+          onclick: async () => { await onSelect(def.id); close(); },
+          'aria-label': unavailable ? `${def.displayName}, ${reason}` : `Choose ${def.displayName}`
+        }, portrait(store, def.id, 'sm'), h('div.grow',
+          h('b', def.displayName),
+          h('div.small.muted', `${store.content.worldById[def.world].displayName} · ${store.content.archetypes[def.archetype].name}`),
+          h('div.small', starline(cs.stars), ` · Tier ${cs.gearTier}`),
+          h('div.numeral', `${fmt(characterPowerForState(store.content, store.state, def.id))} Power`),
+          reason ? h('div.small.warn', reason) : null)));
+      }
+      modal.append(grid, h('div.modal-actions', h('button.btn', { onclick: close }, 'Cancel')));
+    };
+    paint();
+  });
+}
+
+function characterExpeditionForPicker(state, characterId) {
+  return (state.expeditions?.active ?? []).find(item => item.party.includes(characterId)) ?? null;
+}

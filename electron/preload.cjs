@@ -8,5 +8,7 @@ contextBridge.exposeInMainWorld('heroAPI', {
   importJson: () => ipcRenderer.invoke('save:import'),
   loadCustom: () => ipcRenderer.invoke('custom:load'),
   writeCustom: (data) => ipcRenderer.invoke('custom:save', data),
+  loadActiveCustom: () => ipcRenderer.invoke('custom-active:load'),
+  writeActiveCustom: (data) => ipcRenderer.invoke('custom-active:save', data),
   loadSamplePack: () => ipcRenderer.invoke('content:sample')
 });

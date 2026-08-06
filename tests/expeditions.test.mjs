@@ -48,6 +48,24 @@ test('board generation supports libraries without a guaranteed Supply template',
   assert.equal(state.expeditions.board.day, 2);
 });
 
+test('across-world offers never receive an impossible associated-world requirement', () => {
+  const localContent = loadContent();
+  const template = structuredClone(localContent.expeditions.templates[0]);
+  template.id = 'across_world_regression';
+  template.world = null;
+  template.requirementIds = ['req_associated'];
+  template.requirementCount = 1;
+  localContent.expeditions.templates = [template];
+  localContent.expeditions.templateById = { [template.id]: template };
+  localContent.expeditions.fallbackTemplate = template;
+  localContent.expeditions.settings.guaranteedSupplyTemplateId = null;
+  const state = newPlayerState(localContent, T0);
+
+  assert.ok(state.expeditions.board.offers.every(offer => offer.world === null));
+  assert.ok(state.expeditions.board.offers.every(offer =>
+    !offer.requirements.some(requirement => requirement.world === '@associated')));
+});
+
 test('every board has exactly one fixed, unscaled Supply offer', () => {
   for (let seed = 0; seed < 40; seed++) {
     const state = newPlayerState(content, T0);

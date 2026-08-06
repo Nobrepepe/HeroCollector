@@ -58,7 +58,7 @@ export function showFullResults(store, result, { onClose, members, count } = {})
       ...(result.newlyReadyCharacters ?? []).map(id => `${store.content.characterById[id].displayName} is ready to grow`),
       ...(rewards.milestones ?? []),
       rewards.objective ? 'The optional objective is complete' : null
-    ].filter(Boolean);
+    ].filter(text => typeof text === 'string' && text.trim() && text.trim().toLowerCase() !== 'null');
     modal.querySelector('.results-content').append(
       h('div.fade-rule'),
       rewards.energyRefunded ? h('p.good', `Frontier Momentum returned ${rewards.energyRefunded} Energy after this first clear.`) : null,

@@ -3,14 +3,14 @@ import { nodeState, nodeUnlocked, worldCampaignUnlocked } from '../core/state.js
 import { rankMaterialSources } from '../core/sources.js';
 import { sourceRow } from './find-sources.js';
 import { compactResult } from './results.js';
-import { campaignLabel } from './shared.js';
+import { campaignLabel, selectorWorldName } from './shared.js';
 import { sceneImage } from './presentation.js';
 
 export function renderCampaign(store, root, arg) {
   const { content, state } = store;
   const tabs = [
     ['main', 'Main'], ['shadow', 'Shadow'],
-    ...content.worlds.map(world => [world.campaignId, world.displayName])
+    ...content.worlds.map(world => [world.campaignId, selectorWorldName(world)])
   ];
   const allowed = new Set(tabs.map(([id]) => id));
   const [argCampaign, argChapter] = (arg ?? '').split('/');

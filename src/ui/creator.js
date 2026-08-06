@@ -10,7 +10,7 @@ import { portraitSlot } from './shared.js';
 import { exportJson, importJson, loadSamplePack } from '../platform.js';
 import {
   emptyCustomDB, upgradeCustomDB, newCustomWorld, newCustomCharacter,
-  newCustomFaction, addCampaignChapter, canPublishWorld, characterShardAssignments,
+  newCustomFaction, addCampaignChapter, canPublishWorld, canPublishChapterPair, characterShardAssignments,
   scaffoldWorldHq, sampleExpeditionLibrary, newCrisisDefinition, newId
 } from '../core/custom.js';
 
@@ -163,14 +163,28 @@ function overview(store, root) {
       return c ? c.displayName : '—';
     });
     const row = h('div.creator-list-row');
+    const pairStatus = ch.status ?? 'published';
+    const gate = canPublishChapterPair(db, i);
     row.appendChild(h('div.grow',
-      h('div', h('b', ch.title || `Main Chapter ${i + 1}`), h('span.small.muted', ` — nodes ${i * 10 + 1}–${i * 10 + 10}`)),
-      h('div.small.muted', `Shadow assignments: ${shardChars.filter(x => x !== '—').length}/10`)));
+      h('div', h('b', ch.title || `Main Chapter ${i + 1}`), ' ', h('span.badge.' + pairStatus, pairStatus.toUpperCase()), h('span.small.muted', ` — nodes ${i * 10 + 1}–${i * 10 + 10}`)),
+      h('div.small.muted', `Shadow assignments: ${shardChars.filter(x => x !== '—').length}/10${!gate.ok ? ` · ${gate.reasons[0]}` : ''}`)));
     row.appendChild(h('div.chapter-dots',
       h('div', h('span.caption', 'Main'), ...ch.nodes.map(() => h('i.filled'))),
       h('div', h('span.caption', 'Shadow'), ...(shadow?.nodes ?? []).map(node => h('i' + (node.shardCharacterId ? '.assigned' : ''))))));
     row.appendChild(h('button.btn.tiny.primary', { onclick: () => store.go(`#/creator/main-chapter/${i}`) }, 'Edit Main'));
     row.appendChild(h('button.btn.tiny.primary', { onclick: () => store.go(`#/creator/shadow-chapter/${i}`) }, 'Edit Shadow'));
+    if (pairStatus === 'draft') row.appendChild(h('button.btn.tiny.primary', {
+      disabled: !gate.ok,
+      onclick: async () => {
+        ch.status = 'published';
+        shadow.status = 'published';
+        const result = await commit(store, true);
+        toast(result.ok ? `Chapter Pair ${i + 1} published.` : 'Chapter could not be published; see Content health.', result.ok ? 'info' : 'error');
+      }
+    }, 'Publish Pair'));
+    else row.appendChild(h('button.btn.tiny', { onclick: async () => {
+      ch.status = 'draft'; shadow.status = 'draft'; await commit(store, true);
+    } }, 'Move to Draft'));
     if (i === db.mainChapters.length - 1) {
       row.appendChild(h('button.btn.tiny.danger', {
         onclick: () => confirmModal(store, `Delete Main & Shadow Chapter ${i + 1}?`, 'Both paired chapters are removed. Characters whose only shard source is this Shadow chapter become unacquirable.', () => {
@@ -845,6 +859,8 @@ function chapterEditor(store, root, campaign, idx) {
 
   const panel = h('div.panel');
   panel.appendChild(h('h2', `${isShadow ? 'Shadow' : 'Main'} Campaign — Chapter ${chapterNum} (nodes ${idx * 10 + 1}–${idx * 10 + 10})`));
+  const pairPublished = db.mainChapters[idx]?.status === 'published';
+  if (pairPublished) panel.appendChild(h('p.good.small', 'This pair is published. Move it to Draft from the campaign overview before editing; the live game remains stable while draft work is incomplete.'));
   panel.appendChild(h('p.small.muted', isShadow
     ? 'Every node requires a shard character and allows five runs per day. Each unlocks when the corresponding Main node is cleared; Shadow nodes do not gate one another.'
     : 'All nodes are freely repeatable material sources. Thresholds never decrease along the campaign; positions 5 and 10 are checkpoints with larger first-clear rewards.'));
@@ -914,6 +930,13 @@ function chapterEditor(store, root, campaign, idx) {
         commit(store, true).then(() => toast(n > 0 ? `Assigned ${n} Shadow node(s).` : 'No empty Shadow nodes, or no characters are available.'));
       }
     }, 'Auto-fill empty shard nodes'));
+  }
+  if (pairPublished) {
+    for (const control of panel.querySelectorAll('input, select, textarea')) control.disabled = true;
+    for (const well of panel.querySelectorAll('.image-well')) {
+      well.style.pointerEvents = 'none';
+      well.setAttribute('aria-disabled', 'true');
+    }
   }
   panel.appendChild(actions);
   root.appendChild(panel);
