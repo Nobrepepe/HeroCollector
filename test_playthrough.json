@@ -1955,7 +1955,7 @@
       "ownership": "all",
       "sort": "power",
       "direction": "desc",
-      "collectionDensity": "gallery"
+      "collectionDensity": "compact"
     },
     "campaignId": "main",
     "archiveCollapsed": {
