@@ -1,6 +1,14 @@
 export const RENOWN_ID = 'renown';
 export const INTELLIGENCE_ID = 'intelligence';
 export const ASSOCIATED_WORLD_ASSET = '@associated_world_asset';
+// A material reward that names a grade instead of a family: the family is drawn
+// when the reward is rolled, so a cache is not always the same material.
+export const RANDOM_MATERIAL = '@random_material';
+
+// The materials a @random_material entry may draw from, in authored order.
+export function randomMaterialPool(content, grade = 'basic') {
+  return content.materials.filter(material => material.grade === grade);
+}
 
 export function resourceQty(state, id) {
   return state.inventory.resources?.[id] ?? 0;

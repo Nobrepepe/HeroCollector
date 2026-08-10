@@ -20,8 +20,7 @@ export function renderRoster(store, root) {
   const ownedCount = content.characters.filter(def => state.characters[def.id].owned).length;
   root.classList.add('collection-screen', `collection-density-${preferences.collectionDensity}`);
   root.appendChild(h('header.collection-head',
-    h('div', h('div.eyebrow', 'Your people'), h('h1.display-s', `${ownedCount} of ${content.characters.length} met.`),
-      h('p.muted', worldSentence(content))),
+    h('div', h('div.eyebrow', 'Your people'), h('h1.display-s', `${ownedCount} of ${content.characters.length} met.`)),
     h('div.collection-controls',
       h('div.collection-primary',
         primaryFilter(store, preferences, 'Everyone', preferences.ownership === 'all', () => {
@@ -137,11 +136,6 @@ function characterCard(store, def, isReady, index) {
     h('div.progressbar', h('div', { style: { width: `${Math.min(100, cs.shards / need * 100)}%` } })),
     isReady ? h('div.gallery-ready', 'ready to grow') : null));
   return card;
-}
-
-function worldSentence(content) {
-  if (!content.worlds.length) return 'Your worlds are still being authored.';
-  return content.worlds.map(world => world.displayName).join(' · ');
 }
 
 function compactCharacter(store, def, readyItems, pulses) {

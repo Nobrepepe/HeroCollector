@@ -1,6 +1,8 @@
 import { characterPowerForState } from './power.js';
 import { hqExpeditionModifiers } from './hq.js';
-import { addResource, grantRewardEntries, INTELLIGENCE_ID, scaledRewards } from './resources.js';
+import {
+  addResource, grantRewardEntries, INTELLIGENCE_ID, RANDOM_MATERIAL, randomMaterialPool, scaledRewards
+} from './resources.js';
 import { fieldSupplyLimits, FIELD_SUPPLY_ID } from './energy.js';
 import { activeCrisisBoon } from './crises.js';
 
@@ -104,6 +106,14 @@ export function offerFeasibility(content, state, offer) {
   return { feasible: !!party, party };
 }
 
+// A @random_material entry draws one family at its authored grade when the
+// offer is built, so the board already shows which material the cache holds.
+function rollRewardMaterial(content, entry, rng) {
+  if (entry.kind !== 'material' || entry.id !== RANDOM_MATERIAL) return entry.id;
+  const pool = randomMaterialPool(content, entry.grade ?? 'basic');
+  return pool.length ? pick(rng, pool).id : entry.id;
+}
+
 function instantiateOffer(content, state, template, rng, day, position) {
   const requirementDefs = content.expeditions.requirementById;
   const optionalDefs = content.expeditions.optionalById;
@@ -126,7 +136,8 @@ function instantiateOffer(content, state, template, rng, day, position) {
   const sampledRatio = ratio + Math.floor(rng.next() * (ratioMax - ratio + 1));
   const packageDef = content.expeditions.rewardById[template.rewardPackageId];
   const rewards = (packageDef?.entries ?? []).map(entry => ({
-    ...entry, qty: entry.min + Math.floor(rng.next() * (entry.max - entry.min + 1))
+    ...entry, id: rollRewardMaterial(content, entry, rng),
+    qty: entry.min + Math.floor(rng.next() * (entry.max - entry.min + 1))
   }));
   const rare = packageDef?.rare?.length ? structuredClone(pick(rng, packageDef.rare)) : null;
   const duration = template.durations.length === 1 ? template.durations[0] : pick(rng, template.durations);

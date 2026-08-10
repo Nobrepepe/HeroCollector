@@ -5,14 +5,15 @@
 // the minimum prerequisites for a playable save.
 import { h, fmt } from './dom.js';
 import { openModal, toast, render } from '../app.js';
-import { imageWell } from './images.js';
+import { auditArt, deleteOrphanArt, imageWell } from './images.js';
 import { portraitSlot } from './shared.js';
-import { exportJson, importJson, loadSamplePack } from '../platform.js';
+import { artStorageAvailable, exportJson, importJson, loadSamplePack } from '../platform.js';
 import {
   emptyCustomDB, upgradeCustomDB, newCustomWorld, newCustomCharacter,
   newCustomFaction, addCampaignChapter, canPublishWorld, canPublishChapterPair, characterShardAssignments,
   scaffoldWorldHq, sampleExpeditionLibrary, newCrisisDefinition, newId
 } from '../core/custom.js';
+import { RANDOM_MATERIAL } from '../core/resources.js';
 
 export function renderCreator(store, root, arg) {
   const parts = (arg ?? '').split('/').filter(Boolean);
@@ -85,6 +86,10 @@ function colorInput(obj, key, store) {
 function backLink(store, hash, label) {
   return h('button.link', { onclick: () => store.go(hash) }, `← ${label}`);
 }
+function rewardEntryLabel(entry) {
+  return entry.id === RANDOM_MATERIAL
+    ? `any ${entry.grade ?? 'basic'} material (drawn per offer)` : entry.id;
+}
 function familyGradeSelects(nd, store, content) {
   return [
     selectInput(nd, 'family', store, content.materialMeta.familyOrder.map(f => [f, content.materialMeta.families[f].name])),
@@ -116,6 +121,21 @@ function overview(store, root) {
   if (store.contentHealth.length === 0) hp.appendChild(h('p.good.small', '✅ Everything in the creator database is live in the game.'));
   for (const item of store.contentHealth) {
     hp.appendChild(h('div.health-item' + ({ error: '.bad', warn: '.warn', info: '.muted' }[item.level] ?? ''), item.text));
+  }
+  // Art lives in art/ rather than in the database, so a reference can outlive
+  // its file. Checking needs the filesystem, so the row fills in afterwards.
+  if (artStorageAvailable) {
+    const artRow = h('div.health-item.muted', 'Checking imported art…');
+    hp.appendChild(artRow);
+    auditArt(db).then(({ referenced, missing, orphans }) => {
+      if (missing.length) {
+        artRow.className = 'health-item bad';
+        artRow.textContent = `${missing.length} image${missing.length === 1 ? ' is' : 's are'} missing from art/ — the reference is in the database but the file is not on disk. Restore it from version control, or re-import the image. First: ${missing[0]}`;
+      } else {
+        artRow.className = 'health-item good';
+        artRow.textContent = `✅ All ${referenced.size} imported images resolve in art/${orphans.length ? ` · ${orphans.length} unused file${orphans.length === 1 ? '' : 's'} can be cleaned up below.` : '.'}`;
+      }
+    }).catch(() => artRow.remove());
   }
   root.appendChild(hp);
 
@@ -245,8 +265,22 @@ function overview(store, root) {
         });
       }
     }, 'Import content pack…'),
+    artStorageAvailable ? h('button.btn', {
+      onclick: async () => {
+        const { orphans } = await auditArt(db);
+        if (!orphans.length) { toast('No unused art — every file in art/ is still in use.'); return; }
+        confirmModal(store,
+          `Delete ${orphans.length} unused image${orphans.length === 1 ? '' : 's'}?`,
+          `${orphans.length} file${orphans.length === 1 ? '' : 's'} in art/ ${orphans.length === 1 ? 'is' : 'are'} no longer referenced by any world, character, chapter or Crisis — usually art that was replaced or removed. Nothing currently in use is touched.`,
+          async () => {
+            const removed = await deleteOrphanArt(db);
+            toast(`Removed ${removed} unused image${removed === 1 ? '' : 's'} from art/.`);
+            render();
+          });
+      }
+    }, 'Clean unused art…') : null,
     h('button.btn.danger', {
-      onclick: () => confirmModal(store, 'Delete ALL creator content?', 'Every world, character, chapter, and imported image is removed and the game returns to setup mode. This cannot be undone.', async () => {
+      onclick: () => confirmModal(store, 'Delete ALL creator content?', 'Every world, character, chapter, and imported image is removed and the game returns to setup mode. Imported art files stay in art/ until you run “Clean unused art…”. This cannot be undone.', async () => {
         store.customDB = emptyCustomDB();
         await commit(store, true);
         toast('Creator database reset.');
@@ -353,7 +387,7 @@ function expeditionEditor(store, root) {
   for (const pack of lib.rewardPackages) {
     rewards.appendChild(h('h3', pack.displayName || pack.id));
     for (const entry of pack.entries) rewards.appendChild(h('div.creator-list-row',
-      h('span.caption', `${entry.kind} · ${entry.id}`),
+      h('span.caption', `${entry.kind} · ${rewardEntryLabel(entry)}`),
       h('span', 'minimum'), numInput(entry, 'min', store, { min: 0, step: 1 }),
       h('span', 'maximum'), numInput(entry, 'max', store, { min: 0, step: 1 })));
   }
@@ -390,10 +424,12 @@ function worldEditor(store, root, worldId) {
   const w = db.worlds.find(x => x.id === worldId);
   if (!w) { root.appendChild(h('p.bad', 'Unknown world.')); return; }
   root.classList.add('creator-world');
-  root.appendChild(backLink(store, '#/creator', 'Content Creator'));
+  // The banner is the top of the screen; the back link rides on top of it.
   root.appendChild(h('header.creator-world-hero' + (w.image ? '' : '.art-fallback'), {
     style: w.image ? { backgroundImage: `url("${w.image}")` } : {}
-  }, h('div.eyebrow', w.status), h('h1.display-m', w.displayName), h('p', w.tagline)));
+  }, backLink(store, '#/creator', 'Content Creator'),
+  h('div.creator-world-hero-copy',
+    h('div.eyebrow', w.status), h('h1.display-m', w.displayName), h('p', w.tagline))));
 
   // ---- identity & status
   const idp = h('div.panel');

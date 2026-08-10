@@ -95,6 +95,27 @@ export async function writeActiveCustomContent(db) {
   return idbSet('active-custom-content', JSON.parse(JSON.stringify(db)));
 }
 
+// ---------------------------------------------------------------- art files
+// Imported art is written next to index.html as art/<hash>.<ext> so the database
+// only carries a relative URL. The browser build has no writable filesystem, so
+// there `artStorageAvailable` is false and images stay inline data URLs.
+export const artStorageAvailable = isElectron;
+
+export async function writeArt(bytes, extension) {
+  if (!isElectron) return null;
+  return window.heroAPI.writeArt(bytes, extension);
+}
+
+export async function listArt() {
+  if (!isElectron) return [];
+  return window.heroAPI.listArt();
+}
+
+export async function deleteArt(names) {
+  if (!isElectron) return 0;
+  return window.heroAPI.deleteArt(names);
+}
+
 // ---------------------------------------------------------------- import/export
 export async function exportJson(data, name) {
   if (isElectron) return window.heroAPI.exportJson(data, name);

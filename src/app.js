@@ -8,7 +8,7 @@ import { migratePlayerState } from './core/migrate.js';
 import { characterPower } from './core/power.js';
 import { makeRng, entropySeed } from './core/rng.js';
 import { upgradeCustomDB, mergeContent, gameReadiness } from './core/custom.js';
-import { loadRawContent, loadSave, writeSave, loadCustomContent, writeCustomContent, loadActiveCustomContent, writeActiveCustomContent } from './platform.js';
+import { loadRawContent, loadSave, writeSave, loadCustomContent, writeCustomContent, loadActiveCustomContent, writeActiveCustomContent, importSave, exportJson } from './platform.js';
 import { h, clear, fmt } from './ui/dom.js';
 import { renderHome } from './ui/home.js';
 import { renderRoster } from './ui/roster.js';
@@ -401,6 +401,67 @@ function renderTopbar(title) {
 }
 
 // ------------------------------------------------------------- boot
+// A save that cannot be loaded must never be a dead end: the screen that
+// reports the failure also carries the tools to recover from it, because the
+// normal Settings screen is unreachable before a save loads.
+function renderRecoveryScreen({ title, message, details = [], brokenSave = null }) {
+  const screen = document.getElementById('screen');
+  clear(screen);
+  const panel = h('div.panel', h('h2', title), h('p.bad', message));
+  if (details.length) panel.appendChild(h('ul.reasons', details.slice(0, 20).map(e => h('li', e))));
+  panel.appendChild(h('p.muted',
+    'The existing save and its rolling backup were left untouched. Import a working save, rescue a copy of the unreadable one, or start over.'));
+
+  const actions = h('div.modal-actions');
+  actions.appendChild(h('button.btn.primary', {
+    onclick: async () => {
+      const imported = await importSave();
+      if (!imported) { toast('Import canceled or unreadable.', 'error'); return; }
+      let migrated;
+      try {
+        migrated = migratePlayerState(store.content, imported);
+      } catch (error) {
+        toast(`Import migration failed: ${error instanceof Error ? error.message : String(error)}`, 'error');
+        return;
+      }
+      syncSaveWithContent(store.content, migrated);
+      const check = validateSave(store.content, migrated);
+      if (!check.ok) {
+        toast(`Imported save is malformed: ${check.errors[0]}`, 'error');
+        return;
+      }
+      await writeSave(migrated);
+      toast('Save imported. Restarting…');
+      setTimeout(() => location.reload(), 700);
+    }
+  }, 'Import save…'));
+
+  if (brokenSave) {
+    actions.appendChild(h('button.btn', {
+      onclick: () => exportJson(brokenSave, 'hero-collector-unreadable-save.json')
+        .then(ok => ok && toast('Unreadable save exported.'))
+    }, 'Export the unreadable save…'));
+  }
+
+  // Two-step, since the modal system is not running this early in boot.
+  const reset = h('button.btn.danger', 'Start a new game');
+  reset.onclick = () => {
+    if (reset.dataset.armed !== 'yes') {
+      reset.dataset.armed = 'yes';
+      reset.textContent = 'Confirm: erase this save and start over';
+      return;
+    }
+    writeSave(newPlayerState(store.content, Date.now())).then(() => {
+      toast('New game started. Restarting…');
+      setTimeout(() => location.reload(), 700);
+    });
+  };
+  actions.appendChild(reset);
+
+  panel.appendChild(actions);
+  screen.appendChild(panel);
+}
+
 async function boot() {
   store.baseRaw = await loadRawContent();
   store.customDB = upgradeCustomDB(await loadCustomContent());
@@ -445,31 +506,32 @@ async function boot() {
     try {
       state = migratePlayerState(store.content, loadedState);
     } catch (error) {
-      const screen = document.getElementById('screen');
-      clear(screen);
-      screen.appendChild(h('div.panel',
-        h('h2', 'Save migration failed'),
-        h('p.bad', error instanceof Error ? error.message : String(error)),
-        h('p.muted', 'The existing save and rolling backup were left unchanged. Export or restore the save before trying again.')));
+      renderRecoveryScreen({
+        title: 'Save migration failed',
+        message: error instanceof Error ? error.message : String(error),
+        brokenSave: loadedState
+      });
       return;
     }
   }
   store.state = state ?? newPlayerState(store.content, Date.now());
   if (loadedState) {
-    const scrubbed = syncSaveWithContent(store.content, store.state);
-    if (scrubbed.length > 0) {
-      toast(`Save updated for changed content (${scrubbed.length} stale reference${scrubbed.length > 1 ? 's' : ''} cleaned).`);
+    // Only real edits to the save are worth a toast, and they say what they
+    // were: a bare count of "stale references" told the player nothing.
+    const { changes } = syncSaveWithContent(store.content, store.state);
+    if (changes.length > 0) {
+      toast(changes.length === 1 ? changes[0] : `${changes[0]} (+${changes.length - 1} more save update${changes.length > 2 ? 's' : ''}.)`);
     }
   }
   ensureExpeditionBoard(store.content, store.state);
   const saveCheck = validateSave(store.content, store.state);
   if (!saveCheck.ok) {
-    const screen = document.getElementById('screen');
-    clear(screen);
-    screen.appendChild(h('div.panel',
-      h('h2', 'Save validation failed'),
-      h('p.bad', 'The migrated save was not written. Resolve these problems or restore the rolling backup:'),
-      h('ul.reasons', saveCheck.errors.slice(0, 20).map(error => h('li', error)))));
+    renderRecoveryScreen({
+      title: 'Save validation failed',
+      message: 'The migrated save was not written. Resolve these problems or recover below:',
+      details: saveCheck.errors,
+      brokenSave: loadedState
+    });
     return;
   }
 

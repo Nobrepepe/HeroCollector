@@ -3,7 +3,7 @@
 **Date:** 2026-08-06 · **Branch:** `feature/goal-driven-qol-overhaul`
 **Content under test:** the live content pack exported from the running game —
 v11, **6 worlds, 66 characters, 300 nodes**, 15 Expedition templates, 2 Crises
-**Harness:** `scripts/playtest.mjs` — reproduce with `node --max-old-space-size=8192 scripts/playtest.mjs 4300 20260806`
+**Harness:** `scripts/playtest.mjs` — reproduce with `node scripts/playtest.mjs 4300 20260806`
 
 ---
 
@@ -329,10 +329,10 @@ Items 1–4 are the ones that change how the game actually plays.
 ## 7. Reproducing
 
 ```bash
-node --max-old-space-size=8192 scripts/playtest.mjs 4300 20260806
+node scripts/playtest.mjs 4300 20260806
 ```
 
 Arguments: `[maxDays] [seed]`. Flags: `--quiet` (JSON only), and `--no-supply`, `--no-expeditions`,
 `--no-hq`, `--no-crises` for the counterfactual table in §3. The harness prints a milestone log followed by
 a single JSON line containing full statistics, the per-character final state, campaign/archive progress,
-and any invariant violations it detected. The larger heap is required because the content pack embeds art.
+and any invariant violations it detected.

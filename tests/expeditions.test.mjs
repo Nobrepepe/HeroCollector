@@ -37,6 +37,23 @@ test('board persists, has five offers, and fallback keeps offers feasible', () =
   assert.equal(state.expeditions.board, board);
 });
 
+test('a random-material reward draws every family at its authored grade', () => {
+  const state = newPlayerState(content, T0);
+  const drawn = new Set();
+  for (let seed = 0; seed < 40; seed++) {
+    const board = generateExpeditionBoard(content, state, makeRng(seed), { seed });
+    for (const offer of board.offers) {
+      for (const reward of offer.baseRewards) {
+        if (reward.kind !== 'material') continue;
+        assert.ok(content.materialById[reward.id], `unresolved material ${reward.id}`);
+        assert.equal(content.materialById[reward.id].grade, 'basic');
+        drawn.add(content.materialById[reward.id].family);
+      }
+    }
+  }
+  assert.equal(drawn.size, content.materialMeta.familyOrder.length);
+});
+
 test('board generation supports libraries without a guaranteed Supply template', () => {
   const localContent = loadContent();
   localContent.expeditions.settings.guaranteedSupplyTemplateId = null;

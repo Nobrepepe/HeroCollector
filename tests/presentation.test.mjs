@@ -118,8 +118,11 @@ test('best party swap fills empty slots and chooses a legal positive improvement
 });
 
 test('portrait imports use a 16:9 alpha-preserving canvas', () => {
-  assert.deepEqual(
-    { w: IMAGE_KINDS.portrait.w, h: IMAGE_KINDS.portrait.h, contain: IMAGE_KINDS.portrait.contain, preserveAlpha: IMAGE_KINDS.portrait.preserveAlpha },
-    { w: 1200, h: 675, contain: true, preserveAlpha: true }
-  );
+  const { w, h, contain, preserveAlpha } = IMAGE_KINDS.portrait;
+  assert.equal(w / h, 16 / 9, 'portraits are letterboxed into a 16:9 tile');
+  assert.equal(contain, true, 'portraits are contained, never cropped');
+  assert.equal(preserveAlpha, true, 'portraits keep their transparency');
+  // The tile is never drawn wider than ~250 CSS px, so anything past 1280 is
+  // storage spent on pixels no display can show.
+  assert.ok(w >= 512 && w <= 1280, `portrait width ${w} is outside the sane range`);
 });

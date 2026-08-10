@@ -1,4 +1,4 @@
-import { h, fmt } from './dom.js';
+import { append, h, fmt } from './dom.js';
 import { openModal } from '../app.js';
 import { clearNode, checkClear, preferredPartyIndex } from '../core/state.js';
 
@@ -58,13 +58,15 @@ export function showFullResults(store, result, { onClose, members, count } = {})
       ...(result.newlyReadyCharacters ?? []).map(id => `${store.content.characterById[id].displayName} is ready to grow`),
       ...(rewards.milestones ?? []),
       rewards.objective ? 'The optional objective is complete' : null
-    ].filter(text => typeof text === 'string' && text.trim() && text.trim().toLowerCase() !== 'null');
-    modal.querySelector('.results-content').append(
+    ].filter(Boolean);
+    // append() from dom.js, not Element.append: the conditional lines below are
+    // null most of the time, and the native call would render them as "null".
+    append(modal.querySelector('.results-content'), [
       h('div.fade-rule'),
       rewards.energyRefunded ? h('p.good', `Frontier Momentum returned ${rewards.energyRefunded} Energy after this first clear.`) : null,
       rewards.freeRunsUsed ? h('p.good', `${rewards.freeRunsUsed} run${rewards.freeRunsUsed === 1 ? ' was' : 's were'} carried by the Crisis boon, so no Energy was charged for ${rewards.freeRunsUsed === 1 ? 'it' : 'them'}.`) : null,
       h('p.results-unlocks', unlocks.length ? `${unlocks.join('. ')}.` : 'The materials have been added to your Workshop.'),
-      unlocks.length ? h('p.warn', `${unlocks.length} thing${unlocks.length === 1 ? ' is' : 's are'} ready.`) : null);
+      unlocks.length ? h('p.warn', `${unlocks.length} thing${unlocks.length === 1 ? ' is' : 's are'} ready.`) : null]);
 
     const actions = h('div.modal-actions.results-actions');
     const repeatMembers = members ?? selectedMembers(store, result.node.id);

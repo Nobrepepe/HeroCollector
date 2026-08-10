@@ -8,7 +8,7 @@ import { buildContent } from '../src/core/content.js';
 import { validateContent } from '../src/core/validate.js';
 import {
   emptyCustomDB, upgradeCustomDB, newCustomWorld, newCustomCharacter,
-  addCampaignChapter, canPublishWorld, mergeContent, gameReadiness
+  addCampaignChapter, canPublishWorld, mergeContent, gameReadiness, CUSTOM_DB_VERSION
 } from '../src/core/custom.js';
 import {
   newPlayerState, syncSaveWithContent, clearNode, nodeState,
@@ -71,7 +71,7 @@ test('v2 migration moves legacy Main shards into incomplete paired Shadow chapte
   legacy.mainChapters[0].nodes[5].shardCharacterId = legacy.characters[1].id;
   legacy.mainChapters[0].nodes[8].shardCharacterId = legacy.characters[2].id;
   const upgraded = upgradeCustomDB(legacy);
-  assert.equal(upgraded.version, 11);
+  assert.equal(upgraded.version, CUSTOM_DB_VERSION);
   assert.equal(upgraded.shadowChapters.length, upgraded.mainChapters.length);
   assert.equal(upgraded.shadowChapters[0].nodes[2].shardCharacterId, legacy.characters[0].id);
   assert.equal(upgraded.shadowChapters[0].nodes[0].shardCharacterId, null);
@@ -280,7 +280,7 @@ test('save reconciliation: starting characters granted, missing ones dormant', (
   // content becomes the sample game: characters appear, starters granted
   const report = syncSaveWithContent(content0, s);
   assert.equal(content0.characters.filter(d => s.characters[d.id]?.owned).length, 5);
-  assert.ok(report.some(r => /starting character/i.test(r)));
+  assert.ok(report.changes.some(r => /starting character/i.test(r)));
   assert.ok(s.parties[0].members.filter(Boolean).length === 5); // first preset filled
   // content shrinks again: owned progress dormant, parties detached
   s.characters.char_suzume.stars = 4;
@@ -288,7 +288,9 @@ test('save reconciliation: starting characters granted, missing ones dormant', (
   const report2 = syncSaveWithContent(empty, s);
   assert.equal(s.parties[0].members.filter(Boolean).length, 0);
   assert.equal(s.characters.char_suzume.stars, 4); // kept dormant
-  assert.ok(report2.some(r => /dormant/.test(r)));
+  // Dormancy is a standing observation, not something this call changed.
+  assert.ok(report2.notices.some(r => /dormant/.test(r)));
+  assert.ok(!report2.changes.some(r => /dormant/.test(r)));
 });
 
 test('end-to-end: a fully custom game plays through real transactions', () => {

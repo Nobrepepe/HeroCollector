@@ -4,6 +4,7 @@
 // stay inside the global cap. Produces a human-readable error list.
 import { equipmentRecipe } from './content.js';
 import { fieldSupplyLimits, FIELD_SUPPLY_ID } from './energy.js';
+import { RANDOM_MATERIAL, randomMaterialPool } from './resources.js';
 import { CRISIS_BOON_TYPES } from './crises.js';
 
 export function validateContent(content) {
@@ -54,7 +55,13 @@ export function validateContent(content) {
       if (reward.kind === 'resource' && reward.id !== '@associated_world_asset' && !content.resourceById[reward.id]) {
         err(`${pack.id}: unknown resource ${reward.id}`);
       }
-      if (reward.kind === 'material' && !content.materialById[reward.id]) err(`${pack.id}: unknown material ${reward.id}`);
+      if (reward.kind === 'material' && reward.id === RANDOM_MATERIAL) {
+        if (!randomMaterialPool(content, reward.grade ?? 'basic').length) {
+          err(`${pack.id}: no ${reward.grade ?? 'basic'} material exists for the random draw`);
+        }
+      } else if (reward.kind === 'material' && !content.materialById[reward.id]) {
+        err(`${pack.id}: unknown material ${reward.id}`);
+      }
     }
   }
   for (const template of content.expeditions.templates ?? []) {
