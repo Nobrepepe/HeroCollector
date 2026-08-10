@@ -516,9 +516,11 @@ async function boot() {
   }
   store.state = state ?? newPlayerState(store.content, Date.now());
   if (loadedState) {
-    const scrubbed = syncSaveWithContent(store.content, store.state);
-    if (scrubbed.length > 0) {
-      toast(`Save updated for changed content (${scrubbed.length} stale reference${scrubbed.length > 1 ? 's' : ''} cleaned).`);
+    // Only real edits to the save are worth a toast, and they say what they
+    // were: a bare count of "stale references" told the player nothing.
+    const { changes } = syncSaveWithContent(store.content, store.state);
+    if (changes.length > 0) {
+      toast(changes.length === 1 ? changes[0] : `${changes[0]} (+${changes.length - 1} more save update${changes.length > 2 ? 's' : ''}.)`);
     }
   }
   ensureExpeditionBoard(store.content, store.state);

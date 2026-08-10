@@ -7,8 +7,9 @@
 // incomplete or unsafe is *held back* with a human-readable health note
 // instead of producing invalid content. The game itself stays in setup mode
 // until the content meets the minimum prerequisites to start a game.
+import { RANDOM_MATERIAL } from './resources.js';
 
-export const CUSTOM_DB_VERSION = 11;
+export const CUSTOM_DB_VERSION = 12;
 
 export function emptyCustomDB() {
   return {
@@ -202,6 +203,17 @@ export function upgradeCustomDB(db) {
       main.status = complete ? 'published' : 'draft';
       if (shadow) shadow.status = main.status;
     });
+  }
+  // v11 -> v12: an Expedition reward package that promised one fixed basic
+  // material always returned the same one. It now draws a family at roll time.
+  if (oldVersion < 12) {
+    for (const pack of out.expeditions.rewardPackages ?? []) {
+      for (const entry of pack.entries ?? []) {
+        if (entry.kind !== 'material' || !/_basic$/.test(entry.id ?? '')) continue;
+        entry.id = RANDOM_MATERIAL;
+        entry.grade = 'basic';
+      }
+    }
   }
   out.version = CUSTOM_DB_VERSION;
   return out;
@@ -432,7 +444,7 @@ export function sampleExpeditionLibrary(worlds) {
   lib.rewardPackages = [
     pkg('development', [{ kind: 'resource', id: 'renown', min: 40, max: 60 }, { kind: 'resource', id: '@associated_world_asset', min: 4, max: 6 }]),
     pkg('world_supply', [{ kind: 'resource', id: '@associated_world_asset', min: 10, max: 16 }, { kind: 'resource', id: 'renown', min: 10, max: 15 }]),
-    pkg('equipment_cache', [{ kind: 'material', id: 'mat_metal_basic', min: 4, max: 8 }, { kind: 'resource', id: 'intelligence', min: 1, max: 1 }]),
+    pkg('equipment_cache', [{ kind: 'material', id: RANDOM_MATERIAL, grade: 'basic', min: 4, max: 8 }, { kind: 'resource', id: 'intelligence', min: 1, max: 1 }]),
     pkg('intelligence_brief', [{ kind: 'resource', id: 'intelligence', min: 1, max: 2 }, { kind: 'resource', id: 'renown', min: 8, max: 12 }]),
     { ...pkg('character_lead', [{ kind: 'resource', id: 'renown', min: 18, max: 28 }], [{ kind: 'resource', id: 'intelligence', qty: 1, chanceBp: 7000 }]), shardPool: 'associated_or_any', shardRange: [2, 4] },
     pkg('long_venture', [{ kind: 'resource', id: 'renown', min: 70, max: 95 }, { kind: 'resource', id: '@associated_world_asset', min: 14, max: 20 }], [{ kind: 'resource', id: 'intelligence', qty: 2, chanceBp: 8000 }])

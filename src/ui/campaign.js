@@ -102,16 +102,13 @@ function chapterPath(store, chapter, nodes) {
     const ns = nodeState(state, node.id);
     const unlock = nodeUnlocked(content, state, node);
     const status = ns.cleared ? 'cleared' : node.id === firstUnlocked?.id ? 'frontier' : unlock.unlocked ? 'next' : 'locked';
-    const projection = rankMaterialSources(content, state, node.material).find(row => row.node.id === node.id);
-    const power = projection?.check.evalResult?.effectivePower;
-    const label = status === 'cleared' ? 'cleared'
-      : status === 'locked' ? `locked · needs ${fmt(node.threshold)}`
-        : power ? `needs ${fmt(node.threshold)} · you read ${fmt(power)}` : `needs ${fmt(node.threshold)}`;
+    // The path shows the name alone — long names used to collide with the gate
+    // line beneath them. The gate reading lives on the node screen instead.
     path.appendChild(h('button.journey-node.' + status, {
       style: { '--path-y': `${[0, -22, 14, -8, 25, -16, 8, -25, 18, 0][index % 10]}px` },
       onclick: () => store.go(`#/node/${node.id}`),
-      'aria-label': `${campaignLabel(store, node)} ${node.number}, ${node.displayName}, ${label}`
-    }, h('span.journey-dot'), h('span.journey-node-name', node.displayName), h('span.caption', label)));
+      'aria-label': `${campaignLabel(store, node)} ${node.number}, ${node.displayName}, ${status}`
+    }, h('span.journey-dot'), h('span.journey-node-name', node.displayName)));
   });
   section.appendChild(path);
 

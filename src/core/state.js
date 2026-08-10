@@ -97,9 +97,12 @@ export function emptySlots(content) {
 // state entries for characters that are new to the content, and detach live
 // references (party slots, pins) to characters that are gone. Progress for
 // missing content is kept dormant in the save — republishing or restoring the
-// content brings it back untouched. Returns a report of what changed.
+// content brings it back untouched. Returns `changes` (things this call
+// actually did to the save) and `notices` (standing observations that changed
+// nothing), so callers can report the two honestly rather than as one count.
 export function syncSaveWithContent(content, state) {
   const report = [];
+  const notices = [];
   for (const def of content.characters) {
     if (!state.characters[def.id]) {
       state.characters[def.id] = {
@@ -135,7 +138,7 @@ export function syncSaveWithContent(content, state) {
   for (const id of Object.keys(state.characters)) {
     if (!content.characterById[id] && state.characters[id].owned) dormant++;
   }
-  if (dormant > 0) report.push(`${dormant} owned character${dormant > 1 ? 's are' : ' is'} dormant (their content is not in the game right now); progress is kept and returns if the content does.`);
+  if (dormant > 0) notices.push(`${dormant} owned character${dormant > 1 ? 's are' : ' is'} dormant (their content is not in the game right now); progress is kept and returns if the content does.`);
   for (const party of state.parties) {
     for (let i = 0; i < party.members.length; i++) {
       const m = party.members[i];
@@ -229,7 +232,7 @@ export function syncSaveWithContent(content, state) {
       report.push(`Cancelled ${expedition.name} because changed Training capacity could no longer hold its promised Field Supply.`);
     }
   }
-  return report;
+  return { changes: report, notices };
 }
 
 export function nodeState(state, nodeId) {

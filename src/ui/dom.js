@@ -25,7 +25,9 @@ export function h(spec, attrs, ...children) {
   return el;
 }
 
-function append(el, child) {
+// Appends children the way h() does: null/undefined/false are skipped rather
+// than stringified the way the native Element.append would.
+export function append(el, child) {
   if (child === null || child === undefined || child === false) return;
   if (Array.isArray(child)) { for (const c of child) append(el, c); return; }
   if (child instanceof Node) { el.appendChild(child); return; }

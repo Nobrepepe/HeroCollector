@@ -3,7 +3,7 @@
   "contentVersion": "1.0.0",
   "createdAt": "2026-07-24T22:17:19.710Z",
   "energy": 0,
-  "lastResetKey": "2026-08-06",
+  "lastResetKey": "2026-08-10",
   "rng": null,
   "characters": {
     "char_fern": {
@@ -235,7 +235,7 @@
     "char_ayame": {
       "owned": true,
       "stars": 2,
-      "shards": 11,
+      "shards": 15,
       "gearTier": 1,
       "slots": {
         "attire": false,
@@ -245,7 +245,7 @@
         "emblem": true,
         "signature": true
       },
-      "pity": false,
+      "pity": true,
       "skinUnlocked": false,
       "selectedSkinId": null
     },
@@ -269,15 +269,15 @@
     "char_tsubaki": {
       "owned": true,
       "stars": 1,
-      "shards": 2,
+      "shards": 6,
       "gearTier": 0,
       "slots": {
-        "attire": false,
-        "tool": false,
-        "accessory": false,
-        "keepsake": false,
+        "attire": true,
+        "tool": true,
+        "accessory": true,
+        "keepsake": true,
         "emblem": false,
-        "signature": false
+        "signature": true
       },
       "pity": false,
       "skinUnlocked": false,
@@ -354,7 +354,7 @@
     "char_sakura": {
       "owned": false,
       "stars": 0,
-      "shards": 0,
+      "shards": 4,
       "gearTier": 0,
       "slots": {
         "attire": false,
@@ -405,7 +405,7 @@
     "char_elian": {
       "owned": true,
       "stars": 1,
-      "shards": 6,
+      "shards": 10,
       "gearTier": 0,
       "slots": {
         "attire": false,
@@ -439,7 +439,7 @@
     "char_carol": {
       "owned": false,
       "stars": 0,
-      "shards": 2,
+      "shards": 6,
       "gearTier": 0,
       "slots": {
         "attire": false,
@@ -449,7 +449,7 @@
         "emblem": false,
         "signature": false
       },
-      "pity": true,
+      "pity": false,
       "skinUnlocked": false,
       "selectedSkinId": null
     },
@@ -1323,19 +1323,19 @@
   },
   "inventory": {
     "materials": {
-      "mat_fiber_basic": 4,
-      "mat_metal_basic": 24,
-      "mat_compound_basic": 3,
+      "mat_fiber_basic": 1,
+      "mat_metal_basic": 32,
       "mat_mechanism_improved": 6,
-      "mat_essence_basic": 7,
+      "mat_essence_basic": 4,
       "mat_essence_improved": 6,
-      "mat_mineral_basic": 1
+      "mat_mechanism_basic": 1,
+      "mat_mineral_basic": 3
     },
     "components": {},
     "resources": {
-      "intelligence": 5,
+      "intelligence": 8,
       "clan_seals": 4,
-      "renown": 34,
+      "renown": 64,
       "arcane_sigils": 30,
       "field_supply": 0
     }
@@ -1459,7 +1459,7 @@
       "cleared": true,
       "firstClearClaimed": true,
       "objectiveClaimed": false,
-      "attemptsToday": 0
+      "attemptsToday": 5
     },
     "main_11": {
       "cleared": true,
@@ -1483,7 +1483,7 @@
       "cleared": true,
       "firstClearClaimed": true,
       "objectiveClaimed": false,
-      "attemptsToday": 1
+      "attemptsToday": 0
     }
   },
   "parties": [
@@ -1569,6 +1569,26 @@
     "farmingResults": "full"
   },
   "progressLog": [
+    {
+      "at": "2026-08-10T08:13:04.599Z",
+      "text": "Tsubaki equipped Sake-Stained Field Garb (+10 Power)"
+    },
+    {
+      "at": "2026-08-10T08:02:19.038Z",
+      "text": "Tsubaki equipped Open-Gates Sensor Tags (+10 Power)"
+    },
+    {
+      "at": "2026-08-10T07:51:10.981Z",
+      "text": "Tsubaki equipped Apothecary Clarity Pills (+10 Power)"
+    },
+    {
+      "at": "2026-08-10T07:50:29.131Z",
+      "text": "Tsubaki equipped One Minute of Perfect Silence (+10 Power)"
+    },
+    {
+      "at": "2026-08-10T07:49:33.022Z",
+      "text": "Tsubaki equipped Ever-Full Sake Gourd (+10 Power)"
+    },
     {
       "at": "2026-08-06T11:27:11.301Z",
       "text": "Mei equipped Silver Killing Threads (+10 Power)"
@@ -1668,481 +1688,16 @@
     {
       "at": "2026-08-03T13:17:16.619Z",
       "text": "Ashley promoted to 2 Stars (+150 Power)"
-    },
-    {
-      "at": "2026-08-02T13:21:45.095Z",
-      "text": "Ashley equipped Singe-Hem First-Year Uniform (+10 Power)"
-    },
-    {
-      "at": "2026-08-01T14:56:30.504Z",
-      "text": "Ashley equipped First-Year Flame Crest (+10 Power)"
-    },
-    {
-      "at": "2026-08-01T14:55:34.798Z",
-      "text": "First clear: The Open Gates (first-clear rewards claimed)"
-    },
-    {
-      "at": "2026-08-01T14:55:34.798Z",
-      "text": "Frontier Momentum returned 10 Energy after the first clear of The Open Gates."
-    },
-    {
-      "at": "2026-08-01T14:55:21.231Z",
-      "text": "First clear: The Hedge That Walked Away (first-clear rewards claimed)"
     }
   ],
   "lastResetSummary": {
-    "days": 1,
-    "energyGained": 120,
-    "energy": 120,
+    "days": 4,
+    "energyGained": 240,
+    "energy": 240,
     "attemptsReset": true,
     "construction": [],
     "production": [],
     "expeditions": [
-      {
-        "id": "exp_offer_8_0_ufdf3x",
-        "offerId": "offer_8_0_ufdf3x",
-        "templateId": "exp_template_1",
-        "name": "Work Beyond the Gate",
-        "description": "A measured route with a useful answer waiting at its end.",
-        "world": null,
-        "launchDay": 8,
-        "returnDay": 9,
-        "duration": 1,
-        "party": [
-          "char_elian",
-          "char_mei"
-        ],
-        "snapshot": [
-          {
-            "id": "char_elian",
-            "power": 1150,
-            "stars": 1,
-            "world": "world_magic_academy",
-            "archetype": "achiever",
-            "tags": [
-              "faction_rulebook_wildcard"
-            ]
-          },
-          {
-            "id": "char_mei",
-            "power": 1175,
-            "stars": 1,
-            "world": "world_hidden_village",
-            "archetype": "rebel",
-            "tags": [
-              "faction_hollow_masks"
-            ]
-          }
-        ],
-        "tier": "exceptional",
-        "optionalMet": true,
-        "rewards": [
-          {
-            "kind": "resource",
-            "id": "field_supply",
-            "qty": 1,
-            "fixed": true
-          },
-          {
-            "kind": "material",
-            "id": "mat_metal_basic",
-            "min": 4,
-            "max": 8,
-            "qty": 10
-          },
-          {
-            "kind": "resource",
-            "id": "intelligence",
-            "min": 1,
-            "max": 1,
-            "qty": 1
-          }
-        ],
-        "fixedRewards": [
-          {
-            "kind": "resource",
-            "id": "field_supply",
-            "qty": 1,
-            "fixed": true
-          }
-        ],
-        "offerKind": "supply",
-        "rareReward": null,
-        "rareRevealed": false,
-        "sourceOffer": {
-          "id": "offer_8_0_ufdf3x",
-          "templateId": "exp_template_1",
-          "name": "Work Beyond the Gate",
-          "description": "A measured route with a useful answer waiting at its end.",
-          "world": null,
-          "duration": 1,
-          "partySize": 2,
-          "requirements": [
-            {
-              "type": "party_size",
-              "count": 2,
-              "text": "Send 2 characters."
-            },
-            {
-              "id": "req_two_worlds",
-              "type": "distinct_worlds",
-              "count": 2,
-              "text": "Bring knowledge from two worlds."
-            }
-          ],
-          "optional": {
-            "id": "opt_two_worlds",
-            "type": "distinct_worlds",
-            "count": 2,
-            "text": "Bring two different worlds."
-          },
-          "recommendedPower": 2236,
-          "offerKind": "supply",
-          "baseRewards": [
-            {
-              "kind": "material",
-              "id": "mat_metal_basic",
-              "min": 4,
-              "max": 8,
-              "qty": 7
-            },
-            {
-              "kind": "resource",
-              "id": "intelligence",
-              "min": 1,
-              "max": 1,
-              "qty": 1
-            }
-          ],
-          "fixedRewards": [
-            {
-              "kind": "resource",
-              "id": "field_supply",
-              "qty": 1,
-              "fixed": true
-            }
-          ],
-          "rareReward": null,
-          "rareRevealed": false,
-          "rareRoll": 4983,
-          "pinned": false
-        },
-        "report": "An optional trail opened along the way, and the party followed it well.",
-        "acknowledged": false
-      },
-      {
-        "id": "exp_offer_8_3_q20f8y",
-        "offerId": "offer_8_3_q20f8y",
-        "templateId": "exp_template_7",
-        "name": "Work Beyond the Gate 7",
-        "description": "The work asks for breadth rather than battle.",
-        "world": null,
-        "launchDay": 8,
-        "returnDay": 9,
-        "duration": 1,
-        "party": [
-          "char_suzume",
-          "char_hoshi"
-        ],
-        "snapshot": [
-          {
-            "id": "char_suzume",
-            "power": 1425,
-            "stars": 2,
-            "world": "world_hidden_village",
-            "archetype": "achiever",
-            "tags": [
-              "faction_village_shadows"
-            ]
-          },
-          {
-            "id": "char_hoshi",
-            "power": 1185,
-            "stars": 1,
-            "world": "world_hidden_village",
-            "archetype": "caretaker",
-            "tags": [
-              "faction_spiritwardens"
-            ]
-          }
-        ],
-        "tier": "successful",
-        "optionalMet": false,
-        "rewards": [
-          {
-            "kind": "material",
-            "id": "mat_metal_basic",
-            "min": 4,
-            "max": 8,
-            "qty": 5
-          },
-          {
-            "kind": "resource",
-            "id": "intelligence",
-            "min": 1,
-            "max": 1,
-            "qty": 1
-          }
-        ],
-        "fixedRewards": [],
-        "offerKind": "standard",
-        "rareReward": null,
-        "rareRevealed": false,
-        "sourceOffer": {
-          "id": "offer_8_3_q20f8y",
-          "templateId": "exp_template_7",
-          "name": "Work Beyond the Gate 7",
-          "description": "The work asks for breadth rather than battle.",
-          "world": null,
-          "duration": 1,
-          "partySize": 2,
-          "requirements": [
-            {
-              "type": "party_size",
-              "count": 2,
-              "text": "Send 2 characters."
-            },
-            {
-              "id": "req_same_world",
-              "type": "same_world",
-              "count": 2,
-              "text": "Send two characters from the same world."
-            }
-          ],
-          "optional": {
-            "id": "opt_star",
-            "type": "star_character",
-            "stars": 3,
-            "count": 1,
-            "text": "Include someone at three stars or above."
-          },
-          "recommendedPower": 2447,
-          "offerKind": "standard",
-          "baseRewards": [
-            {
-              "kind": "material",
-              "id": "mat_metal_basic",
-              "min": 4,
-              "max": 8,
-              "qty": 4
-            },
-            {
-              "kind": "resource",
-              "id": "intelligence",
-              "min": 1,
-              "max": 1,
-              "qty": 1
-            }
-          ],
-          "fixedRewards": [],
-          "rareReward": null,
-          "rareRevealed": false,
-          "rareRoll": 9892,
-          "pinned": false
-        },
-        "report": "The recommendation proved sound, and the return was clean.",
-        "acknowledged": false
-      }
-    ],
-    "crisis": null,
-    "acknowledged": true
-  },
-  "ui": {
-    "roster": {
-      "world": "all",
-      "archetype": "all",
-      "faction": "all",
-      "ownership": "all",
-      "sort": "power",
-      "direction": "desc",
-      "collectionDensity": "compact"
-    },
-    "campaignId": "main",
-    "archiveCollapsed": {
-      "worlds": {},
-      "collections": {}
-    },
-    "nodePartyById": {
-      "wc_world_hidden_village_1": 0
-    }
-  },
-  "dayNumber": 9,
-  "expeditions": {
-    "board": {
-      "day": 9,
-      "seed": 9,
-      "offers": [
-        {
-          "id": "offer_9_1_1113kji",
-          "templateId": "exp_template_11",
-          "name": "Work Beyond the Gate 11",
-          "description": "The work asks for breadth rather than battle.",
-          "world": "world_hidden_village",
-          "duration": 1,
-          "partySize": 3,
-          "requirements": [
-            {
-              "type": "party_size",
-              "count": 3,
-              "text": "Send 3 characters."
-            },
-            {
-              "id": "req_two_worlds",
-              "type": "distinct_worlds",
-              "count": 2,
-              "text": "Bring knowledge from two worlds."
-            }
-          ],
-          "optional": {
-            "id": "opt_star",
-            "type": "star_character",
-            "stars": 3,
-            "count": 1,
-            "text": "Include someone at three stars or above."
-          },
-          "recommendedPower": 3924,
-          "offerKind": "standard",
-          "baseRewards": [
-            {
-              "kind": "resource",
-              "id": "renown",
-              "min": 18,
-              "max": 28,
-              "qty": 21
-            },
-            {
-              "kind": "shards",
-              "characterId": "char_kaguya",
-              "qty": 3
-            }
-          ],
-          "fixedRewards": [],
-          "rareReward": {
-            "kind": "resource",
-            "id": "intelligence",
-            "qty": 1,
-            "chanceBp": 7000
-          },
-          "rareRevealed": false,
-          "rareRoll": 7843,
-          "pinned": false
-        },
-        {
-          "id": "offer_9_2_1ussr4f",
-          "templateId": "exp_template_13",
-          "name": "Quiet Roads, Useful Rumours 13",
-          "description": "The work asks for breadth rather than battle.",
-          "world": null,
-          "duration": 1,
-          "partySize": 2,
-          "requirements": [
-            {
-              "type": "party_size",
-              "count": 2,
-              "text": "Send 2 characters."
-            },
-            {
-              "id": "req_two_worlds",
-              "type": "distinct_worlds",
-              "count": 2,
-              "text": "Bring knowledge from two worlds."
-            },
-            {
-              "id": "req_stars",
-              "type": "combined_stars",
-              "count": 4,
-              "text": "Bring at least four combined stars."
-            }
-          ],
-          "optional": {
-            "id": "opt_two_arch",
-            "type": "distinct_archetypes",
-            "count": 2,
-            "text": "Bring two different archetypes."
-          },
-          "recommendedPower": 2393,
-          "offerKind": "standard",
-          "baseRewards": [
-            {
-              "kind": "material",
-              "id": "mat_metal_basic",
-              "min": 4,
-              "max": 8,
-              "qty": 5
-            },
-            {
-              "kind": "resource",
-              "id": "intelligence",
-              "min": 1,
-              "max": 1,
-              "qty": 1
-            }
-          ],
-          "fixedRewards": [],
-          "rareReward": null,
-          "rareRevealed": false,
-          "rareRoll": 1838,
-          "pinned": false
-        },
-        {
-          "id": "offer_9_4_1uqigd0",
-          "templateId": "exp_template_12",
-          "name": "Quiet Roads, Useful Rumours 12",
-          "description": "A measured route with a useful answer waiting at its end.",
-          "world": "world_magic_academy",
-          "duration": 1,
-          "partySize": 4,
-          "requirements": [
-            {
-              "type": "party_size",
-              "count": 4,
-              "text": "Send 4 characters."
-            },
-            {
-              "id": "req_two_arch",
-              "type": "distinct_archetypes",
-              "count": 2,
-              "text": "Bring two different archetypes."
-            }
-          ],
-          "optional": {
-            "id": "opt_two_worlds",
-            "type": "distinct_worlds",
-            "count": 2,
-            "text": "Bring two different worlds."
-          },
-          "recommendedPower": 5632,
-          "offerKind": "standard",
-          "baseRewards": [
-            {
-              "kind": "resource",
-              "id": "renown",
-              "min": 70,
-              "max": 95,
-              "qty": 82
-            },
-            {
-              "kind": "resource",
-              "id": "@associated_world_asset",
-              "min": 14,
-              "max": 20,
-              "qty": 18
-            }
-          ],
-          "fixedRewards": [],
-          "rareReward": {
-            "kind": "resource",
-            "id": "intelligence",
-            "qty": 2,
-            "chanceBp": 8000
-          },
-          "rareRevealed": false,
-          "rareRoll": 6514,
-          "pinned": false
-        }
-      ]
-    },
-    "active": [
       {
         "id": "exp_offer_8_1_1ailk5k",
         "offerId": "offer_8_1_1ailk5k",
@@ -2280,7 +1835,9 @@
           "rareRevealed": false,
           "rareRoll": 4337,
           "pinned": false
-        }
+        },
+        "report": "The party found more than the route promised and brought the rare lead home.",
+        "acknowledged": false
       },
       {
         "id": "exp_offer_9_0_18k3smd",
@@ -2321,6 +1878,12 @@
         "tier": "exceptional",
         "optionalMet": true,
         "rewards": [
+          {
+            "kind": "resource",
+            "id": "field_supply",
+            "qty": 1,
+            "fixed": true
+          },
           {
             "kind": "material",
             "id": "mat_metal_basic",
@@ -2404,7 +1967,9 @@
           "rareRevealed": false,
           "rareRoll": 7934,
           "pinned": false
-        }
+        },
+        "report": "The party found more than the route promised and brought the rare lead home.",
+        "acknowledged": false
       },
       {
         "id": "exp_offer_9_3_1u6slhs",
@@ -2515,10 +2080,901 @@
           "rareRevealed": false,
           "rareRoll": 1283,
           "pinned": false
+        },
+        "report": "The plan held. The party returned ahead of the expected margin.",
+        "acknowledged": false
+      }
+    ],
+    "crisis": null,
+    "acknowledged": true
+  },
+  "ui": {
+    "roster": {
+      "world": "all",
+      "archetype": "all",
+      "faction": "all",
+      "ownership": "all",
+      "sort": "power",
+      "direction": "desc",
+      "collectionDensity": "gallery"
+    },
+    "campaignId": "main",
+    "archiveCollapsed": {
+      "worlds": {},
+      "collections": {}
+    },
+    "nodePartyById": {
+      "wc_world_hidden_village_1": 0
+    }
+  },
+  "dayNumber": 13,
+  "expeditions": {
+    "board": {
+      "day": 13,
+      "seed": 13,
+      "offers": [
+        {
+          "id": "offer_13_1_b0v5aq",
+          "templateId": "exp_template_3",
+          "name": "A Map Left Unfinished 3",
+          "description": "The work asks for breadth rather than battle.",
+          "world": "world_magic_academy",
+          "duration": 1,
+          "partySize": 4,
+          "requirements": [
+            {
+              "type": "party_size",
+              "count": 4,
+              "text": "Send 4 characters."
+            },
+            {
+              "id": "req_stars",
+              "type": "combined_stars",
+              "count": 4,
+              "text": "Bring at least four combined stars."
+            }
+          ],
+          "optional": {
+            "id": "opt_star",
+            "type": "star_character",
+            "stars": 3,
+            "count": 1,
+            "text": "Include someone at three stars or above."
+          },
+          "recommendedPower": 5661,
+          "offerKind": "standard",
+          "baseRewards": [
+            {
+              "kind": "material",
+              "id": "mat_metal_basic",
+              "min": 4,
+              "max": 8,
+              "qty": 8
+            },
+            {
+              "kind": "resource",
+              "id": "intelligence",
+              "min": 1,
+              "max": 1,
+              "qty": 1
+            }
+          ],
+          "fixedRewards": [],
+          "rareReward": null,
+          "rareRevealed": false,
+          "rareRoll": 4008,
+          "pinned": false
+        },
+        {
+          "id": "offer_13_2_xmcvsh",
+          "templateId": "exp_template_14",
+          "name": "Work Beyond the Gate 14",
+          "description": "A measured route with a useful answer waiting at its end.",
+          "world": "world_hidden_village",
+          "duration": 1,
+          "partySize": 3,
+          "requirements": [
+            {
+              "type": "party_size",
+              "count": 3,
+              "text": "Send 3 characters."
+            },
+            {
+              "id": "req_two_arch",
+              "type": "distinct_archetypes",
+              "count": 2,
+              "text": "Bring two different archetypes."
+            }
+          ],
+          "optional": {
+            "id": "opt_two_arch",
+            "type": "distinct_archetypes",
+            "count": 2,
+            "text": "Bring two different archetypes."
+          },
+          "recommendedPower": 3899,
+          "offerKind": "standard",
+          "baseRewards": [
+            {
+              "kind": "resource",
+              "id": "@associated_world_asset",
+              "min": 10,
+              "max": 16,
+              "qty": 16
+            },
+            {
+              "kind": "resource",
+              "id": "renown",
+              "min": 10,
+              "max": 15,
+              "qty": 12
+            }
+          ],
+          "fixedRewards": [],
+          "rareReward": null,
+          "rareRevealed": false,
+          "rareRoll": 5516,
+          "pinned": false
+        }
+      ]
+    },
+    "active": [
+      {
+        "id": "exp_offer_13_3_8103cs",
+        "offerId": "offer_13_3_8103cs",
+        "templateId": "exp_template_5",
+        "name": "A Map Left Unfinished 5",
+        "description": "The work asks for breadth rather than battle.",
+        "world": "world_hidden_village",
+        "launchDay": 13,
+        "returnDay": 15,
+        "duration": 2,
+        "party": [
+          "char_ayame",
+          "char_suzume",
+          "char_elian"
+        ],
+        "snapshot": [
+          {
+            "id": "char_ayame",
+            "power": 1449,
+            "stars": 2,
+            "world": "world_hidden_village",
+            "archetype": "leader",
+            "tags": [
+              "faction_spiritwardens"
+            ]
+          },
+          {
+            "id": "char_suzume",
+            "power": 1425,
+            "stars": 2,
+            "world": "world_hidden_village",
+            "archetype": "achiever",
+            "tags": [
+              "faction_village_shadows"
+            ]
+          },
+          {
+            "id": "char_elian",
+            "power": 1150,
+            "stars": 1,
+            "world": "world_magic_academy",
+            "archetype": "achiever",
+            "tags": [
+              "faction_rulebook_wildcard"
+            ]
+          }
+        ],
+        "tier": "completed",
+        "optionalMet": true,
+        "rewards": [
+          {
+            "kind": "resource",
+            "id": "renown",
+            "min": 18,
+            "max": 28,
+            "qty": 21
+          },
+          {
+            "kind": "shards",
+            "characterId": "char_ayame",
+            "qty": 2
+          }
+        ],
+        "fixedRewards": [],
+        "offerKind": "standard",
+        "rareReward": {
+          "kind": "resource",
+          "id": "intelligence",
+          "qty": 1,
+          "chanceBp": 7000
+        },
+        "rareRevealed": false,
+        "sourceOffer": {
+          "id": "offer_13_3_8103cs",
+          "templateId": "exp_template_5",
+          "name": "A Map Left Unfinished 5",
+          "description": "The work asks for breadth rather than battle.",
+          "world": "world_hidden_village",
+          "duration": 2,
+          "partySize": 3,
+          "requirements": [
+            {
+              "type": "party_size",
+              "count": 3,
+              "text": "Send 3 characters."
+            },
+            {
+              "id": "req_same_world",
+              "type": "same_world",
+              "count": 2,
+              "text": "Send two characters from the same world."
+            },
+            {
+              "id": "req_stars",
+              "type": "combined_stars",
+              "count": 4,
+              "text": "Bring at least four combined stars."
+            }
+          ],
+          "optional": {
+            "id": "opt_two_worlds",
+            "type": "distinct_worlds",
+            "count": 2,
+            "text": "Bring two different worlds."
+          },
+          "recommendedPower": 4102,
+          "offerKind": "standard",
+          "baseRewards": [
+            {
+              "kind": "resource",
+              "id": "renown",
+              "min": 18,
+              "max": 28,
+              "qty": 21
+            },
+            {
+              "kind": "shards",
+              "characterId": "char_ayame",
+              "qty": 2
+            }
+          ],
+          "fixedRewards": [],
+          "rareReward": {
+            "kind": "resource",
+            "id": "intelligence",
+            "qty": 1,
+            "chanceBp": 7000
+          },
+          "rareRevealed": false,
+          "rareRoll": 361,
+          "pinned": false
+        }
+      },
+      {
+        "id": "exp_offer_13_0_19azglu",
+        "offerId": "offer_13_0_19azglu",
+        "templateId": "exp_template_1",
+        "name": "Work Beyond the Gate",
+        "description": "The work asks for breadth rather than battle.",
+        "world": null,
+        "launchDay": 13,
+        "returnDay": 14,
+        "duration": 1,
+        "party": [
+          "char_ashley",
+          "char_tsubaki"
+        ],
+        "snapshot": [
+          {
+            "id": "char_ashley",
+            "power": 1400,
+            "stars": 2,
+            "world": "world_magic_academy",
+            "archetype": "freespirit",
+            "tags": [
+              "faction_spark_stone"
+            ]
+          },
+          {
+            "id": "char_tsubaki",
+            "power": 1205,
+            "stars": 1,
+            "world": "world_hidden_village",
+            "archetype": "freespirit",
+            "tags": [
+              "faction_village_shadows"
+            ]
+          }
+        ],
+        "tier": "exceptional",
+        "optionalMet": true,
+        "rewards": [
+          {
+            "kind": "material",
+            "id": "mat_metal_basic",
+            "min": 4,
+            "max": 8,
+            "qty": 12
+          },
+          {
+            "kind": "resource",
+            "id": "intelligence",
+            "min": 1,
+            "max": 1,
+            "qty": 1
+          }
+        ],
+        "fixedRewards": [
+          {
+            "kind": "resource",
+            "id": "field_supply",
+            "qty": 1,
+            "fixed": true
+          }
+        ],
+        "offerKind": "supply",
+        "rareReward": null,
+        "rareRevealed": false,
+        "sourceOffer": {
+          "id": "offer_13_0_19azglu",
+          "templateId": "exp_template_1",
+          "name": "Work Beyond the Gate",
+          "description": "The work asks for breadth rather than battle.",
+          "world": null,
+          "duration": 1,
+          "partySize": 2,
+          "requirements": [
+            {
+              "type": "party_size",
+              "count": 2,
+              "text": "Send 2 characters."
+            },
+            {
+              "id": "req_two_worlds",
+              "type": "distinct_worlds",
+              "count": 2,
+              "text": "Bring knowledge from two worlds."
+            }
+          ],
+          "optional": {
+            "id": "opt_two_worlds",
+            "type": "distinct_worlds",
+            "count": 2,
+            "text": "Bring two different worlds."
+          },
+          "recommendedPower": 2485,
+          "offerKind": "supply",
+          "baseRewards": [
+            {
+              "kind": "material",
+              "id": "mat_metal_basic",
+              "min": 4,
+              "max": 8,
+              "qty": 8
+            },
+            {
+              "kind": "resource",
+              "id": "intelligence",
+              "min": 1,
+              "max": 1,
+              "qty": 1
+            }
+          ],
+          "fixedRewards": [
+            {
+              "kind": "resource",
+              "id": "field_supply",
+              "qty": 1,
+              "fixed": true
+            }
+          ],
+          "rareReward": null,
+          "rareRevealed": false,
+          "rareRoll": 3514,
+          "pinned": false
+        }
+      },
+      {
+        "id": "exp_offer_13_4_pbh9xz",
+        "offerId": "offer_13_4_pbh9xz",
+        "templateId": "exp_template_4",
+        "name": "Quiet Roads, Useful Rumours 4",
+        "description": "The work asks for breadth rather than battle.",
+        "world": null,
+        "launchDay": 13,
+        "returnDay": 14,
+        "duration": 1,
+        "party": [
+          "char_bridget",
+          "char_mei"
+        ],
+        "snapshot": [
+          {
+            "id": "char_bridget",
+            "power": 1300,
+            "stars": 2,
+            "world": "world_magic_academy",
+            "archetype": "caretaker",
+            "tags": [
+              "faction_spark_stone"
+            ]
+          },
+          {
+            "id": "char_mei",
+            "power": 1195,
+            "stars": 1,
+            "world": "world_hidden_village",
+            "archetype": "rebel",
+            "tags": [
+              "faction_hollow_masks"
+            ]
+          }
+        ],
+        "tier": "successful",
+        "optionalMet": false,
+        "rewards": [
+          {
+            "kind": "material",
+            "id": "mat_metal_basic",
+            "min": 4,
+            "max": 8,
+            "qty": 10
+          },
+          {
+            "kind": "resource",
+            "id": "intelligence",
+            "min": 1,
+            "max": 1,
+            "qty": 1
+          }
+        ],
+        "fixedRewards": [],
+        "offerKind": "standard",
+        "rareReward": null,
+        "rareRevealed": false,
+        "sourceOffer": {
+          "id": "offer_13_4_pbh9xz",
+          "templateId": "exp_template_4",
+          "name": "Quiet Roads, Useful Rumours 4",
+          "description": "The work asks for breadth rather than battle.",
+          "world": null,
+          "duration": 1,
+          "partySize": 2,
+          "requirements": [
+            {
+              "type": "party_size",
+              "count": 2,
+              "text": "Send 2 characters."
+            },
+            {
+              "id": "req_two_arch",
+              "type": "distinct_archetypes",
+              "count": 2,
+              "text": "Bring two different archetypes."
+            }
+          ],
+          "optional": {
+            "id": "opt_power",
+            "type": "power_over_recommended",
+            "percentBp": 1000,
+            "count": 1,
+            "text": "Exceed the recommendation by ten percent."
+          },
+          "recommendedPower": 2306,
+          "offerKind": "standard",
+          "baseRewards": [
+            {
+              "kind": "material",
+              "id": "mat_metal_basic",
+              "min": 4,
+              "max": 8,
+              "qty": 8
+            },
+            {
+              "kind": "resource",
+              "id": "intelligence",
+              "min": 1,
+              "max": 1,
+              "qty": 1
+            }
+          ],
+          "fixedRewards": [],
+          "rareReward": null,
+          "rareRevealed": false,
+          "rareRoll": 4298,
+          "pinned": false
         }
       }
     ],
     "reports": [
+      {
+        "id": "exp_offer_9_3_1u6slhs",
+        "offerId": "offer_9_3_1u6slhs",
+        "templateId": "exp_template_4",
+        "name": "Work Beyond the Gate 4",
+        "description": "The work asks for breadth rather than battle.",
+        "world": null,
+        "launchDay": 9,
+        "returnDay": 10,
+        "duration": 1,
+        "party": [
+          "char_mei",
+          "char_hoshi"
+        ],
+        "snapshot": [
+          {
+            "id": "char_mei",
+            "power": 1195,
+            "stars": 1,
+            "world": "world_hidden_village",
+            "archetype": "rebel",
+            "tags": [
+              "faction_hollow_masks"
+            ]
+          },
+          {
+            "id": "char_hoshi",
+            "power": 1185,
+            "stars": 1,
+            "world": "world_hidden_village",
+            "archetype": "caretaker",
+            "tags": [
+              "faction_spiritwardens"
+            ]
+          }
+        ],
+        "tier": "successful",
+        "optionalMet": false,
+        "rewards": [
+          {
+            "kind": "material",
+            "id": "mat_metal_basic",
+            "min": 4,
+            "max": 8,
+            "qty": 5
+          },
+          {
+            "kind": "resource",
+            "id": "intelligence",
+            "min": 1,
+            "max": 1,
+            "qty": 1
+          }
+        ],
+        "fixedRewards": [],
+        "offerKind": "standard",
+        "rareReward": null,
+        "rareRevealed": false,
+        "sourceOffer": {
+          "id": "offer_9_3_1u6slhs",
+          "templateId": "exp_template_4",
+          "name": "Work Beyond the Gate 4",
+          "description": "The work asks for breadth rather than battle.",
+          "world": null,
+          "duration": 1,
+          "partySize": 2,
+          "requirements": [
+            {
+              "type": "party_size",
+              "count": 2,
+              "text": "Send 2 characters."
+            },
+            {
+              "id": "req_two_arch",
+              "type": "distinct_archetypes",
+              "count": 2,
+              "text": "Bring two different archetypes."
+            }
+          ],
+          "optional": {
+            "id": "opt_power",
+            "type": "power_over_recommended",
+            "percentBp": 1000,
+            "count": 1,
+            "text": "Exceed the recommendation by ten percent."
+          },
+          "recommendedPower": 2323,
+          "offerKind": "standard",
+          "baseRewards": [
+            {
+              "kind": "material",
+              "id": "mat_metal_basic",
+              "min": 4,
+              "max": 8,
+              "qty": 4
+            },
+            {
+              "kind": "resource",
+              "id": "intelligence",
+              "min": 1,
+              "max": 1,
+              "qty": 1
+            }
+          ],
+          "fixedRewards": [],
+          "rareReward": null,
+          "rareRevealed": false,
+          "rareRoll": 1283,
+          "pinned": false
+        },
+        "report": "The plan held. The party returned ahead of the expected margin.",
+        "acknowledged": false
+      },
+      {
+        "id": "exp_offer_9_0_18k3smd",
+        "offerId": "offer_9_0_18k3smd",
+        "templateId": "exp_template_1",
+        "name": "Quiet Roads, Useful Rumours",
+        "description": "A measured route with a useful answer waiting at its end.",
+        "world": null,
+        "launchDay": 9,
+        "returnDay": 10,
+        "duration": 1,
+        "party": [
+          "char_suzume",
+          "char_elian"
+        ],
+        "snapshot": [
+          {
+            "id": "char_suzume",
+            "power": 1425,
+            "stars": 2,
+            "world": "world_hidden_village",
+            "archetype": "achiever",
+            "tags": [
+              "faction_village_shadows"
+            ]
+          },
+          {
+            "id": "char_elian",
+            "power": 1150,
+            "stars": 1,
+            "world": "world_magic_academy",
+            "archetype": "achiever",
+            "tags": [
+              "faction_rulebook_wildcard"
+            ]
+          }
+        ],
+        "tier": "exceptional",
+        "optionalMet": true,
+        "rewards": [
+          {
+            "kind": "resource",
+            "id": "field_supply",
+            "qty": 1,
+            "fixed": true
+          },
+          {
+            "kind": "material",
+            "id": "mat_metal_basic",
+            "min": 4,
+            "max": 8,
+            "qty": 7
+          },
+          {
+            "kind": "resource",
+            "id": "intelligence",
+            "min": 1,
+            "max": 1,
+            "qty": 1
+          }
+        ],
+        "fixedRewards": [
+          {
+            "kind": "resource",
+            "id": "field_supply",
+            "qty": 1,
+            "fixed": true
+          }
+        ],
+        "offerKind": "supply",
+        "rareReward": null,
+        "rareRevealed": false,
+        "sourceOffer": {
+          "id": "offer_9_0_18k3smd",
+          "templateId": "exp_template_1",
+          "name": "Quiet Roads, Useful Rumours",
+          "description": "A measured route with a useful answer waiting at its end.",
+          "world": null,
+          "duration": 1,
+          "partySize": 2,
+          "requirements": [
+            {
+              "type": "party_size",
+              "count": 2,
+              "text": "Send 2 characters."
+            },
+            {
+              "id": "req_two_worlds",
+              "type": "distinct_worlds",
+              "count": 2,
+              "text": "Bring knowledge from two worlds."
+            }
+          ],
+          "optional": {
+            "id": "opt_two_worlds",
+            "type": "distinct_worlds",
+            "count": 2,
+            "text": "Bring two different worlds."
+          },
+          "recommendedPower": 2522,
+          "offerKind": "supply",
+          "baseRewards": [
+            {
+              "kind": "material",
+              "id": "mat_metal_basic",
+              "min": 4,
+              "max": 8,
+              "qty": 5
+            },
+            {
+              "kind": "resource",
+              "id": "intelligence",
+              "min": 1,
+              "max": 1,
+              "qty": 1
+            }
+          ],
+          "fixedRewards": [
+            {
+              "kind": "resource",
+              "id": "field_supply",
+              "qty": 1,
+              "fixed": true
+            }
+          ],
+          "rareReward": null,
+          "rareRevealed": false,
+          "rareRoll": 7934,
+          "pinned": false
+        },
+        "report": "The party found more than the route promised and brought the rare lead home.",
+        "acknowledged": false
+      },
+      {
+        "id": "exp_offer_8_1_1ailk5k",
+        "offerId": "offer_8_1_1ailk5k",
+        "templateId": "exp_template_5",
+        "name": "Quiet Roads, Useful Rumours 5",
+        "description": "A measured route with a useful answer waiting at its end.",
+        "world": "world_hidden_village",
+        "launchDay": 8,
+        "returnDay": 10,
+        "duration": 2,
+        "party": [
+          "char_ayame",
+          "char_ashley",
+          "char_bridget"
+        ],
+        "snapshot": [
+          {
+            "id": "char_ayame",
+            "power": 1449,
+            "stars": 2,
+            "world": "world_hidden_village",
+            "archetype": "leader",
+            "tags": [
+              "faction_spiritwardens"
+            ]
+          },
+          {
+            "id": "char_ashley",
+            "power": 1400,
+            "stars": 2,
+            "world": "world_magic_academy",
+            "archetype": "freespirit",
+            "tags": [
+              "faction_spark_stone"
+            ]
+          },
+          {
+            "id": "char_bridget",
+            "power": 1300,
+            "stars": 2,
+            "world": "world_magic_academy",
+            "archetype": "caretaker",
+            "tags": [
+              "faction_spark_stone"
+            ]
+          }
+        ],
+        "tier": "exceptional",
+        "optionalMet": true,
+        "rewards": [
+          {
+            "kind": "resource",
+            "id": "renown",
+            "min": 18,
+            "max": 28,
+            "qty": 30
+          },
+          {
+            "kind": "shards",
+            "characterId": "char_sakura",
+            "qty": 4
+          },
+          {
+            "kind": "resource",
+            "id": "intelligence",
+            "qty": 1,
+            "chanceBp": 7000
+          }
+        ],
+        "fixedRewards": [],
+        "offerKind": "standard",
+        "rareReward": {
+          "kind": "resource",
+          "id": "intelligence",
+          "qty": 1,
+          "chanceBp": 7000
+        },
+        "rareRevealed": false,
+        "sourceOffer": {
+          "id": "offer_8_1_1ailk5k",
+          "templateId": "exp_template_5",
+          "name": "Quiet Roads, Useful Rumours 5",
+          "description": "A measured route with a useful answer waiting at its end.",
+          "world": "world_hidden_village",
+          "duration": 2,
+          "partySize": 3,
+          "requirements": [
+            {
+              "type": "party_size",
+              "count": 3,
+              "text": "Send 3 characters."
+            },
+            {
+              "id": "req_same_world",
+              "type": "same_world",
+              "count": 2,
+              "text": "Send two characters from the same world."
+            },
+            {
+              "id": "req_stars",
+              "type": "combined_stars",
+              "count": 4,
+              "text": "Bring at least four combined stars."
+            }
+          ],
+          "optional": {
+            "id": "opt_two_worlds",
+            "type": "distinct_worlds",
+            "count": 2,
+            "text": "Bring two different worlds."
+          },
+          "recommendedPower": 3967,
+          "offerKind": "standard",
+          "baseRewards": [
+            {
+              "kind": "resource",
+              "id": "renown",
+              "min": 18,
+              "max": 28,
+              "qty": 20
+            },
+            {
+              "kind": "shards",
+              "characterId": "char_sakura",
+              "qty": 3
+            }
+          ],
+          "fixedRewards": [],
+          "rareReward": {
+            "kind": "resource",
+            "id": "intelligence",
+            "qty": 1,
+            "chanceBp": 7000
+          },
+          "rareRevealed": false,
+          "rareRoll": 4337,
+          "pinned": false
+        },
+        "report": "The party found more than the route promised and brought the rare lead home.",
+        "acknowledged": false
+      },
       {
         "id": "exp_offer_8_3_q20f8y",
         "offerId": "offer_8_3_q20f8y",
@@ -3663,7 +4119,7 @@
       }
     ],
     "daily": {
-      "day": 9,
+      "day": 13,
       "freeRerolls": 1,
       "freePins": 0,
       "freeRerollsUsed": 0,
@@ -3718,9 +4174,9 @@
   },
   "energySystems": {
     "daily": {
-      "day": 9,
+      "day": 13,
       "suppliesUsed": 1,
-      "momentumRefunded": 16
+      "momentumRefunded": 0
     }
   },
   "crises": {
