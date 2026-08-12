@@ -151,6 +151,13 @@ export function applyHqProduction(content, state) {
   return produced;
 }
 
+// World Asset an Operations path adds to that world's routes, by level.
+const OPERATIONS_WORLD_ASSET_BP = [0, 500, 1000, 1500];
+
+export function operationsWorldAssetBp(level) {
+  return OPERATIONS_WORLD_ASSET_BP[level] ?? 0;
+}
+
 export function hqExpeditionModifiers(content, state, worldId) {
   const world = content.worldById[worldId];
   const operations = world?.hq?.facilities.find(f => f.category === 'operations');
@@ -159,7 +166,7 @@ export function hqExpeditionModifiers(content, state, worldId) {
   const staff = hqState(state, worldId).staff[operations.id] ?? [];
   const scale = staffScaleBp(content, state, worldId);
   return {
-    worldAssetBp: ([0, 500, 1000, 1500][level] ?? 0)
+    worldAssetBp: operationsWorldAssetBp(level)
       + Math.floor(staff.filter(id => content.characterById[id]?.archetype === 'caretaker').length * 500 * scale / 10000),
     renownBp: Math.floor(staff.filter(id => content.characterById[id]?.archetype === 'leader').length * 500 * scale / 10000),
     rareChanceBp: Math.floor(staff.filter(id => content.characterById[id]?.archetype === 'free_spirit').length * 500 * scale / 10000)

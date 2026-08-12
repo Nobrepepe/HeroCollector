@@ -4,19 +4,23 @@ import { rankMaterialSources } from '../core/sources.js';
 import { sourceRow } from './find-sources.js';
 import { compactResult } from './results.js';
 import { campaignLabel, selectorWorldName } from './shared.js';
+
 import { sceneImage } from './presentation.js';
 
 export function renderCampaign(store, root, arg) {
   const { content, state } = store;
-  const tabs = [
-    ['main', 'Main'], ['shadow', 'Shadow'],
-    ...content.worlds.map(world => [world.campaignId, selectorWorldName(world)])
-  ];
-  const allowed = new Set(tabs.map(([id]) => id));
+  // Journey holds the two campaigns that belong to no single world. A world's
+  // own chapters are reached through that world's hub, so they render here
+  // with a way back to it instead of a tab beside Main and Shadow.
+  const tabs = [['main', 'Main'], ['shadow', 'Shadow']];
+  const shared = new Set(tabs.map(([id]) => id));
   const [argCampaign, argChapter] = (arg ?? '').split('/');
-  if (allowed.has(argCampaign)) state.ui.campaignId = argCampaign;
-  if (!allowed.has(state.ui.campaignId)) state.ui.campaignId = 'main';
-  const current = state.ui.campaignId;
+  const worldCampaign = content.worlds.find(candidate => candidate.campaignId === argCampaign) ?? null;
+  if (!worldCampaign) {
+    if (shared.has(argCampaign)) state.ui.campaignId = argCampaign;
+    if (!shared.has(state.ui.campaignId)) state.ui.campaignId = 'main';
+  }
+  const current = worldCampaign ? worldCampaign.campaignId : state.ui.campaignId;
   const nodes = content.nodesByCampaign[current] ?? [];
   const chapters = [...new Set(nodes.map(node => node.chapter))].sort((a, b) => a - b);
   const remembered = store.ui.journeyChapterByCampaign ??= {};
@@ -42,17 +46,23 @@ export function renderCampaign(store, root, arg) {
     h('div.eyebrow', `${campaignName(content, current)} · chapter ${chapter} of ${chapters.length || 1}`),
     h('h1.display-s', chapterTitle(chapterNodes, world, current, chapter)),
     h('p', chapterDescription(world, current, chapter)));
-  if (world && state.crises?.active?.worldId === world.id) header.appendChild(h('p.warn', 'Crisis today · no Energy is required. ',
-    h('button.link', { onclick: () => store.go('#/crisis') }, 'Review the response →')));
-  const tabBar = h('div.tab-bar');
-  for (const [id, label] of tabs) tabBar.appendChild(h('button.tab-btn' + (id === current ? '.active' : ''), {
-    onclick: () => {
-      const destination = remembered[id] ?? 1;
-      state.ui.campaignId = id;
-      store.save().then(() => store.go(`#/campaign/${id}/${destination}`));
-    }
-  }, label));
-  header.appendChild(tabBar);
+  // A Crisis is announced and answered from its world hub, never from a
+  // chapter path that happens to share its world.
+  if (worldCampaign) {
+    header.appendChild(h('p.journey-worlds-link',
+      h('button.link', { onclick: () => store.go(`#/worlds/${worldCampaign.id}`) },
+        `← ${worldCampaign.displayName}`)));
+  } else {
+    const tabBar = h('div.tab-bar');
+    for (const [id, label] of tabs) tabBar.appendChild(h('button.tab-btn' + (id === current ? '.active' : ''), {
+      onclick: () => {
+        const destination = remembered[id] ?? 1;
+        state.ui.campaignId = id;
+        store.save().then(() => store.go(`#/campaign/${id}/${destination}`));
+      }
+    }, label));
+    header.appendChild(tabBar);
+  }
   page.appendChild(header);
   if (store.ui.lastSourceResult) page.appendChild(compactResult(store, store.ui.lastSourceResult));
 

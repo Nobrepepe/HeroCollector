@@ -80,8 +80,9 @@ export function renderSettings(store, root) {
         const check = validateSave(content, migrated);
         if (!check.ok) {
           openModal((modal, close) => {
-            modal.appendChild(h('h2', 'Save import blocked'));
-            modal.appendChild(h('p.bad.small', 'The migrated save is malformed. The active save was left unchanged.'));
+            modal.appendChild(h('div.eyebrow', 'Save import'));
+            modal.appendChild(h('h2', 'That save could not be read.'));
+            modal.appendChild(h('p.bad', 'The migrated save is malformed, so the active save was left exactly as it was.'));
             modal.appendChild(h('ul.reasons', check.errors.slice(0, 10).map(e => h('li', e))));
             modal.appendChild(h('div.modal-actions', h('button.btn', { onclick: close }, 'Close')));
           });
@@ -92,13 +93,14 @@ export function renderSettings(store, root) {
     }, 'Import save…'),
     h('button.btn.danger', {
       onclick: () => openModal((modal, close) => {
-        modal.appendChild(h('h2', 'Reset to a clean save?'));
-        modal.appendChild(h('p.warn', 'All progress will be replaced by a fresh starting state. The previous save remains in the rolling backup until the next autosave.'));
-        modal.appendChild(h('div', { style: { display: 'flex', gap: '8px' } },
+        modal.appendChild(h('div.eyebrow', 'Saved game'));
+        modal.appendChild(h('h2', 'Start over from a clean save?'));
+        modal.appendChild(h('p', 'All progress is replaced by a fresh starting state. The previous save stays in the rolling backup until the next autosave.'));
+        modal.appendChild(h('div.modal-actions',
+          h('button.btn.primary', { onclick: close }, 'Keep my save'),
           h('button.btn.danger', {
             onclick: async () => { store.state = newPlayerState(content, Date.now()); await store.save(); close(); toast('New game started.'); render(); }
-          }, 'Reset everything'),
-          h('button.btn.primary', { onclick: close }, 'Keep my save')));
+          }, 'Erase everything and start over')));
       })
     }, 'Reset save…')));
   root.appendChild(sv);

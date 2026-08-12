@@ -4,7 +4,7 @@
     {
       "name": "hero-collector-web",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8765"],
+      "runtimeArgs": ["scripts/dev-server.py", "8765"],
       "port": 8765
     }
   ]

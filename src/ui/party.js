@@ -98,7 +98,7 @@ function compareSynergies(a, b) {
 
 function openPartySynergies(active) {
   openModal((modal, close) => {
-    modal.append(h('div.eyebrow', 'Current party'), h('h2', 'All active synergies'));
+    modal.append(h('div.eyebrow', 'Current party'), h('h2', 'Every way these five fit.'));
     const list = h('div.party-synergy-dialog');
     active.forEach((item, index) => list.appendChild(
       h('div.party-synergy', { style: { '--rule-end': `${[78, 61, 72, 84][index % 4]}%` } },
@@ -207,7 +207,8 @@ function pickMember(store, partyIndex, slotIndex, root, recommendedId = null) {
 
 function renamePreset(store, index, root) {
   openModal((modal, close) => {
-    modal.appendChild(h('h2', 'Rename this party'));
+    modal.appendChild(h('div.eyebrow', 'Party preset'));
+    modal.appendChild(h('h2', 'What should these five be called?'));
     const input = h('input', {
       type: 'text', value: store.state.parties[index].name,
       'aria-label': 'Preset name', maxlength: 30
@@ -219,13 +220,14 @@ function renamePreset(store, index, root) {
           if (result.ok !== false) { close(); rerenderParty(store, root); }
         }
       }, 'Keep this name →'),
-      h('button.btn', { onclick: close }, 'Cancel')));
+      h('button.btn', { onclick: close }, 'Leave it unchanged')));
   });
 }
 
 function copyPreset(store, targetIndex, root) {
   openModal((modal, close) => {
-    modal.appendChild(h('h2', 'Copy party members from…'));
+    modal.appendChild(h('div.eyebrow', 'Party preset'));
+    modal.appendChild(h('h2', 'Copy five from another preset.'));
     const select = h('select', { 'aria-label': 'Source preset' });
     store.state.parties.forEach((party, index) => {
       if (index !== targetIndex) select.appendChild(h('option', { value: String(index) }, party.name));
@@ -237,21 +239,22 @@ function copyPreset(store, targetIndex, root) {
           close(); rerenderParty(store, root);
         }
       }, 'Copy members →'),
-      h('button.btn', { onclick: close }, 'Cancel')));
+      h('button.btn', { onclick: close }, 'Leave this preset alone')));
   });
 }
 
 function confirmClearPreset(store, index, root) {
   openModal((modal, close) => {
-    modal.appendChild(h('h2', `Clear ${store.state.parties[index].name}?`));
-    modal.appendChild(h('p.warn', 'All five places in this preset will be emptied.'));
+    modal.appendChild(h('div.eyebrow', 'Party preset'));
+    modal.appendChild(h('h2', `Empty ${store.state.parties[index].name}?`));
+    modal.appendChild(h('p', 'All five places in this preset are emptied. No character is lost and no other preset changes.'));
     modal.appendChild(h('div.modal-actions',
       h('button.btn.danger', {
         onclick: async () => {
           await store.tx(() => clearParty(store.state, index), { rerender: false });
           close(); rerenderParty(store, root);
         }
-      }, 'Clear these five'),
-      h('button.btn', { onclick: close }, 'Cancel')));
+      }, 'Empty these five →'),
+      h('button.btn', { onclick: close }, 'Keep them where they are')));
   });
 }

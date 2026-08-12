@@ -119,7 +119,7 @@ export function renderNode(store, root, nodeId) {
 
   function showNodeSynergies(evaluation) {
     openModal((modal, close) => {
-      modal.append(h('div.eyebrow', 'Selected party'), h('h2', 'Synergies'));
+      modal.append(h('div.eyebrow', 'Selected party'), h('h2', 'How these five fit together.'));
       const active = h('section.node-synergy-dialog', h('h3', 'Active'));
       if (!evaluation.active.length) active.appendChild(h('p.muted', 'No synergies are active.'));
       evaluation.active.forEach(item => active.appendChild(h('div.node-synergy-dialog-row',

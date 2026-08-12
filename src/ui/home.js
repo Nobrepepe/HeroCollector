@@ -99,8 +99,11 @@ function continueThread(store, node) {
       h('button.btn.primary', { onclick: () => store.go(`#/node/${node.id}`) }, 'Enter →'),
       h('div.caption', `⚡ ${store.content.balance.nodeDefaults[node.type].energy}`))));
   if (store.state.energy < store.content.balance.nodeDefaults[node.type].energy && supply.ok) {
-    wrap.appendChild(h('p.today-supply', 'The day is spent, but one Field Supply is waiting. ',
-      h('button.link', { onclick: () => document.querySelector('.sidebar-energy')?.click() }, `Restore ${supply.restored} Energy →`)));
+    wrap.appendChild(h('p.today-supply',
+      h('span.today-supply-dot', { 'aria-hidden': 'true' }),
+      h('span', 'The day is spent, but one Field Supply is waiting. ',
+        h('button.link', { onclick: () => document.querySelector('.sidebar-energy')?.click() },
+          `Restore ${supply.restored} Energy →`))));
   }
   return wrap;
 }

@@ -81,6 +81,10 @@ function renderWorldArchive(store, root, world) {
   const closest = closestCollection(status.collections);
   root.classList.add('archive-world-screen');
   root.appendChild(archiveBackdrop(store.content.images.world[world.id]));
+  // An Archive belongs to a world, so the way out leads back to it.
+  root.appendChild(h('button.link.archive-world-back', {
+    onclick: () => store.go(`#/worlds/${world.id}`)
+  }, `← ${world.displayName}`));
   root.appendChild(h('header.archive-world-head',
     h('div.eyebrow', 'Archive · lore and cosmetics only, never power'),
     h('h1.display-l', world.displayName),
@@ -324,7 +328,7 @@ function fragmentTitle(store, fragment) {
 
 function inspectRelic(store, relic) {
   openModal((modal, close) => {
-    modal.append(h('h2.title', relic.displayName), h('p', relic.lore),
+    modal.append(h('div.eyebrow', 'Relic'), h('h2', relic.displayName), h('p', relic.lore),
       h('p.caption', `Recovered from ${relic.fragments.map(fragment => fragmentTitle(store, fragment)).join(' · ')}`),
       h('div.modal-actions', h('button.btn', { onclick: close }, 'Close')));
   });

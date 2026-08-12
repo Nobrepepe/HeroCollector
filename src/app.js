@@ -10,6 +10,12 @@ import { makeRng, entropySeed } from './core/rng.js';
 import { upgradeCustomDB, mergeContent, gameReadiness } from './core/custom.js';
 import { loadRawContent, loadSave, writeSave, loadCustomContent, writeCustomContent, loadActiveCustomContent, writeActiveCustomContent, importSave, exportJson } from './platform.js';
 import { h, clear, fmt } from './ui/dom.js';
+import {
+  dressModal, modalHead, modalRule, modalAction, modalActions, modalDismiss, noticeLine
+} from './ui/modal.js';
+import { portrait, rewardNodes } from './ui/shared.js';
+import { countWord, nameList } from './ui/presentation.js';
+
 import { renderHome } from './ui/home.js';
 import { renderRoster } from './ui/roster.js';
 import { renderCharacter } from './ui/character.js';
@@ -24,6 +30,7 @@ import { renderCreator } from './ui/creator.js';
 import { renderExpeditions } from './ui/expeditions.js';
 import { renderHeadquarters } from './ui/headquarters.js';
 import { renderCrisis } from './ui/crisis.js';
+import { renderWorlds } from './ui/worlds.js';
 import { renderSplash } from './ui/splash.js';
 import { fieldSupplyLimits, previewFieldSupplyUse, useFieldSupply } from './core/energy.js';
 
@@ -135,7 +142,10 @@ export function toast(text, kind = 'info') {
   setTimeout(() => el.remove(), kind === 'error' ? 6000 : 3500);
 }
 
-export function openModal(build) {
+// Every dialog in the game wears the shell established by design turn 10b, so
+// a Find-sources sheet and the day-open summary are recognisably the same
+// object. `size` only widens it; the grammar inside is the same everywhere.
+export function openModal(build, { size = 'sheet', tone = null } = {}) {
   const root = document.getElementById('modal-root');
   root.className = 'open';
   const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -144,6 +154,7 @@ export function openModal(build) {
   const modal = h('div.modal', {
     role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId, tabindex: '-1'
   });
+  dressModal(modal, { size, tone });
   const descriptor = { layer, modal, opener, titleId, build };
   descriptor.openerAria = opener?.getAttribute?.('aria-label') ?? null;
   const close = () => closeModal(descriptor);
@@ -240,12 +251,16 @@ const routes = {
   home: { title: 'Today', icon: '🏠', render: renderHome, nav: true },
   roster: { title: 'Collection', icon: '👥', render: renderRoster, nav: true },
   party: { title: 'Party', icon: '⚔️', render: renderParty, nav: true },
+  // Worlds holds everything that belongs to one world — its chapters, its
+  // Headquarters, its Archive — so those three are reached through a world
+  // rather than sitting beside it in the navigation.
+  worlds: { title: 'Worlds', icon: '🌍', render: renderWorlds, nav: true },
   campaign: { title: 'Journey', icon: '🗺️', render: renderCampaign, nav: true },
   expeditions: { title: 'Expeditions', icon: '🧭', render: renderExpeditions, nav: true },
-  headquarters: { title: 'Headquarters', icon: '🏰', render: renderHeadquarters, nav: true },
   inventory: { title: 'Workshop', icon: '🎒', render: renderInventory, nav: true },
-  archive: { title: 'Archive', icon: '🏛️', render: renderArchive, nav: true },
   settings: { title: 'Settings', icon: '⚙️', render: renderSettings, nav: true },
+  headquarters: { title: 'Headquarters', render: renderHeadquarters },
+  archive: { title: 'Archive', render: renderArchive },
   character: { title: 'Character', render: renderCharacter },
   node: { title: 'Node', render: renderNode },
   dev: { title: 'Developer Panel', icon: '🧪', render: renderDev },
@@ -258,7 +273,7 @@ function parseRoute() {
   return { name: routes[parts[0]] ? parts[0] : 'home', arg: parts.slice(1).join('/') || null };
 }
 
-const GAME_ROUTES = new Set(['home', 'roster', 'party', 'campaign', 'expeditions', 'headquarters', 'inventory', 'archive', 'character', 'node', 'crisis']);
+const GAME_ROUTES = new Set(['home', 'roster', 'party', 'worlds', 'campaign', 'expeditions', 'headquarters', 'inventory', 'archive', 'character', 'node', 'crisis']);
 
 export function render() {
   const { name, arg } = parseRoute();
@@ -338,11 +353,17 @@ function renderSidebar(active) {
   const nav = document.getElementById('sidebar');
   clear(nav);
   nav.appendChild(h('div.logo', 'Hero ', h('span', 'Collector')));
+  const away = store.state?.expeditions?.active?.length ?? 0;
   for (const [name, r] of Object.entries(routes)) {
     if (!r.nav || name === 'settings') continue;
+    // Expeditions is the only destination that carries a count: parties that
+    // are out are the one thing happening while you are somewhere else.
+    const count = name === 'expeditions' && away > 0 ? `${away} out` : null;
     nav.appendChild(h('button.nav-btn' + (name === active ? '.active' : ''), {
-      onclick: () => store.go(`#/${name}`)
-    }, h('span.nav-dot', { 'aria-hidden': 'true' }), r.title));
+      onclick: () => store.go(`#/${name}`),
+      'aria-label': count ? `${r.title}, ${away} parties out` : null
+    }, h('span.nav-dot', { 'aria-hidden': 'true' }), r.title,
+    count ? h('span.nav-count', { 'aria-hidden': 'true' }, count) : null));
   }
   nav.appendChild(h('div.spacer'));
   // The Content Creator is always reachable while the game is in setup mode;
@@ -360,14 +381,23 @@ function renderSidebar(active) {
   const b = store.content?.balance;
   const e = store.state?.energy ?? 0;
   if (b) {
-    const reset = String(store.state.settings.resetHour).padStart(2, '0');
+    const reset = store.state.settings.resetHour;
     const supplies = fieldSupplyLimits(store.content, store.state);
-    nav.appendChild(h('button.sidebar-energy', { onclick: openRechargeDialog, 'aria-label': `${e} of ${b.energy.storageCap} Energy. ${supplies.held} Field Supplies held; ${supplies.usesRemaining} uses remain today.` },
-      h('div.eyebrow', 'Energy'),
-      h('div.energy-number', fmt(e), h('span', ` / ${fmt(b.energy.storageCap)}`)),
-      h('div.energy-line', h('i', { style: { width: `${Math.min(100, e / b.energy.storageCap * 100)}%` } })),
-      h('div.caption', `${supplies.held} Suppl${supplies.held === 1 ? 'y' : 'ies'} held · ${supplies.usesRemaining} use${supplies.usesRemaining === 1 ? '' : 's'} remain today`),
-      h('div.caption', `+${b.energy.dailyGrant} more at ${reset}:00`)));
+    // The well holds two currencies. Energy is the numeral; Field Supply is a
+    // sentence, because what matters about it is how many uses are left today.
+    nav.appendChild(h('button.sidebar-energy', {
+      onclick: openRechargeDialog,
+      'aria-label': `${e} of ${b.energy.storageCap} Energy. ${supplies.held} of ${supplies.storageCap} Field Supplies held; ${supplies.usesRemaining} uses remain today.`
+    },
+    h('div.eyebrow', 'Energy'),
+    h('div.energy-number', fmt(e), h('span', ` / ${fmt(b.energy.storageCap)}`)),
+    h('div.energy-line', h('i', { style: { width: `${Math.min(100, e / b.energy.storageCap * 100)}%` } })),
+    h('div.caption', `+${fmt(b.energy.dailyGrant)} more at ${reset}:00`),
+    h('div.supply-well',
+      h('span.supply-glyph', { 'aria-hidden': 'true' }, store.content.resourceById.field_supply?.icon ?? '◈'),
+      h('div',
+        h('div.supply-held', `${supplies.held} Field Supply `, h('span', `of ${supplies.storageCap} held`)),
+        h('div.caption', `${countWord(supplies.usesRemaining)} use${supplies.usesRemaining === 1 ? '' : 's'} left today · +${supplies.restore} each`)))));
   }
   nav.appendChild(h('button.nav-btn.settings-link' + (active === 'settings' ? '.active' : ''), {
     onclick: () => store.go('#/settings')
@@ -377,20 +407,29 @@ function renderSidebar(active) {
 function openRechargeDialog() {
   const preview = previewFieldSupplyUse(store.content, store.state);
   openModal((modal, close) => {
-    modal.classList.add('recharge-modal');
-    modal.appendChild(h('div.eyebrow', 'Field Supplies'));
-    modal.appendChild(h('h2', preview.ok ? `${preview.restored} Energy can return now.` : 'The reserve cannot be opened now.'));
-    modal.appendChild(h('p', preview.ok
-      ? preview.wasted > 0 ? `This Supply restores ${preview.restored} Energy; the remaining ${preview.wasted} cannot fit under the ${store.content.balance.energy.storageCap} cap.`
-        : `This Supply restores ${preview.restored} Energy. It is consumed only when you confirm.`
-      : preview.reasons.join(' ')));
-    modal.appendChild(h('p.caption', `${preview.held} held · ${preview.usesRemaining} use${preview.usesRemaining === 1 ? '' : 's'} remain today · storage ${preview.held + preview.reserved} of ${preview.storageCap} including promised Supplies`));
-    modal.appendChild(h('div.modal-actions',
-      h('button.btn.primary', { disabled: !preview.ok, onclick: async () => {
-        const result = await store.tx(() => useFieldSupply(store.content, store.state), { rerender: false });
-        if (result.ok) { close(); render(); }
-      } }, preview.ok ? `Restore ${preview.restored} Energy →` : 'No restoration available'),
-      h('button.btn', { onclick: close }, 'Leave it stored')));
+    dressModal(modal, { size: 'sheet' });
+    modal.appendChild(modalHead('Field Supplies',
+      preview.ok ? `${preview.restored} Energy can return now.` : 'The reserve cannot be opened now.',
+      {
+        lead: preview.ok
+          ? preview.wasted > 0
+            ? `This Supply restores ${preview.restored} Energy; the remaining ${preview.wasted} cannot fit under the ${store.content.balance.energy.storageCap} cap.`
+            : `This Supply restores ${preview.restored} Energy. It is consumed only when you confirm.`
+          : preview.reasons.join(' ')
+      }));
+    modal.appendChild(h('p.hc-modal-fine',
+      `${preview.held} held of ${preview.storageCap} storage · ${preview.reserved} promised by routes already out · ${preview.usesRemaining} use${preview.usesRemaining === 1 ? '' : 's'} remain today`));
+    modal.appendChild(modalActions(
+      modalAction(preview.ok ? `Restore ${preview.restored} Energy →` : 'Nothing can be restored',
+        {
+          disabled: !preview.ok,
+          reason: preview.ok ? null : preview.reasons[0],
+          onclick: async () => {
+            const result = await store.tx(() => useFieldSupply(store.content, store.state), { rerender: false });
+            if (result.ok) { close(); render(); }
+          }
+        }),
+      modalDismiss('Leave it stored', close)));
   });
 }
 
@@ -596,51 +635,95 @@ function startDayPolling() {
   }, 60000);
 }
 
+// 10b — the day opens. Rewards were already granted at the reset; this modal
+// reports what came back and never claims anything.
 function showDaySummary(summary) {
   if (!summary || summary.acknowledged) return;
   openModal((modal, close) => {
-    modal.appendChild(h('div.eyebrow', `${summary.days} game day${summary.days === 1 ? '' : 's'} advanced`));
-    modal.appendChild(h('h2', summary.expeditions?.length
-      ? `${summary.expeditions.length} Expedition${summary.expeditions.length === 1 ? ' has' : 's have'} returned.`
-      : 'A new day has opened.'));
-    modal.appendChild(h('p', `${summary.energyGained} Energy restored. Shard attempts are ready again.`));
-    for (const build of summary.construction ?? []) modal.appendChild(h('p.good', `${build.facilityName} reached Level ${build.targetLevel}.`));
-    if (summary.production?.length) modal.appendChild(h('p', `${summary.production.length} automatic production entr${summary.production.length === 1 ? 'y was' : 'ies were'} added to inventory.`));
-    let suppliesReturned = 0;
-    for (const report of summary.expeditions ?? []) {
-      suppliesReturned += (report.rewards ?? []).filter(entry => entry.id === 'field_supply').reduce((sum, entry) => sum + entry.qty, 0);
-      modal.appendChild(h('div.return-report',
-      h('div.title', report.name), h('p', `${report.tier}. ${report.report}`),
-      h('div.day-return-rewards',
-        h('div.eyebrow', 'Rewards received'),
-        ...(report.rewards ?? []).map(entry => h('span.chip', dayRewardText(entry))))));
+    dressModal(modal, { size: 'day' });
+    const reset = store.state.settings.resetHour;
+    const returned = summary.expeditions ?? [];
+    modal.appendChild(modalHead(
+      `Day ${store.state.dayNumber} · ${reset}:00 · +${fmt(summary.energyGained)} Energy`,
+      dayHeadline(summary, returned),
+      { size: 'l' }));
+
+    if (returned.length) {
+      const rows = h('div.day-returns');
+      returned.forEach((report, index) => {
+        if (index > 0) rows.appendChild(h('div.day-return-divider'));
+        rows.appendChild(dayReturnRow(report));
+      });
+      modal.appendChild(rows);
     }
-    if (suppliesReturned) modal.appendChild(h('p.good', `${suppliesReturned} Field Suppl${suppliesReturned === 1 ? 'y has' : 'ies have'} returned and remains stored.`));
-    if (summary.crisis) modal.appendChild(h('p.warn', `${summary.crisis.name} is active in ${store.content.worldById[summary.crisis.worldId]?.displayName}. It costs no Energy, and leaving it alone causes no penalty.`));
+
+    const notes = dayOtherEvents(summary);
+    if (notes.length) {
+      if (returned.length) modal.appendChild(modalRule());
+      modal.append(...notes.map(text => h('p.hc-modal-lead', text)));
+    }
+
     const finish = async destination => {
       summary.acknowledged = true;
       await store.save();
       close();
       if (destination) store.go(destination);
     };
-    modal.appendChild(h('div.modal-actions', summary.crisis ? h('button.btn.primary', {
-      onclick: () => finish('#/crisis')
-    }, 'Review the Crisis →') : h('button.btn.primary', {
-      onclick: async () => {
-        await finish();
-      }
-    }, 'Begin the day →'), summary.crisis ? h('button.btn', { onclick: () => finish('#/home') }, 'Leave it for later') : null));
+
+    if (summary.crisis) {
+      const world = store.content.worldById[summary.crisis.worldId]?.displayName ?? 'this world';
+      modal.appendChild(modalRule());
+      modal.appendChild(noticeLine(
+        `${summary.crisis.name} is active in ${world}. It costs no Energy, and leaving it alone causes no penalty.`));
+      modal.appendChild(modalActions(
+        modalAction('Review the Crisis →', { onclick: () => finish('#/crisis') }),
+        modalDismiss('Leave it for later', () => finish('#/home'))));
+    } else {
+      modal.appendChild(modalActions(
+        modalAction('Begin the day →', { onclick: () => finish() })));
+    }
   });
 }
 
-function dayRewardText(entry) {
-  if (entry.kind === 'material') {
-    const material = store.content.materialById[entry.id];
-    return `${material?.icon ?? '◆'} ${entry.qty} × ${material?.displayName ?? entry.id}`;
+function dayHeadline(summary, returned) {
+  if (returned.length) {
+    return `${countWord(returned.length, { capitalize: true })} Expedition${returned.length === 1 ? ' has' : 's have'} returned.`;
   }
-  if (entry.kind === 'shards') return `🧩 ${entry.qty} × ${store.content.characterById[entry.characterId]?.displayName ?? entry.characterId} shards`;
-  const name = entry.id === '@associated_world_asset' ? 'World Asset' : store.content.resourceById[entry.id]?.displayName ?? entry.id;
-  return `${entry.qty} × ${name}`;
+  if (summary.crisis) return `${summary.crisis.name} is asking for an answer.`;
+  if (summary.construction?.length) return `${summary.construction[0].facilityName} is finished.`;
+  return 'A new day has opened.';
+}
+
+function dayReturnRow(report) {
+  const names = (report.party ?? []).map(id => store.content.characterById[id]?.displayName).filter(Boolean);
+  const tierTone = report.tier === 'exceptional' ? 'good' : report.tier === 'successful' ? 'text-dim' : 'muted';
+  return h('div.day-return',
+    report.party?.[0] ? portrait(store, report.party[0], 'day-return', { decorative: true }) : null,
+    h('div.grow',
+      h('div.day-return-top',
+        h('div.day-return-name', report.name),
+        h('div.day-return-tier.is-' + tierTone, report.tier)),
+      h('p.day-return-sentence', partySentence(names, report)),
+      h('p.day-return-rewards', ...rewardNodes(store.content, report.rewards))));
+}
+
+function partySentence(names, report) {
+  if (!names.length) return report.report;
+  const who = nameList(names);
+  if (report.tier === 'exceptional') return `${who} came back over the recommendation.`;
+  if (report.tier === 'successful') return `${who} met the recommendation.`;
+  return `${who} met the requirement, not the stretch.`;
+}
+
+function dayOtherEvents(summary) {
+  const notes = [];
+  for (const build of summary.construction ?? []) {
+    notes.push(`${build.facilityName} reached Level ${build.targetLevel}, and the account-wide construction slot is open again.`);
+  }
+  if (summary.production?.length) {
+    notes.push(`${countWord(summary.production.length, { capitalize: true })} automatic production entr${summary.production.length === 1 ? 'y is' : 'ies are'} already in the Workshop.`);
+  }
+  return notes;
 }
 
 boot();

@@ -3,6 +3,7 @@ import { openModal, toast, render } from '../app.js';
 import { checkClear, clearNode, maxSweepCount } from '../core/state.js';
 import { rankMaterialSources } from '../core/sources.js';
 import { campaignLabel } from './shared.js';
+import { modalActions, modalDismiss, modalHead } from './modal.js';
 import { compactResult, showFullResults, resultPresentationMode } from './results.js';
 
 function blockedReason(row) {
@@ -83,28 +84,28 @@ export function openFindSources(store, target, options = {}) {
   return openModal((modal, close) => {
     const renderRows = () => {
       modal.replaceChildren();
-      let title = 'Find Sources';
-      let materials = targetMaterials(store, target);
-      if (target.type === 'material') title = `Sources: ${store.content.materialById[target.id].displayName}`;
+      const materials = targetMaterials(store, target);
+      // Eyebrow names what is being looked for; the headline names where it
+      // comes from, in the same grammar as the day-open summary.
+      const subject = target.type === 'material' ? store.content.materialById[target.id]?.displayName
+        : target.type === 'component' ? store.content.componentById[target.id]?.displayName
+          : store.content.characterById[target.id]?.displayName;
+      modal.appendChild(modalHead(
+        target.type === 'shards' ? 'Shard sources' : 'Sources',
+        `Where ${subject} comes from.`,
+        { size: 'm' }));
       if (target.type === 'component') {
         const component = store.content.componentById[target.id];
-        title = `Sources: ${component.displayName}`;
-        modal.appendChild(h('p.small.muted',
+        modal.appendChild(h('p.caption',
           `Crafted from ${component.inputs.map(i => `${i.qty} × ${store.content.materialById[i.materialId].displayName}`).join(' + ')}.`));
       }
-      modal.prepend(h('h2', title));
       if (target.type === 'material') {
         const lower = store.content.materials.find(material => material.conversionTarget === target.id);
-        if (lower) modal.insertBefore(h('p.small.muted',
-          `Alternative: upcraft ${lower.conversionCost} × ${lower.displayName} into 1 × ${store.content.materialById[target.id].displayName}. Supported conversions are previewed by Craft Components & Equip.`),
-        modal.children[1] ?? null);
+        if (lower) modal.appendChild(h('p.caption',
+          `Alternative: upcraft ${lower.conversionCost} × ${lower.displayName} into 1 × ${store.content.materialById[target.id].displayName}. Supported conversions are previewed by Craft Components & Equip.`));
       }
-      if (store.ui.lastSourceResult) {
-        modal.insertBefore(compactResult(store, store.ui.lastSourceResult), modal.children[1] ?? null);
-      }
+      if (store.ui.lastSourceResult) modal.appendChild(compactResult(store, store.ui.lastSourceResult));
       if (target.type === 'shards') {
-        const def = store.content.characterById[target.id];
-        modal.querySelector('h2').textContent = `Shard sources: ${def.displayName}`;
         const nodes = store.content.shardNodesByCharacter[target.id] ?? [];
         const rows = nodes.flatMap(node => rankMaterialSources(store.content, store.state, node.material)
           .filter(r => r.node.id === node.id));
@@ -129,8 +130,8 @@ export function openFindSources(store, target, options = {}) {
           })));
         }
       }
-      modal.appendChild(h('div.modal-actions', h('button.btn', { onclick: close }, 'Close')));
+      modal.appendChild(modalActions(modalDismiss('Close', close)));
     };
     renderRows();
-  });
+  }, { size: 'wide' });
 }
