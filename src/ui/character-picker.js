@@ -2,6 +2,7 @@ import { h, fmt } from './dom.js';
 import { characterPower, characterPowerForState } from '../core/power.js';
 import { evaluateParty } from '../core/synergy.js';
 import { portrait, starline } from './shared.js';
+import { modalActions, modalDismiss, modalHead } from './modal.js';
 import { openModal } from '../app.js';
 
 export function filterCharacters(content, state, preferences, readySet, search = '') {
@@ -85,20 +86,23 @@ export function openCharacterPicker(store, { partyIndex, slotIndex, onSelect, re
     const preferences = store.ui.pickerPreferences;
     const renderPicker = () => {
       modal.replaceChildren();
-      modal.appendChild(h('h2', 'Choose a character'));
+      const current = store.state.parties[partyIndex].members[slotIndex];
+      modal.appendChild(modalHead(
+        `${store.state.parties[partyIndex].name} · place ${slotIndex + 1} of ${store.content.balance.partySize}`,
+        current ? 'Who stands here instead?' : 'Who stands here?',
+        { size: 'm' }));
       modal.appendChild(characterFilterBar(store, preferences, renderPicker, {
         search, onSearch: value => { search = value; renderGrid(); }, ownership: false
       }));
       preferences.ownership = 'owned';
       const grid = h('div.picker-grid');
-      const current = store.state.parties[partyIndex].members[slotIndex];
       if (current) {
-        modal.appendChild(h('button.btn.danger.tiny', {
+        modal.appendChild(h('button.link.picker-clear', {
           onclick: async () => {
             await onSelect(null);
             close();
           }
-        }, 'Remove from slot'));
+        }, 'Leave this place open'));
       }
       modal.appendChild(grid);
       const renderGrid = () => {
@@ -147,10 +151,10 @@ export function openCharacterPicker(store, { partyIndex, slotIndex, onSelect, re
         }
       };
       renderGrid();
-      modal.appendChild(h('div.modal-actions', h('button.btn', { onclick: close }, 'Cancel')));
+      modal.appendChild(modalActions(modalDismiss('Keep the party as it is', close)));
     };
     renderPicker();
-  });
+  }, { size: 'wide' });
 }
 
 export function openCrisisCharacterPicker(store, { currentId = null, excludedIds = new Set(), favoredTagIds = [], onSelect }) {
@@ -160,11 +164,17 @@ export function openCrisisCharacterPicker(store, { currentId = null, excludedIds
     preferences.ownership = 'owned';
     const paint = () => {
       modal.replaceChildren();
-      modal.appendChild(h('h2', 'Choose who answers this Front.'));
+      const favored = favoredTagIds.map(id => tagLabel(store, id)).join(' and ');
+      modal.appendChild(modalHead('Crisis Front', 'Who answers this Front?', {
+        size: 'm',
+        lead: favored
+          ? `${favored} is favored here — a favored tag lifts the whole Front by 20%. No one may answer two Fronts.`
+          : 'No tag is favored here. No one may answer two Fronts.'
+      }));
       modal.appendChild(characterFilterBar(store, preferences, paint, {
         search, onSearch: value => { search = value; paint(); }, ownership: false
       }));
-      if (currentId) modal.appendChild(h('button.link.bad', { onclick: async () => { await onSelect(null); close(); } }, 'Leave this place open'));
+      if (currentId) modal.appendChild(h('button.link.picker-clear', { onclick: async () => { await onSelect(null); close(); } }, 'Leave this place open'));
       const grid = h('div.picker-grid');
       const candidates = filterCharacters(store.content, store.state, preferences, new Set(), search)
         .filter(def => store.state.characters[def.id].owned);
@@ -182,10 +192,16 @@ export function openCrisisCharacterPicker(store, { currentId = null, excludedIds
           unavailable ? h('div.small.bad', 'Already answering another Front.')
             : h('div.small.good', matches.length ? `Favored here: ${matches.map(id => store.content.tagById[id]?.displayName ?? store.content.worldById[id]?.displayName ?? store.content.archetypes[id]?.name ?? id).join(', ')}` : 'No favored tag here.'))));
       }
-      modal.append(grid, h('div.modal-actions', h('button.btn', { onclick: close }, 'Return to the Front')));
+      modal.append(grid, modalActions(modalDismiss('Return to the Front', close)));
     };
     paint();
-  });
+  }, { size: 'wide', tone: 'crisis' });
+}
+
+function tagLabel(store, id) {
+  return store.content.worldById[id]?.displayName
+    ?? store.content.archetypes[id]?.name
+    ?? store.content.tagById[id]?.displayName ?? id;
 }
 
 export function openExpeditionCharacterPicker(store, {
@@ -197,13 +213,17 @@ export function openExpeditionCharacterPicker(store, {
     preferences.ownership = 'owned';
     const paint = () => {
       modal.replaceChildren();
-      modal.appendChild(h('h2', `Choose expedition member ${slotIndex + 1}`));
+      modal.appendChild(modalHead(`Expedition · place ${slotIndex + 1}`,
+        currentId ? 'Who travels here instead?' : 'Who travels here?', {
+          size: 'm',
+          lead: 'Everyone sent stays usable everywhere else while they are gone.'
+        }));
       modal.appendChild(characterFilterBar(store, preferences, paint, {
         search, onSearch: value => { search = value; paint(); }, ownership: false
       }));
-      if (currentId) modal.appendChild(h('button.btn.danger.tiny', {
+      if (currentId) modal.appendChild(h('button.link.picker-clear', {
         onclick: async () => { await onSelect(null); close(); }
-      }, 'Remove from slot'));
+      }, 'Leave this place open'));
       const grid = h('div.picker-grid');
       const candidates = filterCharacters(store.content, store.state, preferences, new Set(), search)
         .filter(def => store.state.characters[def.id].owned);
@@ -225,10 +245,10 @@ export function openExpeditionCharacterPicker(store, {
           h('div.numeral', `${fmt(characterPowerForState(store.content, store.state, def.id))} Power`),
           reason ? h('div.small.warn', reason) : null)));
       }
-      modal.append(grid, h('div.modal-actions', h('button.btn', { onclick: close }, 'Cancel')));
+      modal.append(grid, modalActions(modalDismiss('Return to the route', close)));
     };
     paint();
-  });
+  }, { size: 'wide' });
 }
 
 function characterExpeditionForPicker(state, characterId) {

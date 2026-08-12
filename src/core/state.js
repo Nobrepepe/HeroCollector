@@ -179,6 +179,10 @@ export function syncSaveWithContent(content, state) {
   }
   const campaigns = new Set(['main', 'shadow', ...content.worlds.map(w => w.campaignId)]);
   if (!campaigns.has(state.ui.campaignId)) state.ui.campaignId = 'main';
+  // The world last held on the Worlds stage; forget it if content dropped it.
+  if (state.ui.selectedWorldId && !content.worldById[state.ui.selectedWorldId]) {
+    delete state.ui.selectedWorldId;
+  }
   const roster = state.ui.roster ??= {
     world: 'all', archetype: 'all', faction: 'all', ownership: 'all', sort: 'power', direction: 'desc'
   };

@@ -80,15 +80,18 @@ export function openGearDialog(store, characterId, slot) {
       const analysis = analyzeEquipmentGoal(content, state, characterId, slot);
       const pinned = isPinned(state, { type: 'equipment', characterId, slot });
       modal.replaceChildren();
+      // Art beside an eyebrow, a serif name, and the reading beneath it — the
+      // same block the day-open summary uses for a returned Expedition.
       modal.appendChild(h('div.gear-dialog-header',
         equipmentArt(content, characterId, slot, meta, 'gear-dialog-art'),
-        h('div', h('h2', analysis.equipmentName),
-          h('p', `${def.displayName} · Gear Tier ${analysis.tier ?? cs.gearTier} · ${meta.name}`),
-          h('p.small.muted', `${def.equipmentLines[slot]} · ${meta.name} equipment line`),
-          h('p.power-delta', `+${analysis.tier ? slotPower(content.balance, analysis.tier) : 0} Power`))));
+        h('div.grow',
+          h('div.eyebrow', `${def.displayName} · ${meta.name} · Gear Tier ${analysis.tier ?? cs.gearTier}`),
+          h('h2', analysis.equipmentName),
+          h('p.caption', `${def.equipmentLines[slot]} · ${meta.name} equipment line`),
+          h('p.gear-dialog-power', `+${analysis.tier ? slotPower(content.balance, analysis.tier) : 0} Power when it is worn`))));
 
       if (analysis.equipped) {
-        modal.appendChild(h('p.good', '✓ Equipped for the current tier.'));
+        modal.appendChild(h('p.good', 'Equipped for the current tier. Nothing else is asked of this slot.'));
       } else {
         modal.appendChild(h('h3', 'Recipe'));
         for (const component of analysis.immediateComponents) {
@@ -134,12 +137,15 @@ export function openGearDialog(store, characterId, slot) {
           }
         }, pinned ? 'Unpin Goal' : 'Pin Goal'));
         const checked = checkCraftAndEquipEquipment(content, state, characterId, slot);
-        const label = analysis.state === 'components-ready' ? 'Craft & Equip'
-          : analysis.state === 'chain-ready' ? 'Craft Components & Equip' : 'Missing Materials';
+        const label = analysis.state === 'components-ready' ? 'Craft and equip →'
+          : analysis.state === 'chain-ready' ? 'Craft the components and equip →' : 'Not enough materials yet';
         actions.appendChild(h('button.btn.primary', {
           disabled: !checked.ok,
           onclick: () => craftEquipmentWithConfirmation(store, characterId, slot, { onSuccess: renderDialog })
         }, label));
+        // An unavailable action states its reason in words rather than
+        // leaving a greyed control to be guessed at.
+        if (!checked.ok) actions.appendChild(h('span.hc-modal-action-reason', checked.reasons[0]));
       }
       actions.appendChild(h('button.btn', { onclick: close }, 'Close'));
       modal.appendChild(actions);
@@ -168,7 +174,8 @@ export function craftEquipmentWithConfirmation(store, characterId, slot, { onSuc
   };
   if (checked.plan.reservationConflicts?.length) {
     openModal((modal, close) => {
-      modal.appendChild(h('h2', 'Use resources reserved by other goals?'));
+      modal.appendChild(h('div.eyebrow', 'Reserved resources'));
+      modal.appendChild(h('h2', 'Another goal is holding some of this.'));
       const names = checked.plan.reservationConflicts.map(conflict => {
         const def = conflict.type === 'material'
           ? store.content.materialById[conflict.id] : store.content.componentById[conflict.id];
@@ -180,11 +187,11 @@ export function craftEquipmentWithConfirmation(store, characterId, slot, { onSuc
         const goal = analyzeEquipmentGoal(store.content, store.state, pin.characterId, pin.slot);
         return `${character.displayName} — ${goal.equipmentName}`;
       });
-      modal.appendChild(h('p.warn', `This action overlaps reserved resources: ${names.join(', ')}.`));
-      if (goals.length) modal.appendChild(h('p.small', `Other active gear goals: ${goals.join(' · ')}`));
+      modal.appendChild(h('p', `Crafting this spends ${names.join(', ')}, which a pinned goal is already counting on. Nothing is lost — that goal simply moves further away.`));
+      if (goals.length) modal.appendChild(h('p.caption', `Waiting on it: ${goals.join(' · ')}`));
       modal.appendChild(h('div.modal-actions',
-        h('button.btn.primary', { onclick: () => { close(); run(); } }, 'Craft anyway'),
-        h('button.btn', { onclick: close }, 'Cancel')));
+        h('button.btn.primary', { onclick: () => { close(); run(); } }, 'Craft it anyway →'),
+        h('button.btn', { onclick: close }, 'Leave it reserved')));
     });
   } else run();
 }

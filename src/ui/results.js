@@ -88,7 +88,7 @@ export function showFullResults(store, result, { onClose, members, count } = {})
       h('button.btn', { onclick: () => { close(); store.go('#/home'); } }, 'Back to today'),
       h('button.btn', { onclick: finish }, 'Close'));
     modal.querySelector('.results-content').appendChild(actions);
-  });
+  }, { size: 'full' });
 }
 
 function materialColumn(store, materials) {

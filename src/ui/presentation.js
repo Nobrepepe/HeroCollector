@@ -126,6 +126,44 @@ function ordinal(n) {
   return 'th';
 }
 
+const COUNT_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight',
+  'nine', 'ten', 'eleven', 'twelve'];
+
+// Headlines count in words; readings and totals stay numerals. "Five routes are
+// waiting." reads as a sentence, "5 routes" reads as a table cell.
+export function countWord(n, { capitalize = false } = {}) {
+  const word = COUNT_WORDS[n] ?? String(n);
+  return capitalize ? word[0].toUpperCase() + word.slice(1) : word;
+}
+
+const ORDINAL_WORDS = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh',
+  'eighth', 'ninth', 'tenth', 'eleventh', 'twelfth'];
+
+export function ordinalWord(n) {
+  return ORDINAL_WORDS[n] ?? `${n}${ordinal(n)}`;
+}
+
+// Names a party in prose: "Suzume, Hoshi and Ayame".
+export function nameList(names) {
+  if (!names.length) return '';
+  if (names.length === 1) return names[0];
+  return `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+}
+
+// Characters of a world, memoised on the content object so the world hub can
+// read a world's roster total without filtering at render time.
+export function charactersByWorld(content, worldId) {
+  const cache = content.__charactersByWorld ??= (() => {
+    const map = new Map();
+    for (const def of content.characters) {
+      if (!map.has(def.world)) map.set(def.world, []);
+      map.get(def.world).push(def);
+    }
+    return map;
+  })();
+  return cache.get(worldId) ?? [];
+}
+
 export function relicPieceModel(store, relic) {
   return relic.fragments.map((fragment, index) => ({
     side: index === 0 ? 'left' : 'right',

@@ -76,6 +76,37 @@ export function tagChips(store, def) {
   return h('div', chips);
 }
 
+// Reward entries as a sentence fragment rather than a row of badges. Field
+// Supply is the one entry that carries colour, because it is the only reward
+// with a storage cap the player has to plan around.
+export function rewardEntryName(content, entry, worldId = null) {
+  if (entry.kind === 'material') return content.materialById[entry.id]?.displayName ?? entry.id;
+  if (entry.kind === 'shards') {
+    return `${content.characterById[entry.characterId]?.displayName ?? entry.characterId} shards`;
+  }
+  if (entry.id === '@associated_world_asset') {
+    return content.worldById[worldId]?.worldAsset?.displayName ?? 'the associated World Asset';
+  }
+  return content.resourceById[entry.id]?.displayName ?? entry.id;
+}
+
+export function rewardNodes(content, entries, { worldId = null, empty = 'No additional resources.' } = {}) {
+  const list = entries ?? [];
+  if (!list.length) return [h('span.muted', empty)];
+  const nodes = [];
+  list.forEach((entry, index) => {
+    if (index > 0) nodes.push(document.createTextNode(' · '));
+    const text = `${fmt(entry.qty)} × ${rewardEntryName(content, entry, worldId)}`;
+    nodes.push(entry.kind === 'resource' && entry.id === 'field_supply'
+      ? h('span.good', text) : document.createTextNode(text));
+  });
+  return nodes;
+}
+
+export function rewardSentence(content, entries, options = {}) {
+  return h('span', ...rewardNodes(content, entries, options));
+}
+
 export function rewardChips(store, rewards) {
   const chips = [];
   for (const [matId, qty] of Object.entries(rewards.materials ?? {})) {

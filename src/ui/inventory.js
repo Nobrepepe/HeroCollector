@@ -270,11 +270,12 @@ function craftControls(store, componentId, maxN) {
     const run = () => store.tx(() => craftComponent(content, state, componentId, n));
     if (state.settings.confirmBulk && n > 1) {
       openModal((modal, close) => {
-        modal.append(h('h2', 'Bulk craft preview'), h('p', `Craft ${n} × ${check.def.displayName}?`),
-          h('p.small.muted', `Consumes ${preview}.`),
+        modal.append(h('div.eyebrow', 'Bulk craft'),
+          h('h2', `Craft ${n} × ${check.def.displayName}?`),
+          h('p', `This consumes ${preview}.`),
           h('div.modal-actions',
-            h('button.btn.primary', { onclick: () => { close(); run(); } }, 'Craft'),
-            h('button.btn', { onclick: close }, 'Cancel')));
+            h('button.btn.primary', { onclick: () => { close(); run(); } }, `Craft ${n} →`),
+            h('button.btn', { onclick: close }, 'Leave the materials alone')));
       });
     } else run();
   };
@@ -291,10 +292,11 @@ function openMaterialActions(store, materialId) {
   const { content, state } = store;
   const material = content.materialById[materialId];
   openModal((modal, close) => {
-    modal.append(h('h2', `${material.icon} ${material.displayName}`),
-      h('p', `In inventory: ${fmt(matQty(state, materialId))}`));
+    modal.append(h('div.eyebrow', `${material.icon} ${material.grade} material`),
+      h('h2', material.displayName),
+      h('p', `${fmt(matQty(state, materialId))} held in the Workshop.`));
     const reserved = buildWorkshopModel(content, state).reservations.materials[materialId] ?? 0;
-    if (reserved) modal.appendChild(h('p.small.pin-color', `${fmt(reserved)} reserved by pinned recipes.`));
+    if (reserved) modal.appendChild(h('p.caption', `${fmt(reserved)} of them are reserved by pinned recipes.`));
     if (material.conversionTarget) {
       const target = content.materialById[material.conversionTarget];
       const maxTimes = Math.floor(matQty(state, materialId) / material.conversionCost);
@@ -303,8 +305,8 @@ function openMaterialActions(store, materialId) {
       }, materialId, 1);
       const qty = h('input', { type: 'number', min: 1, max: Math.max(1, maxTimes), value: 1, 'aria-label': 'Upcraft count' });
       modal.append(h('h3', 'Upcraft'),
-        h('p.small.muted', `${material.conversionCost} ${material.displayName} becomes one ${target.displayName}. ${fmt(maxTimes)} possible now.`));
-      if (!availability.ok) modal.appendChild(h('p.small.warn', availability.reasons[0]));
+        h('p', `${material.conversionCost} ${material.displayName} becomes one ${target.displayName}. ${fmt(maxTimes)} possible now.`));
+      if (!availability.ok) modal.appendChild(h('p.caption', availability.reasons[0]));
       modal.appendChild(h('div.modal-actions', qty, h('button.btn.primary', {
         disabled: maxTimes < 1 || !availability.ok,
         onclick: () => {
@@ -320,15 +322,17 @@ function openMaterialActions(store, materialId) {
             });
           };
           if (check.warning) openModal((confirm, closeConfirm) => {
-            confirm.append(h('h2', 'Reserved materials'), h('p.warn', check.warning),
+            confirm.append(h('div.eyebrow', 'Reserved materials'),
+              h('h2', 'A pinned goal is holding some of this.'),
+              h('p', check.warning),
               h('div.modal-actions',
-                h('button.btn.primary', { onclick: () => { closeConfirm(); commit(); } }, 'Upcraft anyway'),
-                h('button.btn', { onclick: closeConfirm }, 'Cancel')));
+                h('button.btn.primary', { onclick: () => { closeConfirm(); commit(); } }, 'Upcraft anyway →'),
+                h('button.btn', { onclick: closeConfirm }, 'Leave it reserved')));
           });
           else commit();
         }
-      }, 'Upcraft')));
-    } else modal.appendChild(h('p.small.muted', 'Masterwork is the highest grade.'));
+      }, 'Upcraft →')));
+    } else modal.appendChild(h('p.caption', 'Masterwork is the highest grade — nothing converts upward from here.'));
     modal.appendChild(h('div.modal-actions',
       h('button.btn', { onclick: () => { close(); openFindSources(store, { type: 'material', id: materialId }); } }, 'Where it drops'),
       h('button.btn', { onclick: close }, 'Close')));
