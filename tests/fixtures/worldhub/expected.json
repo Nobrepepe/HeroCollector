@@ -1,0 +1,18 @@
+{
+  "appType": "hero-collector.content-pack",
+  "contractId": "198c7717-7dac-4923-8340-daf69ce4ac08",
+  "contractVersion": 1,
+  "libraryId": "cecb7f57-61a2-4189-9bc3-7fc493ec5f0a",
+  "productionId": "4163f143-1599-4995-b0e9-b45bdccb87de",
+  "publicationV1": "07e399b8-d45f-4d7d-8efb-78a2f7b4801e",
+  "publicationV2": "174a6348-ce30-4a2b-bd42-b38b302fcb5d",
+  "worldId": "031168bb-7303-46d8-a838-aac1ce7c971a",
+  "characterIds": [
+    "7e2d87bb-5c66-49b6-bcec-94757ccbc267",
+    "fa7d8931-c82c-41e4-b304-cb0cc7382551"
+  ],
+  "renamedCharacterId": "7e2d87bb-5c66-49b6-bcec-94757ccbc267",
+  "retiredCharacterIds": [
+    "fa7d8931-c82c-41e4-b304-cb0cc7382551"
+  ]
+}
