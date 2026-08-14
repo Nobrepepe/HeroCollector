@@ -75,6 +75,19 @@ export async function loadSamplePack() {
   return res.json();
 }
 
+// ---- World Hub consumer (Electron only; the browser build stays legacy) ----
+export const worldhub = {
+  available: () => typeof window !== 'undefined' && !!window.heroAPI?.worldhubStatus,
+  status: () => window.heroAPI.worldhubStatus(),
+  stageZip: () => window.heroAPI.worldhubStageZip(),
+  stageFolder: (path) => window.heroAPI.worldhubStageFolder(path ?? null),
+  activate: (stagingId) => window.heroAPI.worldhubActivate(stagingId),
+  discard: (stagingId) => window.heroAPI.worldhubDiscard(stagingId),
+  rollback: () => window.heroAPI.worldhubRollback(),
+  activeDb: () => window.heroAPI.worldhubActiveDb(),
+  migrateSave: (mapping) => window.heroAPI.worldhubMigrateSave(mapping),
+};
+
 export async function loadCustomContent() {
   if (isElectron) return window.heroAPI.loadCustom();
   try { return await idbGet('custom-content'); } catch { return null; }

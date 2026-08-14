@@ -28,6 +28,8 @@ import { renderSettings } from './ui/settings.js';
 import { renderDev } from './ui/dev.js';
 import { renderCreator } from './ui/creator.js';
 import { renderExpeditions } from './ui/expeditions.js';
+import { renderWorldHub } from './ui/worldhub.js';
+import { worldhub } from './platform.js';
 import { renderHeadquarters } from './ui/headquarters.js';
 import { renderCrisis } from './ui/crisis.js';
 import { renderWorlds } from './ui/worlds.js';
@@ -52,7 +54,9 @@ const store = {
       world: 'all', archetype: 'all', faction: 'all', ownership: 'owned',
       sort: 'power', direction: 'desc'
     },
-    compactResult: null
+    compactResult: null,
+    // The star promotion waiting to be played on the character screen (13).
+    promotion: null
   },
   async beginDay() {
     if (this.ui.dayStarted) return;
@@ -264,7 +268,9 @@ const routes = {
   character: { title: 'Character', render: renderCharacter },
   node: { title: 'Node', render: renderNode },
   dev: { title: 'Developer Panel', icon: '🧪', render: renderDev },
-  creator: { title: 'Content Creator', icon: '🛠️', render: renderCreator },
+  worldhub: { title: 'World Hub', render: renderWorldHub },
+  // In Hub mode the Creator is retired; a direct #/creator hash lands on the Hub screen.
+  creator: { title: 'Content Creator', icon: '🛠️', render: (s) => s.hubMode ? renderWorldHub(s) : renderCreator(s) },
   crisis: { title: 'Crisis Response', render: renderCrisis }
 };
 
@@ -368,10 +374,17 @@ function renderSidebar(active) {
   nav.appendChild(h('div.spacer'));
   // The Content Creator is always reachable while the game is in setup mode;
   // once playable, it lives behind the dev-tools toggle.
-  if (!store.gameReady.ready || store.state.settings.devPanel) {
+  if (store.hubMode) {
+    nav.appendChild(h('button.nav-btn' + (active === 'worldhub' ? '.active' : ''), {
+      onclick: () => store.go('#/worldhub')
+    }, h('span.ico', '📦'), 'World Hub'));
+  } else if (!store.gameReady.ready || store.state.settings.devPanel) {
     nav.appendChild(h('button.nav-btn' + (active === 'creator' ? '.active' : ''), {
       onclick: () => store.go('#/creator')
     }, h('span.ico', '🛠️'), 'Content Creator'));
+    nav.appendChild(h('button.nav-btn' + (active === 'worldhub' ? '.active' : ''), {
+      onclick: () => store.go('#/worldhub')
+    }, h('span.ico', '📦'), 'World Hub'));
   }
   if (store.state.settings.devPanel) {
     nav.appendChild(h('button.nav-btn' + (active === 'dev' ? '.active' : ''), {
@@ -503,7 +516,25 @@ function renderRecoveryScreen({ title, message, details = [], brokenSave = null 
 
 async function boot() {
   store.baseRaw = await loadRawContent();
-  store.customDB = upgradeCustomDB(await loadCustomContent());
+
+  // World Hub mode: the installed immutable publication is the content
+  // source; the Creator database stays on disk untouched as the legacy
+  // fallback for when no publication is active.
+  store.hubStatus = null;
+  let hubDb = null;
+  if (worldhub.available()) {
+    try {
+      const active = await worldhub.activeDb();
+      if (active && !active.error) {
+        hubDb = active.db;
+        store.hubStatus = active.status;
+      } else if (active?.error) {
+        store.hubLoadError = active.error;
+      }
+    } catch { /* fall back to legacy */ }
+  }
+  store.hubMode = !!hubDb;
+  store.customDB = upgradeCustomDB(hubDb ?? await loadCustomContent());
 
   // Merge base + custom content; if the merge is somehow invalid, fall back
   // to the shipped base content so the game always starts.
@@ -534,7 +565,7 @@ async function boot() {
     ];
     setTimeout(() => toast('Creator content could not be loaded — see the Content Creator health panel.', 'error'), 300);
   }
-  if (check.ok) await writeActiveCustomContent(store.customDB);
+  if (check.ok && !store.hubMode) await writeActiveCustomContent(store.customDB);
   store.content = content;
   store.gameReady = gameReadiness(content);
 

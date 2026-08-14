@@ -98,3 +98,39 @@ game is playable it moves behind the dev-tools toggle (**Ctrl+Shift+D**).
   greedy-bot playthrough proving a fresh save can complete the campaigns, take all
   20 characters to 7★ / the current Gear Tier cap, and complete both Archives
   using only in-game systems.
+
+## World Hub content
+
+Hero Collector can consume [World Hub](../WorldHub) publications (Package
+Protocol 1, Application Contract 1). The authoritative contract lives at
+`worldhub/application-contract.json`.
+
+- **Install** — World Hub screen → *Install publication ZIP…*, or link the
+  World Hub production folder (the one containing `current.json`) and use
+  *Check for update*. Packages are extracted to staging, validated completely
+  (safe ZIP paths, manifest, embedded contract, every checksum, references),
+  adapted, and still pass the game's own `validateContent()` before
+  activation. A rejected package changes nothing; the previous publication is
+  retained for *Roll back*.
+- **Pipeline** — a package adapts into the same custom-content database shape
+  the Creator produces, then flows through the existing
+  `mergeContent → buildContent → validateContent` pipeline. World Hub is the
+  content authority; the game engine (balance, formulas, recipes) stays
+  bundled here.
+- **Media** — packaged art is served through the narrow `hcpkg://` protocol,
+  which resolves only files inside installed publication directories — no
+  data URLs and no filesystem access from the renderer.
+- **Hub mode** — while a publication is active the Content Creator is retired
+  (navigation replaced by the World Hub screen, mutation IPC disabled) and
+  legacy Creator data stays untouched on disk; removing the publication
+  returns the app to legacy content. The Creator/merge path becomes removable
+  once real content parity is confirmed with your own worlds.
+- **Saves** — player state is app-owned and reconciles through the existing
+  `syncSaveWithContent` behavior: characters that leave a publication go
+  dormant in the save, never deleted. A one-time explicit legacy-ID → Hub-UUID
+  migration (`worldhub:migrate-save`) backs up the save first and only applies
+  mappings you provide — ambiguous matches are never guessed.
+- **Provenance** — installs are copied into the app's own
+  `worldhub-content/` with a receipt per publication (source library,
+  production, publication, contract version), so the game works offline from
+  its cache.
