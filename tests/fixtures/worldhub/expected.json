@@ -1,18 +1,18 @@
 {
   "appType": "hero-collector.content-pack",
-  "contractId": "198c7717-7dac-4923-8340-daf69ce4ac08",
+  "contractId": "94c72f6e-9242-4c9c-854c-7cb165e5fc40",
   "contractVersion": 1,
-  "libraryId": "cecb7f57-61a2-4189-9bc3-7fc493ec5f0a",
-  "productionId": "4163f143-1599-4995-b0e9-b45bdccb87de",
-  "publicationV1": "07e399b8-d45f-4d7d-8efb-78a2f7b4801e",
-  "publicationV2": "174a6348-ce30-4a2b-bd42-b38b302fcb5d",
-  "worldId": "031168bb-7303-46d8-a838-aac1ce7c971a",
+  "libraryId": "c2770c1a-8ec2-40b6-a459-bddd637949cc",
+  "productionId": "c0bc6b97-1fe8-49fc-887b-c047eaa35d7f",
+  "publicationV1": "3d151b26-1306-48cd-9e63-4a54ddcc95a5",
+  "publicationV2": "97d3ca0d-8c4c-4baf-a904-bc2991b92a2b",
+  "worldId": "5272f3ef-a112-4259-ad5b-9a8e80848e56",
   "characterIds": [
-    "7e2d87bb-5c66-49b6-bcec-94757ccbc267",
-    "fa7d8931-c82c-41e4-b304-cb0cc7382551"
+    "d7d06345-e87d-4ff6-8773-4a5dac8be47e",
+    "13df00dc-9c29-471a-95d1-a91a8806f926"
   ],
-  "renamedCharacterId": "7e2d87bb-5c66-49b6-bcec-94757ccbc267",
+  "renamedCharacterId": "d7d06345-e87d-4ff6-8773-4a5dac8be47e",
   "retiredCharacterIds": [
-    "fa7d8931-c82c-41e4-b304-cb0cc7382551"
+    "13df00dc-9c29-471a-95d1-a91a8806f926"
   ]
 }
