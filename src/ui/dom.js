@@ -43,10 +43,6 @@ export function pct(bp) {
   return Number.isInteger(v) ? `${v}%` : `${v.toFixed(2)}%`;
 }
 
-export function stars(n, max = 7) {
-  return '★'.repeat(n) + '☆'.repeat(Math.max(0, max - n));
-}
-
 // Mouse-drag horizontal shelves without interfering with their clickable
 // children. Touch and trackpad scrolling continue to use native behavior.
 export function enableMouseDragScroll(element) {

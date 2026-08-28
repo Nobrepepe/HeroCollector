@@ -782,7 +782,7 @@ export function preferredPartyIndex(state, nodeId = null) {
   return 0;
 }
 
-const pinKey = p => p.type === 'equipment' ? `equipment:${p.characterId}:${p.slot}` : `${p.type}:${p.characterId}`;
+export const pinKey = p => p.type === 'equipment' ? `equipment:${p.characterId}:${p.slot}` : `${p.type}:${p.characterId}`;
 export function togglePin(state, pin, content = null) {
   const key = pinKey(pin);
   const idx = state.pins.findIndex(p => pinKey(p) === key);

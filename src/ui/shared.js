@@ -1,5 +1,5 @@
 // Shared UI building blocks used by several screens.
-import { h, fmt, stars } from './dom.js';
+import { h, fmt } from './dom.js';
 import { unlockedSkins } from '../core/state.js';
 import { characterPower } from '../core/power.js';
 
@@ -54,8 +54,13 @@ export function portrait(store, characterId, size = 'md', options = {}) {
   return el;
 }
 
-export function starline(n) {
-  return h('span.starline', { 'aria-label': `${n} of 7 stars` }, stars(n));
+// Each star is its own element so a promotion can address the slot it lands
+// in (design turn 13). Letter-spacing still applies per glyph, so the line
+// reads exactly as it did when it was a single string.
+export function starline(n, max = 7) {
+  return h('span.starline', { 'aria-label': `${n} of ${max} stars` },
+    Array.from({ length: max }, (_, i) =>
+      h(`i.star${i < n ? '.earned' : '.empty'}`, { 'aria-hidden': 'true' }, i < n ? '★' : '☆')));
 }
 
 export function charSub(store, def, cs) {

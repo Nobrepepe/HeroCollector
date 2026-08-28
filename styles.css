@@ -1139,6 +1139,8 @@ table.data th { color: var(--muted-2); font-size: .6875rem; letter-spacing: .16e
 .gallery-power { margin:7px 0 8px; }
 .gallery-ready { color:var(--accent); font-size:.78rem; margin-top:7px; }
 .starline { color:var(--accent); letter-spacing:3px; }
+/* Each star is its own box so a promotion can land in the slot it earned. */
+.starline .star { display:inline-block; font-style:normal; }
 .still-out-there { display:flex; align-items:center; gap:20px; overflow-x:auto; padding:16px 0; }
 .still-out-there > .eyebrow { min-width:110px; }
 .unowned-row { display:flex; align-items:center; gap:9px; flex:none; background:none; border:0; color:var(--text); cursor:pointer; }
@@ -1301,13 +1303,13 @@ table.data th { color: var(--muted-2); font-size: .6875rem; letter-spacing: .16e
 /* ---------- Character ---------- */
 .character-back { position:absolute; z-index:3; top:0; left:0; }
 .character-page { min-height:calc(100vh - 116px); position:relative; display:grid; grid-template-columns:minmax(390px,42%) 1fr; gap:30px; margin:-36px -20px -80px -52px; }
-.character-page::before { content:""; position:absolute; left:-80px; bottom:0; width:720px; height:760px; background:radial-gradient(circle,var(--character-color),transparent 67%); opacity:.2; }
+.character-page::before { content:""; position:absolute; left:-80px; bottom:0; width:720px; height:760px; background:radial-gradient(circle,var(--character-color),transparent 67%); opacity:.2; transition:opacity .9s ease-out, transform .9s ease-out; }
 .character-art { position:relative; z-index:1; min-height:760px; display:flex; align-items:flex-end; justify-content:center; }
 .character-art img { width:100%; height:100%; object-fit:cover; object-position:top center; }
 .character-glyph { font:400 13rem var(--serif); color:var(--character-color); margin:auto; }
 .character-body { position:relative; z-index:2; padding:64px 30px 60px 0; min-width:0; }
 .character-body h1 { margin:8px 0 4px; overflow-wrap:anywhere; }
-.character-body > .starline { font-size:1.06rem; letter-spacing:6px; }
+.character-body > .starline { position:relative; display:inline-block; font-size:1.06rem; letter-spacing:6px; }
 .character-power { margin:34px 0 28px; max-width:650px; }
 .power-line { display:flex; align-items:flex-end; gap:22px; }
 .character-progress { width:min(600px,100%); margin:13px 0; }
@@ -1319,6 +1321,50 @@ table.data th { color: var(--muted-2); font-size: .6875rem; letter-spacing: .16e
 .power-row { display:flex; justify-content:space-between; padding:8px 0; }
 .power-row.total { color:var(--text); }
 .equipment-line-link { display:block; margin:8px 0; }
+
+/* ---------- The star promotion (13) ----------
+   Everything here exists only while the sequence plays. The screen underneath
+   is already settled — nothing below changes what the page says, only when it
+   says it. Timing lives in src/ui/promotion.js; this is the material. */
+.character-power .display-l { font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+.character-progress div { transform-origin:right center; }
+.promotion-leaving { pointer-events:none; }
+
+/* The shards, leaving the bar as one bead of light. */
+.promotion-bead {
+  position:absolute; z-index:4; width:8px; height:8px; border-radius:50%;
+  background:#fff3dc; box-shadow:0 0 16px 5px rgba(233,169,79,.75); pointer-events:none;
+}
+.promotion-bloom {
+  position:absolute; z-index:3; width:220px; height:220px; border-radius:50%; pointer-events:none;
+  background:radial-gradient(closest-side,rgba(255,231,190,.9),rgba(233,169,79,.35) 40%,transparent 72%);
+}
+/* The slot keeps its empty ☆ until the bead arrives to replace it. */
+.promotion-ghost { position:absolute; text-align:center; pointer-events:none; }
+.starline .star.promotion-new { color:#f6c67f; text-shadow:0 0 18px rgba(233,169,79,.9); }
+
+/* Her art relights: the ambient radial grows and stays, one sheen crosses the
+   full body, seven embers drift up and die. */
+.character-page.promotion-relit::before { opacity:.28; transform:scale(1.08); }
+.promotion-sheen {
+  position:absolute; top:-10%; left:0; width:46%; height:120%; pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(255,226,182,.5),transparent);
+}
+.promotion-ember {
+  position:absolute; border-radius:50%; pointer-events:none;
+  background:var(--ember); box-shadow:0 0 9px 2px var(--ember-glow);
+}
+
+/* The payoff stands in the space the gear row left behind. */
+.promotion-payoff { position:absolute; z-index:2; max-width:790px; }
+.promotion-headline { font:400 clamp(2.4rem,4.2vw,3.75rem)/1.02 var(--serif); text-wrap:balance; }
+.promotion-line { display:flex; gap:14px; align-items:flex-start; margin-top:16px; }
+.promotion-headline + .promotion-line { margin-top:34px; }
+.promotion-line p { margin:0; font-size:.906rem; line-height:1.6; color:var(--text-dim); text-wrap:pretty; }
+.promotion-line.quiet p { color:var(--muted); }
+.promotion-dot { position:relative; top:7px; flex:none; width:7px; height:7px; border-radius:50%; background:var(--accent); }
+.promotion-line.good .promotion-dot { background:var(--good); box-shadow:0 0 12px 2px rgba(111,201,160,.45); }
+.promotion-line.quiet .promotion-dot { background:rgba(244,236,225,.3); }
 
 @media (max-width: 1180px) {
   .today-page { margin-left:-32px; margin-right:-32px; padding-left:32px; padding-right:32px; }

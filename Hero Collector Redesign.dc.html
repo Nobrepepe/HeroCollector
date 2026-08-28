@@ -26,7 +26,218 @@ a{color:#e9a94f;text-decoration:none}a:hover{color:#f6c67f}
 .dv-next{margin:24px 0 0;font:12px/1.6 Figtree,sans-serif;color:#7d7269}
 @keyframes hc-pulse{0%,100%{opacity:.35;transform:scale(1)}50%{opacity:.9;transform:scale(1.06)}}
 @keyframes hc-drift{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes hc-pdim{0%,8%{opacity:1}17%,86.5%{opacity:.22}95%,100%{opacity:1}}
+@keyframes hc-pclear{0%,8%{opacity:1;transform:translateY(0)}15%,86.5%{opacity:0;transform:translateY(16px)}95%,100%{opacity:1;transform:translateY(0)}}
+@keyframes hc-pbar{0%,8%{transform:scaleX(1);opacity:1}20.3%{transform:scaleX(.008);opacity:1}22%{opacity:0}94%{transform:scaleX(.008);opacity:0}100%{transform:scaleX(1);opacity:1}}
+@keyframes hc-pbead{0%,19%{opacity:0;transform:translate(0,0) scale(.6)}20.3%{opacity:1;transform:translate(0,0) scale(1)}22%{opacity:1;transform:translate(-200px,-96px) scale(.9)}23%{opacity:1;transform:translate(-477px,-150px) scale(.55)}23.8%{opacity:0;transform:translate(-477px,-150px) scale(.3)}100%{opacity:0;transform:translate(-477px,-150px) scale(.3)}}
+@keyframes hc-pflash{0%,22.6%{opacity:0;transform:translate(-50%,-50%) scale(.18)}24.3%{opacity:1;transform:translate(-50%,-50%) scale(.7)}31%{opacity:0;transform:translate(-50%,-50%) scale(2.1)}100%{opacity:0;transform:translate(-50%,-50%) scale(.18)}}
+@keyframes hc-pstar{0%,23%{opacity:0;transform:scale(2.8) rotate(-26deg)}25.7%{opacity:1;transform:scale(1) rotate(0)}27.5%{transform:scale(1.18)}30%{transform:scale(1)}86.5%{opacity:1;transform:scale(1)}93%,100%{opacity:0;transform:scale(2.8) rotate(-26deg)}}
+@keyframes hc-pghost{0%,20%{opacity:1}23%{opacity:0}93%{opacity:0}100%{opacity:1}}
+@keyframes hc-pflare{0%,23%{filter:none}26%{filter:brightness(1.7) drop-shadow(0 0 14px rgba(233,169,79,.85))}34%,100%{filter:none}}
+@keyframes hc-ppower{0%,23%{transform:scale(1)}26.5%{transform:scale(1.06)}34%,100%{transform:scale(1)}}
+@keyframes hc-pdelta{0%,25%{opacity:0}29%{opacity:1}86.5%{opacity:1}92%,100%{opacity:0}}
+@keyframes hc-pin{0%,32.4%{opacity:0;transform:translateY(14px)}38%{opacity:1;transform:translateY(0)}86.5%{opacity:1;transform:translateY(0)}92%,100%{opacity:0;transform:translateY(14px)}}
+@keyframes hc-plate{0%,40.5%{opacity:0;transform:translateY(10px)}46%{opacity:1;transform:translateY(0)}86.5%{opacity:1;transform:translateY(0)}92%,100%{opacity:0;transform:translateY(10px)}}
+@keyframes hc-prelight{0%,20%{opacity:.55;transform:scale(1)}27%{opacity:1;transform:scale(1.08)}40%{opacity:.88;transform:scale(1.04)}86.5%{opacity:.88}96%,100%{opacity:.55;transform:scale(1)}}
+@keyframes hc-psheen{0%,22%{opacity:0;transform:translateX(-60%)}25%{opacity:.5}38%,100%{opacity:0;transform:translateX(150%)}}
+@keyframes hc-pspark{0%,22%{opacity:0;transform:translateY(0) scale(1)}26%{opacity:.85}48%,100%{opacity:0;transform:translateY(-260px) scale(.35)}}
+@keyframes hc-pquiet{0%,8%{opacity:1}13.5%{opacity:0}93%{opacity:0}100%{opacity:1}}
 </style></helmet>
+
+<section class="dv-turn" id="t13">
+<div class="dv-thd"><span class="dv-tid">13</span><span class="dv-tname">The star promotion — the one moment worth stopping the screen for</span></div>
+<p style="margin:-8px 0 26px;max-width:1000px;font:400 13.5px/1.7 Figtree,sans-serif;color:#a2958a">Today a promotion is a button that stops being disabled and a toast that says <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">⭐ Ashley: 2,192 → 2,442 Power</code> (<code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">promoteWithFeedback</code>, <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">src/ui/character.js</code>). It is the largest single jump a character ever makes — days of shards, spent in one act — and it currently reads smaller than crafting a component. Three decisions: it happens <strong style="color:#f4ece1;font-weight:500">in place</strong>, no modal, because the reward is <em>this</em> character being more than she was; <strong style="color:#f4ece1;font-weight:500">the shards become the star</strong> — the progress bar's own light is what detaches, flies up and strikes the empty slot, so the spend and the gain are one gesture; and the payoff is <strong style="color:#f4ece1;font-weight:500">consequences, not confetti</strong> — three sentences naming what is newly possible. <a class="dv-oid" href="#13a">13a</a> plays on a loop; <a class="dv-oid" href="#13b">13b</a> is the beat sheet to build from.</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="13a"><div class="dv-olabel"><span class="dv-oid">13a</span>The moment, playing — 7.4s, looping</div>
+<div class="dv-card" style="width:1440px;height:900px;position:relative;overflow:hidden;background:#12100f;color:#f4ece1;font-family:Figtree,system-ui,sans-serif">
+<div style="position:absolute;inset:0;background:radial-gradient(75% 80% at 22% 62%,rgba(226,96,63,.28),transparent 60%);animation:hc-prelight 7.4s ease-in-out infinite"></div>
+
+<div style="position:absolute;left:-60px;bottom:-40px;width:700px;height:940px;overflow:hidden;-webkit-mask-image:radial-gradient(62% 55% at 52% 48%,#000 46%,transparent 80%);mask-image:radial-gradient(62% 55% at 52% 48%,#000 46%,transparent 80%)">
+<div style="position:absolute;inset:0;background:repeating-linear-gradient(100deg,#3c2b21 0 10px,#2b1f18 10px 20px)"></div>
+<div style="position:absolute;top:-10%;left:0;width:46%;height:120%;opacity:0;background:linear-gradient(100deg,transparent,rgba(255,226,182,.5),transparent);animation:hc-psheen 7.4s ease-in-out infinite"></div>
+</div>
+<div style="position:absolute;left:170px;bottom:70px;font:11px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.4)">full body — 9:16, bleeds off frame</div>
+
+<div style="position:absolute;left:150px;top:640px;width:6px;height:6px;border-radius:50%;background:#f6c67f;opacity:0;box-shadow:0 0 10px 2px rgba(233,169,79,.6);animation:hc-pspark 7.4s ease-out infinite"></div>
+<div style="position:absolute;left:232px;top:690px;width:4px;height:4px;border-radius:50%;background:#e9a94f;opacity:0;box-shadow:0 0 8px 2px rgba(233,169,79,.5);animation:hc-pspark 7.4s ease-out .18s infinite"></div>
+<div style="position:absolute;left:300px;top:620px;width:5px;height:5px;border-radius:50%;background:#f6c67f;opacity:0;box-shadow:0 0 9px 2px rgba(233,169,79,.5);animation:hc-pspark 7.4s ease-out .34s infinite"></div>
+<div style="position:absolute;left:372px;top:706px;width:3px;height:3px;border-radius:50%;background:#e9a94f;opacity:0;animation:hc-pspark 7.4s ease-out .1s infinite"></div>
+<div style="position:absolute;left:428px;top:660px;width:5px;height:5px;border-radius:50%;background:#e2603f;opacity:0;box-shadow:0 0 10px 2px rgba(226,96,63,.5);animation:hc-pspark 7.4s ease-out .46s infinite"></div>
+<div style="position:absolute;left:196px;top:588px;width:3px;height:3px;border-radius:50%;background:#f6c67f;opacity:0;animation:hc-pspark 7.4s ease-out .58s infinite"></div>
+<div style="position:absolute;left:344px;top:748px;width:4px;height:4px;border-radius:50%;background:#f6c67f;opacity:0;box-shadow:0 0 8px 2px rgba(233,169,79,.45);animation:hc-pspark 7.4s ease-out .26s infinite"></div>
+
+<div style="position:absolute;left:52px;top:40px;font-size:13.5px;color:#8e8278;animation:hc-pdim 7.4s ease-in-out infinite">← Collection</div>
+<div style="position:absolute;left:560px;top:96px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#8e8278;animation:hc-pdim 7.4s ease-in-out infinite">Rebel · Fire · First Years · Eden Magic Academy</div>
+
+<div style="position:absolute;left:560px;top:112px;font-family:'Instrument Serif',serif;font-size:104px;line-height:.98">Ashley</div>
+
+<div style="position:absolute;left:560px;top:232px;display:flex;gap:6px;align-items:center;font-size:17px;line-height:22px">
+<span style="width:22px;text-align:center;color:#e9a94f;animation:hc-pflare 7.4s ease-out infinite">★</span>
+<span style="width:22px;text-align:center;color:#e9a94f;animation:hc-pflare 7.4s ease-out infinite">★</span>
+<span style="width:22px;text-align:center;color:#e9a94f;animation:hc-pflare 7.4s ease-out infinite">★</span>
+<span style="width:22px;text-align:center;color:#e9a94f;animation:hc-pflare 7.4s ease-out infinite">★</span>
+<span style="position:relative;width:22px;height:22px;text-align:center">
+<span style="position:absolute;inset:0;color:rgba(244,236,225,.22);animation:hc-pghost 7.4s ease-in-out infinite">☆</span>
+<span style="position:absolute;left:50%;top:50%;width:220px;height:220px;transform:translate(-50%,-50%) scale(.18);opacity:0;border-radius:50%;background:radial-gradient(closest-side,rgba(255,231,190,.9),rgba(233,169,79,.35) 40%,transparent 72%);animation:hc-pflash 7.4s ease-out infinite"></span>
+<span style="position:absolute;inset:0;color:#f6c67f;opacity:0;text-shadow:0 0 18px rgba(233,169,79,.9);animation:hc-pstar 7.4s cubic-bezier(.2,1.5,.4,1) infinite">★</span>
+</span>
+<span style="width:22px;text-align:center;color:rgba(244,236,225,.22)">☆</span>
+<span style="width:22px;text-align:center;color:rgba(244,236,225,.22)">☆</span>
+</div>
+
+<div style="position:absolute;left:560px;top:276px;display:flex;align-items:flex-end;gap:20px">
+<div style="font-family:'Instrument Serif',serif;font-size:78px;line-height:.9;transform-origin:left bottom;animation:hc-ppower 7.4s cubic-bezier(.3,1.4,.5,1) infinite;font-variant-numeric:tabular-nums"><span ref="{{ promoRef }}">2,192</span></div>
+<div style="position:relative;padding-bottom:10px;width:330px;height:44px">
+<div style="position:absolute;left:0;top:0;animation:hc-pquiet 7.4s ease-in-out infinite">
+<div style="font-size:14px;color:#6fc9a0">+72 since this morning</div>
+<div style="font-size:12.5px;color:#8e8278">power · fourth of ten in your roster</div>
+</div>
+<div style="position:absolute;left:0;top:0;opacity:0;animation:hc-pdelta 7.4s ease-out infinite">
+<div style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.1;color:#6fc9a0">+250</div>
+<div style="font-size:12.5px;color:#b8aca1">power · second of ten — she passes Carol</div>
+</div>
+</div>
+</div>
+
+<div style="position:absolute;left:560px;top:392px;width:600px;height:2px;background:rgba(244,236,225,.1)"></div>
+<div style="position:absolute;left:560px;top:392px;width:600px;height:2px;transform-origin:right center;background:linear-gradient(to right,#e2603f,#e9a94f 70%,#f6c67f);animation:hc-pbar 7.4s cubic-bezier(.7,0,.3,1) infinite"></div>
+<div style="position:absolute;left:1156px;top:389px;width:8px;height:8px;border-radius:50%;opacity:0;background:#fff3dc;box-shadow:0 0 16px 5px rgba(233,169,79,.75);animation:hc-pbead 7.4s cubic-bezier(.4,0,.3,1) infinite"></div>
+
+<div style="position:absolute;left:560px;top:412px;display:flex;gap:11px;align-items:flex-start;animation:hc-pquiet 7.4s ease-in-out infinite">
+<span style="position:relative;top:7px;width:7px;height:7px;flex:none;border-radius:50%;background:#e9a94f;animation:hc-pulse 2.4s ease-in-out infinite"></span>
+<div style="font-size:14px;line-height:1.6;color:#b8aca1">Seventy-five shards are in — the fifth star is hers whenever you want it. <span style="color:#e9a94f">Give her the star →</span></div>
+</div>
+
+<div style="position:absolute;left:560px;top:500px;width:820px;opacity:0;animation:hc-pin 7.4s cubic-bezier(.2,.9,.3,1) infinite">
+<div style="font-family:'Instrument Serif',serif;font-size:60px;line-height:1.02">The fifth star is hers.</div>
+</div>
+
+<div style="position:absolute;left:560px;top:600px;width:790px;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;gap:14px;align-items:flex-start;opacity:0;animation:hc-plate 7.4s ease-out infinite">
+<span style="position:relative;top:7px;width:7px;height:7px;flex:none;border-radius:50%;background:#6fc9a0;box-shadow:0 0 12px 2px rgba(111,201,160,.45)"></span>
+<div style="font-size:14.5px;line-height:1.6;color:#b8aca1;text-wrap:pretty">Shadow 8 comes inside reach — it asks 2,400 and she reads <span style="color:#f4ece1">2,442</span>.</div>
+</div>
+<div style="display:flex;gap:14px;align-items:flex-start;opacity:0;animation:hc-plate 7.4s ease-out .14s infinite">
+<span style="position:relative;top:7px;width:7px;height:7px;flex:none;border-radius:50%;background:#e9a94f"></span>
+<div style="font-size:14.5px;line-height:1.6;color:#b8aca1;text-wrap:pretty">Gear tier five may open now. The Emblem slot was waiting on this.</div>
+</div>
+<div style="display:flex;gap:14px;align-items:flex-start;opacity:0;animation:hc-plate 7.4s ease-out .28s infinite">
+<span style="position:relative;top:7px;width:7px;height:7px;flex:none;border-radius:50%;background:rgba(244,236,225,.3)"></span>
+<div style="font-size:14.5px;line-height:1.6;color:#a2958a;text-wrap:pretty">Her sixth star asks a hundred and ten shards. Shadow 6 still drops them.</div>
+</div>
+</div>
+
+<div style="position:absolute;left:560px;top:600px;width:800px;animation:hc-pclear 7.4s ease-out infinite">
+<div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Gear tier four · four of six</div>
+<div style="display:flex;gap:30px;margin-top:22px;align-items:flex-start">
+<sc-for list="{{ gear }}" as="g" hint-placeholder-count="6">
+<div style="display:flex;flex-direction:column;align-items:center;gap:10px;width:96px;{{ g.lift }}">
+<div style="position:relative;width:74px;height:74px">
+<div style="{{ g.ring }}"></div>
+<div style="{{ g.inner }}">{{ g.icon }}</div>
+</div>
+<div style="text-align:center;font-size:12px;color:{{ g.labelColor }};line-height:1.3">{{ g.label }}</div>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="position:absolute;left:560px;bottom:56px;width:800px;animation:hc-pclear 7.4s ease-out infinite">
+<div style="height:1px;background:linear-gradient(to right,transparent,rgba(244,236,225,.14) 10%,rgba(244,236,225,.14) 72%,transparent)"></div>
+<div style="display:flex;gap:38px;margin-top:16px;font-size:13.5px;color:#a2958a">
+<span>Power, itemised <span style="color:#6f645c">⌄</span></span>
+<span>Her story <span style="color:#6f645c">⌄</span></span>
+<span style="margin-left:auto;color:#e9a94f">Add to party</span>
+</div>
+</div>
+
+<div style="position:absolute;right:52px;bottom:34px;font-size:12px;color:#6f645c;opacity:0;animation:hc-plate 7.4s ease-out .42s infinite">click anywhere and it settles at once</div>
+</div>
+</div>
+
+<div class="dv-opt" id="13b"><div class="dv-olabel"><span class="dv-oid">13b</span>The beat sheet — what moves, when, and how it degrades</div>
+<div class="dv-card" style="width:1060px;height:900px;position:relative;overflow:hidden;background:#12100f;color:#f4ece1;font-family:Figtree,system-ui,sans-serif;padding:44px 52px;box-sizing:border-box">
+<div style="position:absolute;inset:0;background:radial-gradient(70% 50% at 84% -6%,rgba(233,169,79,.1),transparent 62%)"></div>
+<div style="position:relative">
+<div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Promotion sequence · 7.4 seconds, then it is just the character screen</div>
+<div style="margin-top:10px;font-family:'Instrument Serif',serif;font-size:40px;line-height:1.04">Nine beats. Only three of them<br>are decoration.</div>
+
+<div style="margin-top:24px;height:2px;background:linear-gradient(to right,#e2603f 0%,#e9a94f 22%,#f6c67f 34%,rgba(244,236,225,.16) 58%,rgba(244,236,225,.16) 100%)"></div>
+<div style="margin-top:7px;display:flex;font:11px ui-monospace,Menlo,monospace;color:#6f645c">
+<span style="width:14.6%">0s</span><span style="width:13.5%">1.0</span><span style="width:9.5%">1.7</span><span style="width:12.2%">2.4</span><span style="width:16.2%">3.6</span><span style="width:34%">hold →</span>
+</div>
+
+<div style="margin-top:20px;display:flex;flex-direction:column;gap:0">
+<div style="display:flex;gap:22px;align-items:baseline;padding:5px 0;border-top:1px solid rgba(244,236,225,.09)">
+<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#8e8278">0 – 600</span>
+<span style="width:186px;flex:none;font-size:14px;font-weight:600">Quiet</span>
+<span style="flex:1;font-size:13.5px;line-height:1.55;color:#a2958a">The bar is full, the ember dot breathes, the sentence offers the star. Nothing is disabled and nothing shouts.</span>
+</div>
+<div style="display:flex;gap:22px;align-items:baseline;padding:5px 0;border-top:1px solid rgba(244,236,225,.09)">
+<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#8e8278">600 – 1000</span>
+<span style="width:186px;flex:none;font-size:14px;font-weight:600">Everything else leaves</span>
+<span style="flex:1;font-size:13.5px;line-height:1.55;color:#a2958a">Gear row and footer fall 16px and go to zero; eyebrow and back-link dim to 22%. Name, stars, power and art stay lit — <span style="color:#f4ece1">ease-out</span>.</span>
+</div>
+<div style="display:flex;gap:22px;align-items:baseline;padding:5px 0;border-top:1px solid rgba(244,236,225,.09)">
+<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">1000 – 1500</span>
+<span style="width:186px;flex:none;font-size:14px;font-weight:600">The shards collapse</span>
+<span style="flex:1;font-size:13.5px;line-height:1.55;color:#a2958a">The fill scales toward its own right end until only a bead of light is left — the spend, drawn once. <span style="color:#f4ece1">cubic-bezier(.7,0,.3,1)</span>.</span>
+</div>
+<div style="display:flex;gap:22px;align-items:baseline;padding:5px 0;border-top:1px solid rgba(244,236,225,.09)">
+<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">1500 – 1700</span>
+<span style="width:186px;flex:none;font-size:14px;font-weight:600">The bead travels</span>
+<span style="flex:1;font-size:13.5px;line-height:1.55;color:#a2958a">477px left, 150px up, into the fifth slot, shrinking to 55%. The empty ☆ fades out to meet it.</span>
+</div>
+<div style="display:flex;gap:22px;align-items:baseline;padding:5px 0;border-top:1px solid rgba(244,236,225,.09)">
+<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">1700 – 1900</span>
+<span style="width:186px;flex:none;font-size:14px;font-weight:600">Strike</span>
+<span style="flex:1;font-size:13.5px;line-height:1.55;color:#a2958a">A bloom expands from the slot and dies inside 500ms. The star lands from scale 2.8 and −26°, overshoots to 1.18, settles. The four earned stars flare once.</span>
+</div>
+<div style="display:flex;gap:22px;align-items:baseline;padding:5px 0;border-top:1px solid rgba(244,236,225,.09)">
+<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">1700 – 2550</span>
+<span style="width:186px;flex:none;font-size:14px;font-weight:600">The number answers</span>
+<span style="flex:1;font-size:13.5px;line-height:1.55;color:#a2958a">2,192 rolls to 2,442 over 850ms, ease-out, tabular figures so nothing jitters. The numeral bumps 6%; the rank line swaps for the new standing.</span>
+</div>
+<div style="display:flex;gap:22px;align-items:baseline;padding:5px 0;border-top:1px solid rgba(244,236,225,.09)">
+<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#8e8278">1800 – 3200</span>
+<span style="width:186px;flex:none;font-size:14px;font-weight:600">Her art relights</span>
+<span style="flex:1;font-size:13.5px;line-height:1.55;color:#a2958a">The ambient radial in her colour grows 8% and stays there. One sheen crosses the full body. Seven embers drift 260px up and die — no confetti, no burst.</span>
+</div>
+<div style="display:flex;gap:22px;align-items:baseline;padding:5px 0;border-top:1px solid rgba(244,236,225,.09)">
+<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#8e8278">2400 – 2900</span>
+<span style="width:186px;flex:none;font-size:14px;font-weight:600">The sentence</span>
+<span style="flex:1;font-size:13.5px;line-height:1.55;color:#a2958a">“The fifth star is hers.” — 60px serif, rising 14px into the space the gear row left behind.</span>
+</div>
+<div style="display:flex;gap:22px;align-items:baseline;padding:5px 0;border-top:1px solid rgba(244,236,225,.09);border-bottom:1px solid rgba(244,236,225,.09)">
+<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#8e8278">3000 – 4300</span>
+<span style="width:186px;flex:none;font-size:14px;font-weight:600">The consequences</span>
+<span style="flex:1;font-size:13.5px;line-height:1.55;color:#a2958a">Three lines, 140ms apart, each naming something newly possible — a node in reach, a gear tier allowed, the next star priced. This is the reward.</span>
+</div>
+</div>
+
+<div style="margin-top:22px;display:flex;gap:44px;align-items:flex-start">
+<div style="flex:1">
+<div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">It can always be cut short</div>
+<div style="margin-top:10px;font-size:13.5px;line-height:1.6;color:#a2958a;text-wrap:pretty">A click at any point jumps to the settled state — nothing is queued behind the animation, and no input is swallowed. Promote twice in a row and the second sequence starts from the settled screen.</div>
+</div>
+<div style="flex:1">
+<div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">prefers-reduced-motion</div>
+<div style="margin-top:10px;font-size:13.5px;line-height:1.6;color:#a2958a;text-wrap:pretty">No travel, no sheen, no embers. The dim still happens; the star, the number and the three lines cross-fade in over 180ms. The moment survives as a change of state.</div>
+</div>
+</div>
+
+<div style="margin-top:20px;display:flex;gap:12px;align-items:flex-start">
+<span style="position:relative;top:7px;width:7px;height:7px;flex:none;border-radius:50%;background:#e9a94f;animation:hc-pulse 2.8s ease-in-out infinite"></span>
+<div style="font-size:13.5px;line-height:1.6;color:#a2958a;text-wrap:pretty">Where it hooks: <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">promoteWithFeedback()</code> replaces its <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">toast()</code> with this sequence. <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">promoteStar()</code> already returns <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">powerBefore</code>/<code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">powerAfter</code> for the roll, and <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">balance.starPowerCumulative</code> gives the +250. The three consequence lines need one new selector — the same reach/gear/next-star check the roster already runs for <em>a star is ready</em>.</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">The same shape covers the two neighbouring moments if you want them: <strong style="color:#a2958a;font-weight:500">a gear tier completing</strong> (the bead flies into the gear ring instead of the starline) and <strong style="color:#a2958a;font-weight:500">a character joining</strong> at <a class="dv-oid" href="#1b">1b</a> — where the art arrives rather than relights.</p>
+</section>
 
 <section class="dv-turn" id="t12">
 <div class="dv-thd"><span class="dv-tid">12</span><span class="dv-tname">Worlds — choosing one, and standing inside it</span></div>
@@ -2878,6 +3089,30 @@ const FACE = (c) => `position:absolute;inset:0;border-radius:50%;display:flex;al
 const SMALLFACE = (c) => `width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;background:radial-gradient(75% 75% at 40% 30%,${c},#1c1611)`;
 
 class Component extends DCLogic {
+  promoRef = React.createRef();
+
+  componentDidMount() {
+    const T = 7400, START = 1700, DUR = 850, FROM = 2192, TO = 2442, END = 6880;
+    const t0 = performance.now();
+    const tick = (now) => {
+      const el = this.promoRef.current;
+      if (el) {
+        const t = (now - t0) % T;
+        let v = FROM;
+        if (t >= START && t < START + DUR) {
+          const p = (t - START) / DUR;
+          v = FROM + (TO - FROM) * (1 - Math.pow(1 - p, 3));
+        } else if (t >= START + DUR && t < END) v = TO;
+        const next = Math.round(v).toLocaleString('en-US');
+        if (el.textContent !== next) el.textContent = next;
+      }
+      this._raf = requestAnimationFrame(tick);
+    };
+    this._raf = requestAnimationFrame(tick);
+  }
+
+  componentWillUnmount() { cancelAnimationFrame(this._raf); }
+
   renderVals() {
     const gallery = [
       ['Liadriel','✨','#c9a35e','Leader',6,'3,410','',94,''],
@@ -3050,7 +3285,7 @@ class Component extends DCLogic {
       hintColor: owned === 2 ? '#e9a94f' : '#8e8278'
     }));
 
-    return { gallery, unmet, readyNow, gear, party, path, chapters, cast, nodeRows, relics };
+    return { gallery, unmet, readyNow, gear, party, path, chapters, cast, nodeRows, relics, promoRef: this.promoRef };
   }
 }
 </script>

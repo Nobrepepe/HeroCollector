@@ -7,7 +7,9 @@ import {
 import { starline, activeSkin } from './shared.js';
 import { openFindSources } from './find-sources.js';
 import { gearPanel, openGearDialog } from './gear.js';
-import { toast } from '../app.js';
+import { playPromotion, settlePromotion } from './promotion.js';
+import { promotionSnapshot, promotionConsequences, starName } from '../core/consequences.js';
+import { render } from '../app.js';
 import { characterExpedition } from '../core/expeditions.js';
 import { hqState } from '../core/hq.js';
 
@@ -53,6 +55,10 @@ export function renderCharacter(store, root, characterId) {
   page.appendChild(body);
   root.appendChild(page);
 
+  // A promotion that just committed plays here, on the settled page, before
+  // the browser has painted it (turn 13).
+  playPromotion(store, page, characterId);
+
   if (store.ui.pendingReopen?.gear?.characterId === characterId) {
     const pending = store.ui.pendingReopen;
     store.ui.pendingReopen = null;
@@ -67,13 +73,13 @@ function ownedProgress(store, def, cs, power) {
   wrap.appendChild(h('div.power-line',
     h('div.display-l', fmt(power.total)),
     h('div', delta > 0 ? h('div.good', `+${fmt(delta)} from your last upgrade`) : null,
-      h('div.caption', `power · ${powerRank(store, def.id)} in your collection`))));
+      h('div.caption.power-rank', `power · ${powerRank(store, def.id)} in your collection`))));
   if (cs.stars < 7) {
     const need = store.content.balance.starShards[cs.stars];
     const gain = store.content.balance.starPowerCumulative[cs.stars] - store.content.balance.starPowerCumulative[cs.stars - 1];
     wrap.append(
       h('div.progressbar.character-progress', h('div', { style: { width: `${Math.min(100, cs.shards / need * 100)}%` } })),
-      h('p', `${fmt(Math.max(0, need - cs.shards))} more shards and the ${ordinal(cs.stars + 1)} star adds ${fmt(gain)}. `,
+      h('p.character-shard-note', `${fmt(Math.max(0, need - cs.shards))} more shards and the ${ordinal(cs.stars + 1)} star adds ${fmt(gain)}. `,
         h('button.link', { onclick: () => openFindSources(store, { type: 'shards', id: def.id }) }, 'Where they drop →')));
     const check = checkPromoteStar(store.content, store.state, def.id);
     wrap.appendChild(h('div.character-actions',
@@ -128,10 +134,28 @@ function ordinal(n) {
   return `${n}${n % 10 === 1 ? 'st' : n % 10 === 2 ? 'nd' : n % 10 === 3 ? 'rd' : 'th'}`;
 }
 
-function promoteWithFeedback(store, characterId) {
-  store.tx(() => {
-    const result = promoteStar(store.content, store.state, characterId);
-    if (result.ok) toast(`⭐ ${store.content.characterById[characterId].displayName}: ${fmt(result.powerBefore)} → ${fmt(result.powerAfter)} Power`);
-    return result;
-  });
+// Turn 13: the promotion is the largest single jump a character ever makes,
+// so it is played on the character screen rather than announced by a toast.
+// The reading of what the star made possible is a diff, which is why the
+// before-snapshot is taken outside the transaction that spends the shards.
+async function promoteWithFeedback(store, characterId) {
+  settlePromotion();
+  const before = promotionSnapshot(store.content, store.state, characterId);
+  const result = await store.tx(() => promoteStar(store.content, store.state, characterId), { rerender: false });
+  // The save is written before the sequence is even described, so a screen
+  // left during the await simply renders the settled state.
+  if (!result.ok || location.hash !== `#/character/${characterId}`) { render(); return; }
+  store.ui.promotion = {
+    characterId, before,
+    powerBefore: result.powerBefore, powerAfter: result.powerAfter,
+    headline: promotionHeadline(store.content.characterById[characterId].displayName, result.stars),
+    consequences: promotionConsequences(store.content, store.state, characterId, before)
+  };
+  render();
+}
+
+// Characters carry no pronouns, so the sentence names them: "The fifth star
+// is Ashley’s." A name already ending in s takes the bare apostrophe.
+function promotionHeadline(name, stars) {
+  return `The ${starName(stars)} star is ${/s$/i.test(name) ? `${name}’` : `${name}’s`}.`;
 }
