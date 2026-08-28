@@ -155,10 +155,13 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
 
   /* ---- expeditions ---- */
   const productionSets = assetSets.hc_expedition_art ?? [];
+  const guaranteedSupplyTemplateId = (values.hc_expedition_templates ?? [])
+    .find((template) => template.exptpl_supply === true)?.exptpl_id ?? null;
   const expeditions = {
     settings: {
       offerCount: 5, slotCount: 3, freeRerolls: 1, freePins: 1, minimumFeasible: 2,
       generationAttempts: 40, cycleLengthDays: 4, cycleScaleBp: 40000,
+      guaranteedSupplyTemplateId,
       intelligenceCosts: { reroll: 1, pin: 1, reveal: 1 },
       resultMultipliersBp: { completed: 10000, successful: 12500, exceptional: 15000 },
     },
@@ -178,6 +181,11 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
       id: reward.expreward_id, displayName: reward.expreward_name,
       rare: reward.expreward_rare === true,
       entries: entriesFrom(reward.expreward_entries, 'rentry', { range: true }),
+      // A lead range makes routes with this package character leads: the
+      // player chooses a revealed hero of the route's world at launch.
+      ...(reward.expreward_lead_max
+        ? { shardPool: 'associated_or_any', shardRange: [reward.expreward_lead_min ?? 1, reward.expreward_lead_max] }
+        : {}),
     })),
     templates: (values.hc_expedition_templates ?? []).map((template) => ({
       id: template.exptpl_id, enabled: true,
@@ -191,7 +199,8 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
       powerRatioBp: template.exptpl_power_ratio_bp ?? 10000,
       titles: template.exptpl_titles ?? [],
       descriptions: template.exptpl_descriptions ?? [],
-      fixedRewards: [],
+      fixedRewards: template.exptpl_supply === true
+        ? [{ kind: 'resource', id: 'field_supply', qty: 1 }] : [],
     })),
     reports: {
       completed: ['The party returned with everything promised.'],
