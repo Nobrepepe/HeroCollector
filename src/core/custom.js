@@ -351,60 +351,6 @@ export function upgradeCustomDB(db) {
   return out;
 }
 
-let idCounter = 0;
-export function newId(prefix) {
-  idCounter = (idCounter + 1) % 1000;
-  return `${prefix}_${Date.now().toString(36)}${idCounter.toString(36)}`;
-}
-
-// ---------------------------------------------------------------- factories
-const WC_RANGES = [[9500, 12500], [12800, 15800], [16100, 19500]];
-const WC_GRADES = ['improved', 'improved', 'advanced'];
-const FAMILIES = ['metal', 'fiber', 'mineral', 'compound', 'mechanism', 'essence'];
-// Suggested Main Campaign pacing (GDD 8.1); later chapters continue upward.
-const MAIN_RANGES = [[5500, 7500], [7800, 10500], [10800, 14000], [14300, 18000], [18400, 22500], [23000, 27500]];
-const MAIN_GRADES = ['basic', 'improved', 'advanced', 'superior', 'superior', 'masterwork'];
-
-export function newCustomWorld(name) {
-  const id = newId('cw');
-  const campaignNodes = [];
-  for (let ch = 0; ch < 3; ch++) {
-    const [lo, hi] = WC_RANGES[ch];
-    for (let i = 0; i < 10; i++) {
-      campaignNodes.push({
-        name: `Chapter ${ch + 1} — Node ${i + 1}`,
-        threshold: Math.round((lo + ((hi - lo) * i) / 9) / 50) * 50,
-        family: FAMILIES[(ch * 10 + i) % 6],
-        grade: WC_GRADES[ch]
-      });
-    }
-  }
-  const collections = [];
-  for (let c = 0; c < 3; c++) {
-    collections.push({
-      name: `Collection ${c + 1}`,
-      rewardSkin: { characterId: null, skinId: null },
-      relics: Array.from({ length: 5 }, (_, r) => ({ name: `Relic ${c * 5 + r + 1}`, lore: '', image: null }))
-    });
-  }
-  return {
-    id, status: 'draft',
-    displayName: name || 'New World',
-    tagline: '',
-    icon: '🌍',
-    palette: { primary: '#5a7a9e', accent: '#9ec3e8', dark: '#1c2733' },
-    image: null,
-    hqImage: null,
-    campaignChapterImages: [null, null, null],
-    campaignChapterTitles: Array.from({ length: 3 }, (_, i) => `${name || 'New World'} · Chapter ${i + 1}`),
-    campaignNodes,
-    description: '', displayOrder: 0,
-    worldAsset: { id: `asset_${id}`, displayName: `${name || 'New World'} Asset`, description: '', icon: '◆' },
-    hq: null,
-    archive: { collections, fullSkin: { characterId: null, skinId: null } }
-  };
-}
-
 export function emptyExpeditionLibrary() {
   return {
     settings: {
@@ -493,27 +439,6 @@ export function sampleCrisisLibrary(worlds) {
   return lib;
 }
 
-export function newCrisisDefinition(world) {
-  const id = newId('crisis');
-  return {
-    id, enabled: true, worldId: world.id, name: 'New Crisis', openingDescription: '', artwork: null,
-    weight: 1, minimumClearedNodes: 0,
-    fronts: Array.from({ length: 3 }, (_, index) => ({
-      id: `${id}_front_${index + 1}`, name: `Front ${index + 1}`, description: '',
-      favoredTagIds: [world.id], recommendedPowerByGrade: { local: 3000, major: 5000, world: 7500 },
-      struggleText: 'The Front held beyond the response. Nothing was lost.',
-      successText: 'The Front was secured.', excelText: 'The Front was secured with room to spare.'
-    })),
-    consolationReward: [{ kind: 'resource', id: 'renown', qty: 10 }],
-    cacheChoices: [
-      { id: `${id}_supply`, name: 'Field Supply', description: 'One stored extension to the day.', rewards: [{ kind: 'resource', id: 'field_supply', qty: 1 }] },
-      { id: `${id}_intel`, name: 'Intelligence', description: 'Useful knowledge from the response.', rewards: [{ kind: 'resource', id: 'intelligence', qty: 2 }] },
-      { id: `${id}_asset`, name: world.worldAsset.displayName, description: 'Resources recovered for this world.', rewards: [{ kind: 'resource', id: '@associated_world_asset', qty: 8 }] }
-    ],
-    boon: { type: 'instant_intelligence', qty: 2, prose: 'The response yields two Intelligence immediately.' }
-  };
-}
-
 const level = (renown, asset, extras = {}) => ({
   cost: [{ kind: 'resource', id: 'renown', qty: renown }, { kind: 'resource', id: '@associated_world_asset', qty: asset }],
   buildDays: 1, ...extras
@@ -549,11 +474,6 @@ export function defaultHq(world, signature = 'daily_free_reroll') {
       ] : []
     }))
   };
-}
-
-export function scaffoldWorldHq(world) {
-  world.hq ??= defaultHq(world);
-  return world.hq;
 }
 
 export function sampleExpeditionLibrary(worlds) {
@@ -608,161 +528,6 @@ export function sampleExpeditionLibrary(worlds) {
   lib.templates.push(supply);
   lib.settings.guaranteedSupplyTemplateId = supply.id;
   return lib;
-}
-
-export function newCustomCharacter(worldId, name, slotOrder, slotMeta) {
-  const display = name || 'New Character';
-  const equipment = {};
-  for (const slot of slotOrder) {
-    equipment[slot] = { name: `${display}’s ${slotMeta[slot].name}`, image: null };
-  }
-  return {
-    id: newId('cc'), worldId,
-    displayName: display,
-    glyph: display[0].toUpperCase(),
-    color: '#7a8aa0',
-    archetype: 'leader',
-    tier: 'minor',
-    starting: false,
-    faction: null,
-    extraTags: [],
-    description: '',
-    lore: '',
-    portrait: null,
-    fullBody: null,
-    equipment,
-    skins: []
-  };
-}
-
-export function newCustomFaction(name) {
-  return {
-    id: newId('cf'),
-    displayName: name,
-    explanation: `${name} members work well together.`,
-    thresholds: [{ count: 2, bonusBp: 200 }, { count: 3, bonusBp: 400 }]
-  };
-}
-
-export function lastMainThreshold(db) {
-  let max = 0;
-  for (const ch of db.mainChapters) for (const nd of ch.nodes) if (nd.threshold > max) max = nd.threshold;
-  return max;
-}
-
-export function newMainChapter(db) {
-  const idx = db.mainChapters.length; // 0-based; this becomes Chapter idx+1
-  const grade = MAIN_GRADES[Math.min(idx, MAIN_GRADES.length - 1)];
-  let prev = lastMainThreshold(db);
-  let familyIdx = idx;
-  const nodes = Array.from({ length: 10 }, (_, i) => {
-    let t;
-    if (idx < MAIN_RANGES.length) {
-      const [lo, hi] = MAIN_RANGES[idx];
-      t = Math.round((lo + ((hi - lo) * i) / 9) / 50) * 50;
-    } else {
-      t = prev + 500;
-    }
-    t = Math.max(t, prev);
-    prev = t;
-    const family = FAMILIES[familyIdx++ % 6];
-    return {
-      name: `Chapter ${idx + 1} — Node ${i + 1}`,
-      threshold: t,
-      family,
-      grade
-    };
-  });
-  return { title: `Main Chapter ${idx + 1}`, image: null, status: 'draft', nodes };
-}
-
-export function newShadowChapter(mainChapter, chapterIndex) {
-  return {
-    title: `Shadow Chapter ${chapterIndex + 1}`,
-    image: null, status: 'draft',
-    nodes: mainChapter.nodes.map((nd, i) => ({
-      name: `Shadow — ${nd.name || `Chapter ${chapterIndex + 1} — Node ${i + 1}`}`,
-      threshold: nd.threshold,
-      family: nd.family,
-      grade: nd.grade,
-      shardCharacterId: null
-    }))
-  };
-}
-
-export function canPublishChapterPair(db, index) {
-  const reasons = [];
-  const main = db.mainChapters[index];
-  const shadow = db.shadowChapters[index];
-  if (!main || main.nodes?.length !== 10) reasons.push('Main chapter needs exactly 10 nodes.');
-  if (!shadow || shadow.nodes?.length !== 10) reasons.push('Shadow chapter needs exactly 10 nodes.');
-  let previous = index > 0 ? Math.max(...(db.mainChapters[index - 1]?.nodes ?? []).map(node => Number(node.threshold) || 0), 0) : 0;
-  for (const node of main?.nodes ?? []) {
-    if (!Number.isFinite(node.threshold) || node.threshold < previous) reasons.push('Main thresholds must never decrease.');
-    previous = node.threshold;
-  }
-  for (const [nodeIndex, node] of (shadow?.nodes ?? []).entries()) {
-    if (!node.shardCharacterId) reasons.push(`Shadow node ${nodeIndex + 1} needs a character.`);
-    else {
-      const character = db.characters.find(item => item.id === node.shardCharacterId);
-      if (!character) reasons.push(`Shadow node ${nodeIndex + 1} references a missing character.`);
-      else if (db.worlds.find(world => world.id === character.worldId)?.status !== 'published') reasons.push(`Shadow node ${nodeIndex + 1} uses a character from a draft world.`);
-    }
-    if (node.worldId && db.worlds.find(world => world.id === node.worldId)?.status !== 'published') reasons.push(`Shadow node ${nodeIndex + 1} references a draft or missing world.`);
-  }
-  for (const [nodeIndex, node] of (main?.nodes ?? []).entries()) {
-    if (node.worldId && db.worlds.find(world => world.id === node.worldId)?.status !== 'published') reasons.push(`Main node ${nodeIndex + 1} references a draft or missing world.`);
-  }
-  if (index > 0 && db.mainChapters[index - 1]?.status !== 'published') reasons.push('The previous chapter pair must be published first.');
-  return { ok: reasons.length === 0, reasons: [...new Set(reasons)] };
-}
-
-export function addCampaignChapter(db) {
-  const main = newMainChapter(db);
-  db.mainChapters.push(main);
-  db.shadowChapters.push(newShadowChapter(main, db.mainChapters.length - 1));
-  return db.mainChapters.length - 1;
-}
-
-// ---------------------------------------------------------------- gates
-// A world may be published only when it can actually be played (GDD: a World
-// Campaign needs a full five-character party).
-export function canPublishWorld(db, worldId) {
-  const reasons = [];
-  const chars = db.characters.filter(c => c.worldId === worldId);
-  if (chars.length < 5) {
-    reasons.push(`A world needs at least 5 characters to be playable (has ${chars.length}). Keep it as a draft until then.`);
-  }
-  const assigned = new Set();
-  for (const ch of db.shadowChapters ?? []) {
-    if (ch.nodes.length === 10 && ch.nodes.every(nd => nd.shardCharacterId)) {
-      for (const nd of ch.nodes) assigned.add(nd.shardCharacterId);
-    }
-  }
-  const world = db.worlds.find(w => w.id === worldId);
-  for (const nd of world?.campaignNodes ?? []) if (nd.shardCharacterId) assigned.add(nd.shardCharacterId);
-  const unsourced = chars.filter(c => !assigned.has(c.id));
-  if (chars.length >= 5 && unsourced.length > 0) {
-    reasons.push(`Every character needs a live shard source. Assign complete Shadow Campaign chapters or nodes in this World Campaign for: ${unsourced.map(c => c.displayName).join(', ')}.`);
-  }
-  return { ok: reasons.length === 0, reasons };
-}
-
-export function characterShardAssignments(db, characterId) {
-  const spots = [];
-  (db.shadowChapters ?? []).forEach((ch, ci) => {
-    ch.nodes.forEach((nd, i) => {
-      if (nd.shardCharacterId === characterId) spots.push({ campaign: 'shadow', chapter: ci + 1, position: i + 1 });
-    });
-  });
-  for (const w of db.worlds) {
-    w.campaignNodes.forEach((nd, i) => {
-      if (nd.shardCharacterId === characterId) {
-        spots.push({ campaign: 'world', worldId: w.id, worldName: w.displayName, chapter: Math.floor(i / 10) + 1, position: (i % 10) + 1 });
-      }
-    });
-  }
-  return spots;
 }
 
 // ---------------------------------------------------------------- readiness

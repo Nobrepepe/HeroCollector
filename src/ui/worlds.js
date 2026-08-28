@@ -4,9 +4,10 @@
 // with its own live reading and an untouched world is visibly emptier than
 // one you live in.
 import { h, fmt } from './dom.js';
-import { archiveStatus, nodeState, worldCampaignUnlocked } from '../core/state.js';
-import { facilityLevel, hqRank } from '../core/hq.js';
-import { canAffordEntries, resourceQty } from '../core/resources.js';
+import { nodeState, worldCampaignUnlocked } from '../core/state.js';
+import { masteryRank } from '../core/mastery.js';
+import { relicStatus } from '../core/relics.js';
+import { programOverview, PROGRAM_NAMES } from '../core/programs.js';
 import { eligibleCrisisDefinitions } from '../core/crises.js';
 import { portrait, selectorWorldName } from './shared.js';
 import { charactersByWorld, countWord, ordinalWord } from './presentation.js';
@@ -23,14 +24,18 @@ export function worldReading(store, world) {
   const { content, state } = store;
   const roster = charactersByWorld(content, world.id);
   const owned = roster.filter(def => state.characters[def.id]?.owned);
-  const seen = roster.some(def => state.characters[def.id]?.owned || state.characters[def.id]?.shards > 0);
+  const seen = roster.some(def => state.characters[def.id]?.owned
+    || state.characters[def.id]?.revealed || state.characters[def.id]?.shards > 0);
   const entry = worldCampaignUnlocked(content, state, world.id);
   const nodes = content.nodesByCampaign[world.campaignId] ?? [];
   const chapters = [...new Set(nodes.map(node => node.chapter))].sort((a, b) => a - b);
   const cleared = nodes.filter(node => nodeState(state, node.id).cleared);
   const frontier = nodes.find(node => !nodeState(state, node.id).cleared) ?? null;
   const chapter = frontier ? chapters.indexOf(frontier.chapter) + 1 : chapters.length;
-  const archive = content.archiveByWorld[world.id] ? archiveStatus(content, state, world.id) : null;
+  const mastery = masteryRank(content, state, world.id);
+  const relic = relicStatus(content, state, world.id);
+  const programs = programOverview(content, state, world.id);
+  const pendingChoices = state.mastery[world.id]?.pendingChoices ?? [];
   const active = state.crises?.active;
   const crisis = active?.worldId === world.id ? active : null;
   // A Crisis still wants an answer while it is unresolved, and again while its
@@ -38,14 +43,11 @@ export function worldReading(store, world) {
   // event, but nothing is asked of you.
   const wantsAnswer = !!crisis && (crisis.status === 'planning'
     || (crisis.status === 'resolved' && crisis.result?.outcome !== 'endured' && !crisis.cacheClaimed));
-  const away = (state.expeditions?.active ?? []).filter(item => item.world === world.id);
+  const away = (state.expeditions?.active?.routes ?? []).filter(route => route.world === world.id);
   return {
     world, roster, owned, seen, entry, nodes, chapters, cleared, frontier,
-    chapter: Math.max(1, chapter), archive, away,
+    chapter: Math.max(1, chapter), mastery, relic, programs, pendingChoices, away,
     unlocked: entry.unlocked,
-    hqFounded: !!world.hq?.enabled,
-    hqRank: world.hq?.enabled ? hqRank(content, state, world.id) : 0,
-    currency: resourceQty(state, world.worldAsset.id),
     crisis, crisisActive: wantsAnswer ? crisis : null,
     crisisSettled: !!crisis && !wantsAnswer,
     crisisEligible: eligibleCrisisDefinitions(content, state).some(def => def.worldId === world.id)
@@ -54,6 +56,7 @@ export function worldReading(store, world) {
 
 function stateWord(reading) {
   if (reading.crisisActive) return { text: 'crisis', tone: 'bad' };
+  if (reading.pendingChoices.length) return { text: 'reward waiting', tone: 'good' };
   if (reading.crisisSettled) return { text: 'answered', tone: 'faint' };
   if (reading.away.length) return { text: `${reading.away.length} out`, tone: 'faint' };
   if (reading.unlocked && !reading.cleared.length) return { text: 'new', tone: 'good' };
@@ -63,7 +66,7 @@ function stateWord(reading) {
 function readingLine(reading) {
   return [
     `Chapter ${reading.chapter} of ${reading.chapters.length || 1}`,
-    reading.hqFounded ? `HQ Rank ${reading.hqRank}` : 'no Headquarters',
+    `${reading.mastery.displayName} · ${fmt(reading.mastery.score)} Mastery`,
     `${reading.owned.length} of ${reading.roster.length} characters`
   ].join(' · ');
 }
@@ -191,8 +194,9 @@ function renderWorldHub(store, root, worldId) {
   page.appendChild(h('section.world-held', h('div.eyebrow', 'Held here'),
     h('div.world-held-row',
       h('div',
-        h('div.world-held-number' + (reading.currency ? '' : '.is-zero'), fmt(reading.currency)),
-        h('div.world-held-label', world.worldAsset.displayName)),
+        h('div.world-held-number' + (reading.mastery.score ? '' : '.is-zero'), fmt(reading.mastery.score),
+          h('span.world-held-of', ` / ${fmt(reading.mastery.max)}`)),
+        h('div.world-held-label', `${reading.mastery.displayName} · Mastery`)),
       h('div',
         h('div.world-held-number', String(reading.owned.length),
           h('span.world-held-of', ` / ${reading.roster.length}`)),
@@ -218,7 +222,7 @@ function destinations(store, reading) {
   const list = h('div.world-destinations');
   const rows = [];
   if (reading.crisisActive) rows.push(crisisRow(store, reading));
-  rows.push(chaptersRow(store, reading), headquartersRow(store, reading), relicsRow(store, reading));
+  rows.push(chaptersRow(store, reading), programsRow(store, reading), masteryRow(store, reading));
   if (!reading.crisisActive) rows.push(crisisRow(store, reading));
   rows.forEach((row, index) => {
     if (index > 0) list.appendChild(h('div.world-destination-rule', { 'aria-hidden': 'true' }));
@@ -320,71 +324,64 @@ function chaptersRow(store, reading) {
   return row;
 }
 
-function headquartersRow(store, reading) {
-  const { content, state } = store;
+function programsRow(store, reading) {
   const world = reading.world;
-  if (!reading.hqFounded) {
-    return destinationRow({
-      name: 'Headquarters', dim: true, reading: 'not founded',
-      sentence: 'No grounds have been broken here. Nothing about this world is missing while it stays that way.'
-    });
+  const programs = reading.programs;
+  const relicNote = programs.relicSlot && programs.relic?.complete
+    ? `relic in ${PROGRAM_NAMES[programs.relicSlot]}`
+    : programs.relic?.complete ? 'relic uninstalled' : null;
+  // The Programs advance through relevant play everywhere the world is
+  // touched, so the row is only inert while nothing has ever fed them.
+  const touched = programs.procurement.meter > 0 || programs.procurement.delivered > 0
+    || programs.development.meter > 0 || programs.development.delivered > 0
+    || programs.operations.meter > 0 || programs.operations.delivered > 0;
+  const needsChoice = !programs.procurement.family || !programs.development.heroId;
+  let sentence;
+  if (!touched && !reading.unlocked) {
+    sentence = 'The three Programs advance on their own once play touches this world. Nothing here asks for a visit yet.';
+  } else if (needsChoice) {
+    sentence = [`${!programs.procurement.family ? 'Procurement is banking Energy without a chosen material family. ' : 'Development is banking shards without a chosen hero. '}`,
+      h('button.link', { onclick: () => store.go(`#/programs/${world.id}`) }, 'Set it →')];
+  } else {
+    const toShipment = Math.max(0, programs.procurement.threshold - programs.procurement.meter % programs.procurement.threshold);
+    sentence = [`The next shipment lands after ${fmt(toShipment)} more Energy of play here. `,
+      h('button.link', { onclick: () => store.go(`#/programs/${world.id}`) }, 'Visit →')];
   }
-  // In a preview the destination is inert and states its gate.
-  if (!reading.unlocked) {
-    return destinationRow({
-      name: 'Headquarters', dim: true, reading: `Rank ${reading.hqRank} · closed`,
-      sentence: `${world.worldAsset.displayName} pays for everything built here, and it is only earned inside this campaign. The grounds wait until the campaign opens.`
-    });
-  }
-  const build = state.headquarters.construction;
-  const here = build?.worldId === world.id ? build : null;
-  const next = world.hq.facilities
-    .map(facility => ({ facility, next: facility.levels[facilityLevel(state, world.id, facility.id)] }))
-    .filter(entry => entry.next)
-    .find(entry => canAffordEntries(content, state, entry.next.cost, world.id).ok);
-  const clauses = [];
-  if (here) clauses.push(`${here.facilityName} reaches Level ${here.targetLevel} on day ${here.dueDay}`);
-  clauses.push(next ? `the ${next.facility.displayName} is affordable now` : 'nothing new is affordable yet');
-  const prose = `${clauses.join('; ')}. `;
   return destinationRow({
-    name: 'Headquarters',
-    reading: `Rank ${reading.hqRank}${here ? ` · building until day ${here.dueDay}` : ''}`,
-    sentence: [prose[0].toUpperCase() + prose.slice(1),
-      h('button.link', { onclick: () => store.go(`#/headquarters/${world.id}`) }, 'Visit →')]
+    name: 'Programs',
+    reading: [relicNote, `${programs.procurement.delivered + programs.development.delivered + programs.operations.delivered} payouts so far`]
+      .filter(Boolean).join(' · '),
+    sentence, dim: !touched && !reading.unlocked
   });
 }
 
-function relicsRow(store, reading) {
-  const { content, state } = store;
-  if (!reading.archive) {
-    return destinationRow({
-      name: 'Relics', dim: true, reading: 'no Archive here',
-      sentence: 'No Archive has been written for this world. Nothing is waiting to be recovered.'
-    });
+function masteryRow(store, reading) {
+  const world = reading.world;
+  const mastery = reading.mastery;
+  const relic = reading.relic;
+  const open = () => store.go(`#/mastery/${world.id}`);
+  let sentence;
+  if (reading.pendingChoices.length) {
+    sentence = [`${countWord(reading.pendingChoices.length, { capitalize: true })} milestone reward${reading.pendingChoices.length === 1 ? ' is' : 's are'} waiting on a choice. `,
+      h('button.link', { onclick: open }, 'Choose →')];
+  } else if (relic && !relic.complete) {
+    const nextPiece = relic.pieces.find(entry => !entry.owned);
+    sentence = [nextPiece?.sourceNode
+      ? `${nextPiece.piece.displayName} is still buried at ${nextPiece.sourceNode.displayName}. `
+      : 'The relic is still in pieces. ',
+    h('button.link', { onclick: open }, 'Open the track →')];
+  } else if (mastery.next) {
+    sentence = [`${fmt(mastery.next.at - mastery.score)} points from ${mastery.next.displayName}. `,
+      h('button.link', { onclick: open }, 'Open the track →')];
+  } else {
+    sentence = ['This world is Mastered — everything it can teach has been learned. ',
+      h('button.link', { onclick: open }, 'Open the track →')];
   }
-  if (!reading.unlocked) {
-    return destinationRow({
-      name: 'Relics', dim: true,
-      reading: `${reading.archive.relicsDone} of ${reading.archive.relicsTotal} recovered`,
-      sentence: 'Every piece is buried in this campaign, so none can be recovered until it opens.'
-    });
-  }
-  const status = reading.archive;
-  // The next relic is named by where its first missing fragment is buried.
-  const nextRelic = status.collections
-    .flatMap(collection => collection.relics)
-    .find(entry => !entry.complete);
-  const missing = nextRelic?.relic.fragments.find(fragment => !state.archive.fragments[fragment.id]);
-  const node = missing ? content.nodeById[missing.sourceNode] : null;
-  const sentence = nextRelic
-    ? [node ? `${nextRelic.relic.displayName} is still missing a piece, buried at ${node.displayName}. ` : `${nextRelic.relic.displayName} is still missing a piece. `,
-      h('button.link', { onclick: () => store.go(`#/archive/${reading.world.id}`) }, 'Open the Archive →')]
-    : ['Every relic here is whole. ',
-      h('button.link', { onclick: () => store.go(`#/archive/${reading.world.id}`) }, 'Open the Archive →')];
   return destinationRow({
-    name: 'Relics',
-    reading: `${status.relicsDone} of ${status.relicsTotal} recovered`,
-    sentence, dim: status.relicsDone === 0
+    name: 'Mastery',
+    reading: `${fmt(mastery.score)} of ${fmt(mastery.max)} · ${mastery.displayName}`
+      + (relic ? ` · relic ${relic.ownedCount} of ${relic.total}` : ''),
+    sentence, dim: mastery.score === 0
   });
 }
 
@@ -411,13 +408,13 @@ function rosterPanel(store, reading) {
   }
   // A thin roster is told what would thicken it rather than how empty it is.
   const reachable = reading.roster
-    .filter(def => !state.characters[def.id]?.owned && (content.shardNodesByCharacter[def.id] ?? []).length)
+    .filter(def => !state.characters[def.id]?.owned && (content.encounterNodesByCharacter[def.id] ?? []).length)
     .slice(0, 2);
   section.appendChild(h('p.world-roster-copy',
     reachable.length
       ? `${countWord(reachable.length, { capitalize: true })} more ${reachable.length === 1 ? 'is' : 'are'} reachable — ${reachable
-        .map(def => `${def.displayName} from ${(content.shardNodesByCharacter[def.id] ?? [])[0].displayName}`).join(', and ')}. `
-      : 'No shard source for this world has been published yet, so the roster cannot grow here today. ',
+        .map(def => `${def.displayName}, encountered at ${(content.encounterNodesByCharacter[def.id] ?? [])[0].displayName}`).join(', and ')}. `
+      : 'No encounter for this world has been published yet, so the roster cannot grow here today. ',
     reachable.length
       ? h('button.link', { onclick: () => store.go(`#/character/${reachable[0].id}`) }, 'Show me →')
       : h('button.link', { onclick: () => openFilteredCollection(store, reading.world.id) }, 'Open the Collection, filtered →')));
@@ -447,9 +444,7 @@ function routesPanel(store, reading) {
       h('div.caption', 'across-world routes still accept these characters')]));
   row.appendChild(h('div.grow', reading.away.length
     ? [h('div.world-route-name', `${countWord(reading.away.length, { capitalize: true })} away`),
-      h('div.caption', reading.away.length === 1
-        ? `returns on day ${reading.away[0].returnDay}`
-        : `${new Set(reading.away.map(item => item.returnDay)).size === 1 ? 'both return' : 'they return'} on day ${Math.min(...reading.away.map(item => item.returnDay))}`)]
+      h('div.caption', `the cycle returns on day ${store.state.expeditions.active.returnDay}`)]
     : [h('div.world-route-name', 'None away'),
       h('div.caption', 'every one of them is here')]));
   row.appendChild(h('button.link.world-routes-link', { onclick: () => store.go('#/expeditions') }, 'Expeditions →'));

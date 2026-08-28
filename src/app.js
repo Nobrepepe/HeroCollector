@@ -3,18 +3,18 @@
 // transactions and re-render.
 import { buildContent } from './core/content.js';
 import { validateContent, validateSave } from './core/validate.js';
-import { newPlayerState, applyDailyReset, syncSaveWithContent, ensureExpeditionBoard } from './core/state.js';
-import { migratePlayerState } from './core/migrate.js';
+import { newPlayerState, applyDailyReset, syncSaveWithContent, ensureExpeditionBoard, SCHEMA_VERSION } from './core/state.js';
 import { characterPower } from './core/power.js';
 import { makeRng, entropySeed } from './core/rng.js';
 import { upgradeCustomDB, mergeContent, gameReadiness } from './core/custom.js';
-import { loadRawContent, loadSave, writeSave, loadCustomContent, writeCustomContent, loadActiveCustomContent, writeActiveCustomContent, importSave, exportJson } from './platform.js';
+import { loadRawContent, loadSave, writeSave, loadDefaultPack, loadActiveCustomContent, writeActiveCustomContent, importSave, exportJson } from './platform.js';
 import { h, clear, fmt } from './ui/dom.js';
 import {
   dressModal, modalHead, modalRule, modalAction, modalActions, modalDismiss, noticeLine
 } from './ui/modal.js';
 import { portrait, rewardNodes } from './ui/shared.js';
 import { countWord, nameList } from './ui/presentation.js';
+import { openSupplyDialog } from './ui/supplies.js';
 
 import { renderHome } from './ui/home.js';
 import { renderRoster } from './ui/roster.js';
@@ -23,18 +23,17 @@ import { renderParty } from './ui/party.js';
 import { renderCampaign } from './ui/campaign.js';
 import { renderNode } from './ui/node.js';
 import { renderInventory } from './ui/inventory.js';
-import { renderArchive } from './ui/archive.js';
+import { renderMastery } from './ui/mastery.js';
 import { renderSettings } from './ui/settings.js';
 import { renderDev } from './ui/dev.js';
-import { renderCreator } from './ui/creator.js';
 import { renderExpeditions } from './ui/expeditions.js';
 import { renderWorldHub } from './ui/worldhub.js';
 import { worldhub } from './platform.js';
-import { renderHeadquarters } from './ui/headquarters.js';
+import { renderPrograms } from './ui/programs.js';
 import { renderCrisis } from './ui/crisis.js';
 import { renderWorlds } from './ui/worlds.js';
 import { renderSplash } from './ui/splash.js';
-import { fieldSupplyLimits, previewFieldSupplyUse, useFieldSupply } from './core/energy.js';
+import { fieldSupplyLimits } from './core/energy.js';
 
 const store = {
   content: null,
@@ -80,7 +79,7 @@ const store = {
       energy: this.state.energy,
       materials: { ...this.state.inventory.materials },
       shards: Object.fromEntries(Object.entries(this.state.characters).map(([id, cs]) => [id, cs.shards])),
-      fragments: { ...this.state.archive.fragments },
+      relicPieces: { ...this.state.relics.pieces },
       power: Object.fromEntries(this.content.characters.map(def => [
         def.id, characterPower(this.content, this.state.characters[def.id])
       ]))
@@ -107,8 +106,6 @@ const store = {
     if (!input || this.ui.activeSearchInput === input) this.ui.activeSearchInput = null;
   },
   clearReturnContext() { this.ui.returnContext = null; },
-
-  async saveCustom() { await writeCustomContent(this.customDB); },
 
   // Re-merge base + custom content and swap it in live. Never applies an
   // invalid content set: on validation failure the previous content stays.
@@ -263,14 +260,12 @@ const routes = {
   expeditions: { title: 'Expeditions', icon: '🧭', render: renderExpeditions, nav: true },
   inventory: { title: 'Workshop', icon: '🎒', render: renderInventory, nav: true },
   settings: { title: 'Settings', icon: '⚙️', render: renderSettings, nav: true },
-  headquarters: { title: 'Headquarters', render: renderHeadquarters },
-  archive: { title: 'Archive', render: renderArchive },
+  programs: { title: 'Programs', render: renderPrograms },
+  mastery: { title: 'Mastery', render: renderMastery },
   character: { title: 'Character', render: renderCharacter },
   node: { title: 'Node', render: renderNode },
   dev: { title: 'Developer Panel', icon: '🧪', render: renderDev },
   worldhub: { title: 'World Hub', render: renderWorldHub },
-  // In Hub mode the Creator is retired; a direct #/creator hash lands on the Hub screen.
-  creator: { title: 'Content Creator', icon: '🛠️', render: (s) => s.hubMode ? renderWorldHub(s) : renderCreator(s) },
   crisis: { title: 'Crisis Response', render: renderCrisis }
 };
 
@@ -279,7 +274,7 @@ function parseRoute() {
   return { name: routes[parts[0]] ? parts[0] : 'home', arg: parts.slice(1).join('/') || null };
 }
 
-const GAME_ROUTES = new Set(['home', 'roster', 'party', 'worlds', 'campaign', 'expeditions', 'headquarters', 'inventory', 'archive', 'character', 'node', 'crisis']);
+const GAME_ROUTES = new Set(['home', 'roster', 'party', 'worlds', 'campaign', 'expeditions', 'programs', 'inventory', 'mastery', 'character', 'node', 'crisis']);
 
 export function render() {
   const { name, arg } = parseRoute();
@@ -344,14 +339,14 @@ function goBack() {
 
 function renderSetup(screen) {
   const panel = h('div.panel');
-  panel.appendChild(h('h2', '🛠️ Your game is not ready to play yet'));
-  panel.appendChild(h('p.muted', 'All playable content — worlds, characters, and the Main Campaign — is authored in the Content Creator. The game starts once these prerequisites are met:'));
+  panel.appendChild(h('h2', '📦 Your game is not ready to play yet'));
+  panel.appendChild(h('p.muted', 'All playable content — worlds, characters, and the Main Campaign — comes from a World Hub publication (or a content pack imported through the dev panel). The game starts once these prerequisites are met:'));
   for (const c of store.gameReady.checks) {
     panel.appendChild(h('div.health-item' + (c.ok ? '.good' : '.warn'), `${c.ok ? '✅' : '◻️'} ${c.text}`));
   }
   panel.appendChild(h('div', { style: { marginTop: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap' } },
-    h('button.btn.primary', { onclick: () => store.go('#/creator') }, 'Open the Content Creator'),
-    h('span.small.muted', 'Tip: the Creator can import the sample worlds as a fully editable starting point.')));
+    h('button.btn.primary', { onclick: () => store.go('#/worldhub') }, 'Open the World Hub screen'),
+    h('span.small.muted', 'Install a publication ZIP or link a World Hub production folder.')));
   screen.appendChild(panel);
 }
 
@@ -359,7 +354,7 @@ function renderSidebar(active) {
   const nav = document.getElementById('sidebar');
   clear(nav);
   nav.appendChild(h('div.logo', 'Hero ', h('span', 'Collector')));
-  const away = store.state?.expeditions?.active?.length ?? 0;
+  const away = store.state?.expeditions?.active?.routes?.length ?? 0;
   for (const [name, r] of Object.entries(routes)) {
     if (!r.nav || name === 'settings') continue;
     // Expeditions is the only destination that carries a count: parties that
@@ -372,16 +367,9 @@ function renderSidebar(active) {
     count ? h('span.nav-count', { 'aria-hidden': 'true' }, count) : null));
   }
   nav.appendChild(h('div.spacer'));
-  // The Content Creator is always reachable while the game is in setup mode;
-  // once playable, it lives behind the dev-tools toggle.
-  if (store.hubMode) {
-    nav.appendChild(h('button.nav-btn' + (active === 'worldhub' ? '.active' : ''), {
-      onclick: () => store.go('#/worldhub')
-    }, h('span.ico', '📦'), 'World Hub'));
-  } else if (!store.gameReady.ready || store.state.settings.devPanel) {
-    nav.appendChild(h('button.nav-btn' + (active === 'creator' ? '.active' : ''), {
-      onclick: () => store.go('#/creator')
-    }, h('span.ico', '🛠️'), 'Content Creator'));
+  // The World Hub screen stays reachable in setup mode and behind the
+  // dev-tools toggle once the game is playable.
+  if (store.hubMode || !store.gameReady.ready || store.state.settings.devPanel) {
     nav.appendChild(h('button.nav-btn' + (active === 'worldhub' ? '.active' : ''), {
       onclick: () => store.go('#/worldhub')
     }, h('span.ico', '📦'), 'World Hub'));
@@ -397,53 +385,26 @@ function renderSidebar(active) {
     const reset = store.state.settings.resetHour;
     const supplies = fieldSupplyLimits(store.content, store.state);
     // The well holds two currencies. Energy is the numeral; Field Supply is a
-    // sentence, because what matters about it is how many uses are left today.
+    // sentence, because what matters about it is the targeted pushes it holds.
     nav.appendChild(h('button.sidebar-energy', {
-      onclick: openRechargeDialog,
-      'aria-label': `${e} of ${b.energy.storageCap} Energy. ${supplies.held} of ${supplies.storageCap} Field Supplies held; ${supplies.usesRemaining} uses remain today.`
+      onclick: () => openSupplyDialog(store),
+      'aria-label': `${e} of ${b.energy.storageCap} Energy. ${supplies.held} of ${supplies.storageCap} Field Supplies held.`
     },
     h('div.eyebrow', 'Energy'),
     h('div.energy-number', fmt(e), h('span', ` / ${fmt(b.energy.storageCap)}`)),
     h('div.energy-line', h('i', { style: { width: `${Math.min(100, e / b.energy.storageCap * 100)}%` } })),
     h('div.caption', `+${fmt(b.energy.dailyGrant)} more at ${reset}:00`),
     h('div.supply-well',
-      h('span.supply-glyph', { 'aria-hidden': 'true' }, store.content.resourceById.field_supply?.icon ?? '◈'),
+      h('span.supply-glyph', { 'aria-hidden': 'true' }, store.content.resourceById.field_supply?.icon ?? '▰'),
       h('div',
         h('div.supply-held', `${supplies.held} Field Supply `, h('span', `of ${supplies.storageCap} held`)),
-        h('div.caption', `${countWord(supplies.usesRemaining)} use${supplies.usesRemaining === 1 ? '' : 's'} left today · +${supplies.restore} each`)))));
+        h('div.caption', store.state.surge
+          ? 'A Surge is armed for the next attempt'
+          : `${countWord(supplies.held, { capitalize: true })} targeted push${supplies.held === 1 ? '' : 'es'} in reserve`)))));
   }
   nav.appendChild(h('button.nav-btn.settings-link' + (active === 'settings' ? '.active' : ''), {
     onclick: () => store.go('#/settings')
   }, h('span.nav-dot', { 'aria-hidden': 'true' }), 'Settings'));
-}
-
-function openRechargeDialog() {
-  const preview = previewFieldSupplyUse(store.content, store.state);
-  openModal((modal, close) => {
-    dressModal(modal, { size: 'sheet' });
-    modal.appendChild(modalHead('Field Supplies',
-      preview.ok ? `${preview.restored} Energy can return now.` : 'The reserve cannot be opened now.',
-      {
-        lead: preview.ok
-          ? preview.wasted > 0
-            ? `This Supply restores ${preview.restored} Energy; the remaining ${preview.wasted} cannot fit under the ${store.content.balance.energy.storageCap} cap.`
-            : `This Supply restores ${preview.restored} Energy. It is consumed only when you confirm.`
-          : preview.reasons.join(' ')
-      }));
-    modal.appendChild(h('p.hc-modal-fine',
-      `${preview.held} held of ${preview.storageCap} storage · ${preview.reserved} promised by routes already out · ${preview.usesRemaining} use${preview.usesRemaining === 1 ? '' : 's'} remain today`));
-    modal.appendChild(modalActions(
-      modalAction(preview.ok ? `Restore ${preview.restored} Energy →` : 'Nothing can be restored',
-        {
-          disabled: !preview.ok,
-          reason: preview.ok ? null : preview.reasons[0],
-          onclick: async () => {
-            const result = await store.tx(() => useFieldSupply(store.content, store.state), { rerender: false });
-            if (result.ok) { close(); render(); }
-          }
-        }),
-      modalDismiss('Leave it stored', close)));
-  });
 }
 
 function renderTopbar(title) {
@@ -469,20 +430,17 @@ function renderRecoveryScreen({ title, message, details = [], brokenSave = null 
     onclick: async () => {
       const imported = await importSave();
       if (!imported) { toast('Import canceled or unreadable.', 'error'); return; }
-      let migrated;
-      try {
-        migrated = migratePlayerState(store.content, imported);
-      } catch (error) {
-        toast(`Import migration failed: ${error instanceof Error ? error.message : String(error)}`, 'error');
+      if (imported.schemaVersion !== SCHEMA_VERSION) {
+        toast(`That save is schema ${imported.schemaVersion ?? 'unknown'}; this build plays schema ${SCHEMA_VERSION} saves only.`, 'error');
         return;
       }
-      syncSaveWithContent(store.content, migrated);
-      const check = validateSave(store.content, migrated);
+      syncSaveWithContent(store.content, imported);
+      const check = validateSave(store.content, imported);
       if (!check.ok) {
         toast(`Imported save is malformed: ${check.errors[0]}`, 'error');
         return;
       }
-      await writeSave(migrated);
+      await writeSave(imported);
       toast('Save imported. Restarting…');
       setTimeout(() => location.reload(), 700);
     }
@@ -517,10 +475,10 @@ function renderRecoveryScreen({ title, message, details = [], brokenSave = null 
 async function boot() {
   store.baseRaw = await loadRawContent();
 
-  // World Hub mode: the installed immutable publication is the content
-  // source; the Creator database stays on disk untouched as the legacy
-  // fallback for when no publication is active.
+  // Content source order: an installed World Hub publication, then a pack
+  // imported through the dev panel, then the bundled default pack.
   store.hubStatus = null;
+  store.hubLoadError = null;
   let hubDb = null;
   if (worldhub.available()) {
     try {
@@ -531,13 +489,17 @@ async function boot() {
       } else if (active?.error) {
         store.hubLoadError = active.error;
       }
-    } catch { /* fall back to legacy */ }
+    } catch { /* fall back to local packs */ }
   }
   store.hubMode = !!hubDb;
-  store.customDB = upgradeCustomDB(hubDb ?? await loadCustomContent());
+  if (store.hubLoadError) {
+    setTimeout(() => toast(`The installed World Hub publication could not be loaded: ${store.hubLoadError}`, 'error'), 300);
+  }
+  const packDb = hubDb ?? await loadActiveCustomContent() ?? await loadDefaultPack();
+  store.customDB = upgradeCustomDB(packDb);
 
-  // Merge base + custom content; if the merge is somehow invalid, fall back
-  // to the shipped base content so the game always starts.
+  // Merge base + pack content; if the merge is somehow invalid, fall back to
+  // the bundled default pack, then bare system content, so the game starts.
   const merged = mergeContent(store.baseRaw, store.customDB);
   let content = buildContent(merged.raw);
   let check = validateContent(content);
@@ -545,12 +507,12 @@ async function boot() {
     content.images = merged.images;
     store.contentHealth = merged.health;
   } else {
-    const activeDB = upgradeCustomDB(await loadActiveCustomContent());
-    const activeMerged = mergeContent(store.baseRaw, activeDB);
-    const activeContent = buildContent(activeMerged.raw);
-    const activeCheck = validateContent(activeContent);
-    content = activeCheck.ok ? activeContent : buildContent(store.baseRaw);
-    if (activeCheck.ok) content.images = activeMerged.images;
+    const fallbackDB = upgradeCustomDB(await loadDefaultPack());
+    const fallbackMerged = mergeContent(store.baseRaw, fallbackDB);
+    const fallbackContent = buildContent(fallbackMerged.raw);
+    const fallbackCheck = validateContent(fallbackContent);
+    content = fallbackCheck.ok ? fallbackContent : buildContent(store.baseRaw);
+    if (fallbackCheck.ok) content.images = fallbackMerged.images;
     const baseCheck = validateContent(content);
     if (!baseCheck.ok) {
       document.getElementById('screen').appendChild(
@@ -560,12 +522,11 @@ async function boot() {
       return;
     }
     store.contentHealth = [
-      { level: 'error', text: 'Custom content could not be merged and was disabled for this session:' },
+      { level: 'error', text: 'The active content pack could not be merged and was disabled for this session:' },
       ...check.errors.slice(0, 10).map(e => ({ level: 'error', text: e }))
     ];
-    setTimeout(() => toast('Creator content could not be loaded — see the Content Creator health panel.', 'error'), 300);
+    setTimeout(() => toast('The active content pack could not be loaded — the bundled default is running instead.', 'error'), 300);
   }
-  if (check.ok && !store.hubMode) await writeActiveCustomContent(store.customDB);
   store.content = content;
   store.gameReady = gameReadiness(content);
 
@@ -573,16 +534,15 @@ async function boot() {
   store.ui.isFreshSave = !loadedState;
   let state = null;
   if (loadedState) {
-    try {
-      state = migratePlayerState(store.content, loadedState);
-    } catch (error) {
+    if (loadedState.schemaVersion !== SCHEMA_VERSION) {
       renderRecoveryScreen({
-        title: 'Save migration failed',
-        message: error instanceof Error ? error.message : String(error),
+        title: 'This save is from an older version of the game',
+        message: `The save is schema ${loadedState.schemaVersion ?? 'unknown'}; this build plays schema ${SCHEMA_VERSION} saves only. The overhaul replaced the old progression systems, so older saves cannot be carried forward.`,
         brokenSave: loadedState
       });
       return;
     }
+    state = loadedState;
   }
   store.state = state ?? newPlayerState(store.content, Date.now());
   if (loadedState) {
@@ -673,7 +633,7 @@ function showDaySummary(summary) {
   openModal((modal, close) => {
     dressModal(modal, { size: 'day' });
     const reset = store.state.settings.resetHour;
-    const returned = summary.expeditions ?? [];
+    const returned = (summary.cycleReports ?? []).flatMap(report => report.routes);
     modal.appendChild(modalHead(
       `Day ${store.state.dayNumber} · ${reset}:00 · +${fmt(summary.energyGained)} Energy`,
       dayHeadline(summary, returned),
@@ -718,10 +678,10 @@ function showDaySummary(summary) {
 
 function dayHeadline(summary, returned) {
   if (returned.length) {
-    return `${countWord(returned.length, { capitalize: true })} Expedition${returned.length === 1 ? ' has' : 's have'} returned.`;
+    return `The Expedition cycle has returned — ${countWord(returned.length)} route${returned.length === 1 ? '' : 's'} came home together.`;
   }
   if (summary.crisis) return `${summary.crisis.name} is asking for an answer.`;
-  if (summary.construction?.length) return `${summary.construction[0].facilityName} is finished.`;
+  if (summary.shipments?.length) return 'The Programs have delivered overnight.';
   return 'A new day has opened.';
 }
 
@@ -748,11 +708,19 @@ function partySentence(names, report) {
 
 function dayOtherEvents(summary) {
   const notes = [];
-  for (const build of summary.construction ?? []) {
-    notes.push(`${build.facilityName} reached Level ${build.targetLevel}, and the account-wide construction slot is open again.`);
-  }
-  if (summary.production?.length) {
-    notes.push(`${countWord(summary.production.length, { capitalize: true })} automatic production entr${summary.production.length === 1 ? 'y is' : 'ies are'} already in the Workshop.`);
+  for (const event of summary.shipments ?? []) {
+    const world = store.content.worldById[event.worldId]?.displayName ?? 'a world';
+    if (event.program === 'procurement') {
+      const entry = event.granted?.[0];
+      const material = entry ? store.content.materialById[entry.id]?.displayName ?? entry.id : 'materials';
+      notes.push(`${world}’s Procurement shipped ${entry?.qty ?? ''} ${material} to the Workshop.`);
+    } else if (event.program === 'development') {
+      const entry = event.granted?.[0];
+      const hero = store.content.characterById[entry?.characterId]?.displayName ?? 'the chosen hero';
+      notes.push(`${world}’s Development tutored ${hero}: +${entry?.qty ?? 1} shard${(entry?.qty ?? 1) === 1 ? '' : 's'}.`);
+    } else if (event.program === 'operations') {
+      notes.push(`${world}’s Operations improved its next cycle routes.`);
+    }
   }
   return notes;
 }

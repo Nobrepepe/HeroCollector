@@ -232,8 +232,8 @@ export function openExpeditionCharacterPicker(store, {
         const otherSlot = selectedIds.findIndex((id, index) => id === def.id && index !== slotIndex);
         const unavailable = !!away || otherSlot >= 0;
         const cs = store.state.characters[def.id];
-        const reason = away ? `Away on ${away.name} until day ${away.returnDay}`
-          : otherSlot >= 0 ? `Already in slot ${otherSlot + 1}` : null;
+        const reason = away ? `Away on ${away.name} until the cycle returns`
+          : otherSlot >= 0 ? 'Already committed to this cycle' : null;
         grid.appendChild(h('button.picker-card', {
           disabled: unavailable,
           onclick: async () => { await onSelect(def.id); close(); },
@@ -252,5 +252,5 @@ export function openExpeditionCharacterPicker(store, {
 }
 
 function characterExpeditionForPicker(state, characterId) {
-  return (state.expeditions?.active ?? []).find(item => item.party.includes(characterId)) ?? null;
+  return (state.expeditions?.active?.routes ?? []).find(route => route.party.includes(characterId)) ?? null;
 }

@@ -2,7 +2,7 @@
 // save state are separated (GDD 12.1); saves live in the OS user-data folder
 // with one rolling backup and manual export/import.
 import { app, BrowserWindow, ipcMain, dialog, protocol } from 'electron';
-import { readFileSync, writeFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, rmSync, cpSync, renameSync } from 'node:fs';
+import { readFileSync, writeFileSync, copyFileSync, existsSync, mkdirSync, rmSync, cpSync, renameSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, dirname, basename, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,15 +15,7 @@ import { adaptPackageToCustomDb } from '../src/core/worldhub/adapter.js';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const savePath = () => join(app.getPath('userData'), 'save.json');
 const backupPath = () => join(app.getPath('userData'), 'save.backup.json');
-const customPath = () => join(app.getPath('userData'), 'custom-content.json');
-const customBackupPath = () => join(app.getPath('userData'), 'custom-content.backup.json');
 const activeCustomPath = () => join(app.getPath('userData'), 'active-custom-content.json');
-
-// Creator art lives beside index.html rather than in userData, so the paths
-// stored in the database ("art/<hash>.webp") resolve as ordinary relative URLs
-// and travel with the repository.
-const ART_DIR = join(root, 'art');
-const ART_EXTENSIONS = new Set(['webp', 'png', 'jpg', 'jpeg']);
 
 const CONTENT_FILES = ['balance', 'worlds', 'archetypes', 'materials', 'components', 'characters', 'tags', 'recipes', 'nodes', 'archives'];
 
@@ -362,28 +354,10 @@ app.whenReady().then(() => {
     return JSON.parse(readFileSync(filePaths[0], 'utf8'));
   });
 
-  ipcMain.handle('content:sample', () => {
-    return JSON.parse(readFileSync(join(root, 'content', 'sample-pack.json'), 'utf8'));
-  });
-
-  ipcMain.handle('custom:load', () => {
-    if (!existsSync(customPath())) return null;
-    try {
-      return JSON.parse(readFileSync(customPath(), 'utf8'));
-    } catch (e) {
-      if (existsSync(customBackupPath())) {
-        try { return JSON.parse(readFileSync(customBackupPath(), 'utf8')); } catch {}
-      }
-      return null;
-    }
-  });
-
-  ipcMain.handle('custom:save', (_ev, data) => {
-    if (hubPointer()) return false; // Hub mode: the Creator is read-only
-    mkdirSync(app.getPath('userData'), { recursive: true });
-    if (existsSync(customPath())) copyFileSync(customPath(), customBackupPath());
-    writeFileSync(customPath(), JSON.stringify(data));
-    return true;
+  // The bundled default content pack: the built-in fallback until a World Hub
+  // publication is activated or a pack is imported through the dev panel.
+  ipcMain.handle('content:default', () => {
+    try { return JSON.parse(readFileSync(join(root, 'default_content.json'), 'utf8')); } catch { return null; }
   });
 
   ipcMain.handle('custom-active:load', () => {
@@ -395,41 +369,6 @@ app.whenReady().then(() => {
     mkdirSync(app.getPath('userData'), { recursive: true });
     writeFileSync(activeCustomPath(), JSON.stringify(data));
     return true;
-  });
-
-  // Art is content-addressed: identical images collapse onto one file, and an
-  // unchanged image keeps its path (and its Git blob) across re-imports.
-  ipcMain.handle('art:write', (_ev, bytes, extension) => {
-    if (hubPointer()) return null; // Hub mode: the Creator is read-only
-    const ext = ART_EXTENSIONS.has(extension) ? extension : 'webp';
-    const buffer = Buffer.from(bytes);
-    const hash = createHash('sha256').update(buffer).digest('hex').slice(0, 32);
-    const name = `${hash}.${ext}`;
-    mkdirSync(ART_DIR, { recursive: true });
-    const target = join(ART_DIR, name);
-    if (!existsSync(target)) writeFileSync(target, buffer);
-    return `art/${name}`;
-  });
-
-  ipcMain.handle('art:list', () => {
-    if (!existsSync(ART_DIR)) return [];
-    return readdirSync(ART_DIR)
-      .filter(name => ART_EXTENSIONS.has(name.split('.').pop()?.toLowerCase()));
-  });
-
-  // Only ever unlinks a plain file name inside the art directory, so a bad
-  // caller cannot reach outside it.
-  ipcMain.handle('art:delete', (_ev, names) => {
-    let removed = 0;
-    for (const raw of names ?? []) {
-      const name = basename(String(raw));
-      if (!ART_EXTENSIONS.has(name.split('.').pop()?.toLowerCase())) continue;
-      const target = join(ART_DIR, name);
-      if (!existsSync(target)) continue;
-      unlinkSync(target);
-      removed++;
-    }
-    return removed;
   });
 
   createWindow();

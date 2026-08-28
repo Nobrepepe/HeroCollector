@@ -174,12 +174,18 @@ function compactReadyLabel(items, owned) {
   return 'upgrade ready';
 }
 
+// One unclaimed encounter stake would carry them over the line.
 function oneShardRunAway(content, state, def) {
   const cs = state.characters[def.id];
   const need = content.balance.acquisitionTiers[def.tier].cumulativeShards;
-  const bestRun = Math.max(0, ...(content.shardNodesByCharacter[def.id] ?? [])
-    .map(node => content.balance.nodeDefaults[node.type]?.repeat?.count ?? 0));
-  return cs.shards < need && need - cs.shards <= bestRun;
+  const bestStake = Math.max(0, ...(content.encounterNodesByCharacter[def.id] ?? [])
+    .filter(node => !nodeStateFirstClaimed(state, node.id))
+    .map(node => node.firstClear?.shards?.qty ?? 0));
+  return cs.shards < need && need - cs.shards <= bestStake;
+}
+
+function nodeStateFirstClaimed(state, nodeId) {
+  return !!state.nodes[nodeId]?.firstClearClaimed;
 }
 
 function numberWord(number) {

@@ -58,7 +58,6 @@ export function newPlayerState(content, now = Date.now()) {
     parties,
     activePartyIndex: 0,
     pins: [],
-    archive: { fragments: {} },
     settings: {
       resetHour: b.energy.resetHour, textScale: 1, reducedMotion: false,
       confirmBulk: true, farmingResults: 'automatic'

@@ -1,7 +1,7 @@
 import { h, fmt } from './dom.js';
 import { openModal, toast, render } from '../app.js';
 import { checkClear, clearNode, maxSweepCount } from '../core/state.js';
-import { rankMaterialSources } from '../core/sources.js';
+import { rankMaterialSources, rankShardSources } from '../core/sources.js';
 import { campaignLabel } from './shared.js';
 import { modalActions, modalDismiss, modalHead } from './modal.js';
 import { compactResult, showFullResults, resultPresentationMode } from './results.js';
@@ -27,8 +27,7 @@ export function sourceRow(store, row, { onUpdate, onNavigate, returnContext } = 
     h('div', h('b', `${campaignLabel(store, node)} ${node.number} — ${node.displayName}`),
       row.recommended ? h('span.badge.recommended', 'Recommended') : null),
     h('div.small.muted',
-      `${material.icon} ${row.guaranteed} × ${material.displayName} guaranteed · ⚡ ${row.energy} per run`,
-      node.shardCharacter ? ` · ${content.characterById[node.shardCharacter].displayName} shards · ${row.attemptsLeft} attempts left` : ''),
+      `${material.icon} ${row.guaranteed} × ${material.displayName} guaranteed · ⚡ ${row.energy} per run`),
     h('div.small.muted',
       `Required Power ${fmt(node.threshold)} · selected party ${
         row.check.evalResult ? fmt(row.check.evalResult.effectivePower) : 'incomplete'
@@ -106,18 +105,30 @@ export function openFindSources(store, target, options = {}) {
       }
       if (store.ui.lastSourceResult) modal.appendChild(compactResult(store, store.ui.lastSourceResult));
       if (target.type === 'shards') {
-        const nodes = store.content.shardNodesByCharacter[target.id] ?? [];
-        const rows = nodes.flatMap(node => rankMaterialSources(store.content, store.state, node.material)
-          .filter(r => r.node.id === node.id));
-        rows.forEach(row => { row.recommended = false; });
-        rows.sort((a, b) => a.bucket - b.bucket || b.efficiency - a.efficiency || a.node.number - b.node.number);
-        const recommended = rows.find(row => row.sweepable || row.available);
-        if (recommended) recommended.recommended = true;
-        rows.forEach(row => modal.appendChild(sourceRow(store, row, {
-          onUpdate: result => { options.onUpdate?.(result); render(); renderRows(); },
-          onNavigate: close,
-          returnContext: options.returnContext
-        })));
+        const reading = rankShardSources(store.content, store.state, target.id);
+        // Shards are deterministic now: Focus converts Energy, encounters
+        // stake a first-clear grant, and targeted pushes fill the gaps.
+        modal.appendChild(h('p.caption', reading.focusSlot
+          ? `${subject} holds your ${reading.focusSlot.name} Focus — every ⚡ spent on campaign nodes brings the next shard ${reading.focusSlot.energyToNext} closer.`
+          : reading.revealed
+            ? `${subject} is revealed: assign them to a Development Focus slot and every campaign run pays toward them. Tutoring (Field Supply), Mastery milestones, and Expedition leads can all be pointed at them too.`
+            : `${subject} has not been encountered yet. First-clear their encounter node below to reveal them.`));
+        const unclaimed = reading.encounters.filter(entry => !entry.claimed);
+        if (!reading.encounters.length) {
+          modal.appendChild(h('p.muted', 'No live encounter names this character.'));
+        }
+        for (const entry of unclaimed) {
+          const rows = rankMaterialSources(store.content, store.state, entry.node.material)
+            .filter(r => r.node.id === entry.node.id);
+          rows.forEach(row => modal.appendChild(sourceRow(store, row, {
+            onUpdate: result => { options.onUpdate?.(result); render(); renderRows(); },
+            onNavigate: close,
+            returnContext: options.returnContext
+          })));
+        }
+        if (reading.encounters.length && !unclaimed.length) {
+          modal.appendChild(h('p.caption.good', 'Every encounter stake for this hero has been claimed — Focus, Tutoring, milestones, and route leads carry the rest.'));
+        }
       } else {
         for (const materialId of materials) {
           if (materials.length > 1) modal.appendChild(h('h3', store.content.materialById[materialId].displayName));

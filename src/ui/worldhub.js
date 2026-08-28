@@ -1,19 +1,21 @@
 // World Hub Content screen: install, link, preview, activate, roll back.
-// In Hub mode the Content Creator is retired and canonical content comes
-// from the installed immutable publication.
+// In Hub mode canonical content comes from the installed immutable
+// publication; otherwise the bundled default pack (or a dev-imported one)
+// carries the game.
 import { h, clear } from './dom.js';
 import { worldhub } from '../platform.js';
 
-export function renderWorldHub(store) {
-  const root = h('div.screen.worldhub-screen');
+export function renderWorldHub(store, root) {
+  const page = h('div.worldhub-screen');
   const body = h('div.panel');
-  root.appendChild(h('h1', 'World Hub Content'));
-  root.appendChild(body);
+  page.appendChild(h('h1', 'World Hub Content'));
+  page.appendChild(body);
+  root.appendChild(page);
 
   if (!worldhub.available()) {
     body.appendChild(h('p.muted',
-      'World Hub packages install through the desktop app. The browser build stays on legacy content.'));
-    return root;
+      'World Hub packages install through the desktop app. The browser build runs on the bundled default pack (or a pack imported through the dev panel).'));
+    return;
   }
 
   const rerender = () => { clear(body); draw(); };
@@ -61,11 +63,10 @@ export function renderWorldHub(store) {
         `Hub mode — “${receipt.productionName ?? 'unknown production'}” revision ${receipt.productionRevision ?? '?'}, ` +
         `publication ${String(status.publicationId).slice(0, 8)}…, imported ${String(receipt.importedAt ?? '').slice(0, 10)}.`));
       body.appendChild(h('p.muted',
-        'The Content Creator is retired while a publication is active; canonical content comes from World Hub. ' +
-        'Legacy Creator data is untouched and returns if no publication is active.'));
+        'Canonical content comes from the installed World Hub publication while one is active.'));
     } else {
       body.appendChild(h('p',
-        'Legacy mode — content comes from the Content Creator. Install a World Hub publication to make the Hub the content source.'));
+        'No publication is active — the bundled default pack is carrying the game. Install a World Hub publication to make the Hub the content source.'));
     }
     if (status.linkedFolder) {
       body.appendChild(h('p.muted', `Linked production folder: ${status.linkedFolder}`));
@@ -95,5 +96,4 @@ export function renderWorldHub(store) {
   }
 
   draw();
-  return root;
 }

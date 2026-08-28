@@ -39,9 +39,9 @@ export async function writeSave(state) {
   return true;
 }
 
-// ---------------------------------------------------------------- custom content
-// The creator database (with embedded images) is too large for localStorage,
-// so the browser fallback uses IndexedDB.
+// ---------------------------------------------------------------- content packs
+// An imported content pack can be too large for localStorage, so the browser
+// fallback uses IndexedDB.
 function idb() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open('hero-collector', 1);
@@ -68,11 +68,14 @@ async function idbSet(key, value) {
   });
 }
 
-// The shipped sample worlds, as an importable creator-database pack.
-export async function loadSamplePack() {
-  if (isElectron) return window.heroAPI.loadSamplePack();
-  const res = await fetch('content/sample-pack.json');
-  return res.json();
+// The bundled default content pack: the built-in fallback until a World Hub
+// publication is activated or a pack is imported through the dev panel.
+export async function loadDefaultPack() {
+  try {
+    if (isElectron) return await window.heroAPI.loadDefaultPack();
+    const res = await fetch('default_content.json');
+    return res.ok ? await res.json() : null;
+  } catch { return null; }
 }
 
 // ---- World Hub consumer (Electron only; the browser build stays legacy) ----
@@ -88,16 +91,8 @@ export const worldhub = {
   migrateSave: (mapping) => window.heroAPI.worldhubMigrateSave(mapping),
 };
 
-export async function loadCustomContent() {
-  if (isElectron) return window.heroAPI.loadCustom();
-  try { return await idbGet('custom-content'); } catch { return null; }
-}
-
-export async function writeCustomContent(db) {
-  if (isElectron) return window.heroAPI.writeCustom(db);
-  return idbSet('custom-content', JSON.parse(JSON.stringify(db)));
-}
-
+// The last content pack explicitly imported through the dev panel. Absent on
+// fresh installs; the bundled default pack fills in.
 export async function loadActiveCustomContent() {
   if (isElectron) return window.heroAPI.loadActiveCustom();
   try { return await idbGet('active-custom-content'); } catch { return null; }
@@ -106,27 +101,6 @@ export async function loadActiveCustomContent() {
 export async function writeActiveCustomContent(db) {
   if (isElectron) return window.heroAPI.writeActiveCustom(db);
   return idbSet('active-custom-content', JSON.parse(JSON.stringify(db)));
-}
-
-// ---------------------------------------------------------------- art files
-// Imported art is written next to index.html as art/<hash>.<ext> so the database
-// only carries a relative URL. The browser build has no writable filesystem, so
-// there `artStorageAvailable` is false and images stay inline data URLs.
-export const artStorageAvailable = isElectron;
-
-export async function writeArt(bytes, extension) {
-  if (!isElectron) return null;
-  return window.heroAPI.writeArt(bytes, extension);
-}
-
-export async function listArt() {
-  if (!isElectron) return [];
-  return window.heroAPI.listArt();
-}
-
-export async function deleteArt(names) {
-  if (!isElectron) return 0;
-  return window.heroAPI.deleteArt(names);
 }
 
 // ---------------------------------------------------------------- import/export

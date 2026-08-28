@@ -164,22 +164,6 @@ export function charactersByWorld(content, worldId) {
   return cache.get(worldId) ?? [];
 }
 
-export function relicPieceModel(store, relic) {
-  return relic.fragments.map((fragment, index) => ({
-    side: index === 0 ? 'left' : 'right',
-    fragment,
-    owned: !!store.state.archive.fragments[fragment.id],
-    node: store.content.nodeById[fragment.sourceNode]
-  }));
-}
-
-export function collectionSummary(collection) {
-  const whole = collection.relics.filter(item => item.complete).length;
-  const half = collection.relics.filter(item => item.owned === 1).length;
-  const buried = collection.relics.filter(item => item.owned === 0).length;
-  return `${whole} whole, ${half} half-found, ${buried} still buried`;
-}
-
 export function activeGearTier(store, characterId) {
   return activeTier(store.content.balance, store.state.characters[characterId], store.content.maxGearTier);
 }

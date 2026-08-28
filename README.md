@@ -1,11 +1,11 @@
 # Hero Collector — MVP
 
-A single-player, menu-first hero-collection progression game, implemented from the
-*Hero Collection Progression Game MVP GDD* as an Electron desktop application.
-No combat simulation, no monetization, no accounts: you spend a daily Energy
-allowance on campaign nodes, farm materials and character shards, craft
-character-themed equipment, raise Stars and Gear Tiers, and build parties whose
-tag synergies beat visible Power thresholds.
+A single-player, menu-first hero-collection progression game, implemented as an
+Electron desktop application. No combat simulation, no monetization, no
+accounts: you spend a daily Energy allowance on campaign nodes, farm materials
+while Development Focus converts the same Energy into deterministic character
+shards, craft character-themed equipment, raise Stars and Gear Tiers, and build
+parties whose tag synergies beat visible Power thresholds.
 
 ## Run
 
@@ -19,89 +19,83 @@ with one rolling backup; Settings offers export/import and a clean reset.
 
 For a quick browser preview without Electron, serve the folder over HTTP
 (`python3 -m http.server 8765`) and open `http://localhost:8765` — the save
-then uses localStorage instead.
+then uses localStorage instead, and the bundled default content pack carries
+the game.
 
 ## Development
 
 ```bash
 npm run generate     # regenerate content/*.json from scripts/generate-content.mjs
 npm test             # rules tests (GDD Appendix B invariants) + full simulated playthrough
-node scripts/simulate.mjs [days]   # pacing trace of the greedy playthrough bot
+node scripts/playtest.mjs [days] [seed]   # balance harness on default_content.json
 ```
 
-The hidden developer panel (GDD 12.5) toggles with **Ctrl+Shift+D** or from
-Settings: grants, node unlock/relock, reset-day advancement, RNG seeding, shard
-simulation, power/synergy traces, and content validation.
+The hidden developer panel toggles with **Ctrl+Shift+D** or from Settings:
+grants, node unlock/relock, reset-day advancement, RNG seeding, power/synergy
+traces, content-pack import, and content validation.
 
-## Content Creator — the game's content is yours
+## Progression systems (the goal-driven overhaul)
 
-**All playable content is authored in-app.** The shipped files carry only
-system data (balance, archetypes, materials, components, recipes, universal
-tag rules); worlds, characters, the Main Campaign, and archives live in the
-creator database. A fresh install boots into **setup mode** — a readiness
-checklist replaces the game screens until the content meets the minimum
-prerequisites for a playable save:
+The central principle: ordinary play continuously produces both Gear materials
+and shards; the player decides which materials to pursue and which Heroes to
+develop.
 
-1. at least one **published world**,
-2. at least **5 starting characters** (Minor characters flagged "starting"),
-3. at least one live **Main Campaign chapter**,
-4. at least one complete **Shadow Campaign chapter**.
+- **Development Focus** — three global slots (Primary 1 shard/24⚡, Secondary
+  1/30, Long-term 1/40). Every point of Energy spent on any campaign node
+  advances all three meters; shards apply automatically and progress carries
+  between days. 120 Energy ≈ 12 deterministic shards. A revealed Hero can
+  receive shards before being recruited.
+- **Encounters** — campaign nodes may carry an encounter: the first clear
+  reveals that Hero (making them a Focus target) and stakes 2 shards.
+  Recruitment and Star promotion remain deterministic cumulative thresholds.
+- **World Programs** — each world's Headquarters runs three automatic
+  Programs: Procurement (Energy on that world's nodes → material shipments of
+  a chosen family), Development (shards applied to that world's heroes →
+  bonus shards for a chosen hero), Operations (completed routes → visibly
+  improved routes next cycle). No timers, no construction, no currencies.
+- **Relics** — one four-piece relic per world, found by first-clearing World
+  Campaign nodes 4, 9, 15, and 21. Pieces grant Mastery; the reconstructed
+  relic installs into exactly one Program and visibly improves its payouts.
+- **World Mastery** — a derived 0–1,000 track per world (350 campaign, 350
+  heroes, 200 gear, 100 relic) with the Unfamiliar → Mastered ranks.
+  Milestones grant only visible, finite rewards — chosen material caches,
+  targeted shards, Field Supplies, skins — never passive percentages.
+- **Expeditions** — one board per cycle; choose up to three routes, assign
+  every party together, and everything launches and returns together four
+  days later. The board waits indefinitely; rerolls and pins are per-cycle;
+  character-lead routes take a *chosen* revealed hero.
+- **Field Supplies** — stored strategic consumables with three targeted
+  modes: a material requisition, hero tutoring, or a one-attempt Surge past a
+  near-miss Power gate. No daily use requirement.
 
-While in setup mode the Content Creator is always in the sidebar; once the
-game is playable it moves behind the dev-tools toggle (**Ctrl+Shift+D**).
+## Architecture
 
-- **Worlds** — create, edit, delete. A world stays a **draft** until it has at
-  least 5 characters, each with a shard source; only then can it be
-  **published**. Unpublishing keeps owned progress dormant until republish.
-- **Characters** — name, archetype, acquisition tier, starting flag, faction
-  (creatable), tags, description, lore, six named equipment lines.
-- **Main & Shadow Campaigns** — paired chapters of 10 nodes. Main is an
-  unlimited material campaign with checkpoints at 5/10. Every Shadow node is
-  a five-runs-per-day shard source unlocked by its matching Main node.
-- **World Campaigns & Archives** — each world's 3×10 campaign with editable
-  names/thresholds/materials and optional same-world shard drops, plus 3
-  collections × 5 relics with lore, art, milestone rewards, and the
-  full-Archive character skin.
-- **Art import** — cropped/resized in-app, stored in the creator database:
-  character portrait (square) + full body (9:16), world banner (16:9), six
-  equipment images per character (square), relic art (16:9), skin portrait +
-  full body.
-- **Sample worlds** — the original two worlds ship as
-  `content/sample-pack.json`; one click in the Creator imports them as fully
-  editable content (or ignore them and build from scratch).
-- Everything lives in `custom-content.json` in the user-data folder (with a
-  rolling backup); incomplete content is held back with a readable health
-  report instead of breaking the game. Content packs export/import as JSON.
-
-## Architecture (GDD §12)
-
-- `content/*.json` — versioned static content: 2 worlds, 20 characters, tags,
-  30 materials, 30 components, 36 recipe templates, 10 tier profiles,
-  100 campaign nodes, 30 Archive relics, and all balance constants.
-  Generated (and re-generatable) by `scripts/generate-content.mjs`; expansion is
-  data entry, not new logic.
-- `src/core/` — deterministic domain logic, UI-independent and fully unit-tested:
-  - `power.js` — Character Power (1,000 base + Stars + Gear; launch progression
-    is capped by the highest freely farmable material grade)
-  - `synergy.js` — tag-driven party bonuses in basis points, 25% global cap,
-    full explainability (active bonuses + what's missing)
-  - `state.js` — all transactions (clear/sweep, craft, upcraft, equip, tier
-    completion, promotion, unlock, pins, daily reset); each validates first and
-    applies atomically
-  - `validate.js` — content and save validation with readable error reports
-  - `rng.js` — seedable mulberry32 for reproducible rewards
-- `src/ui/` — the ten required screens (Home, Roster, Character, Party Builder,
-  Campaign Map, Node, Results, Inventory/Crafting, World Archive, Settings) plus
-  the dev panel; screens only call core transactions and re-render.
+- `content/*.json` — system data only: balance constants, archetypes, 30
+  materials, 30 components, 36 recipe templates, 10 tier profiles, universal
+  tag rules. Generated by `scripts/generate-content.mjs`.
+- **Content packs** — all playable content (worlds, characters, campaigns,
+  encounters, relics, expeditions, crises) comes from a content pack:
+  a World Hub publication, a dev-panel import, or the bundled
+  `default_content.json`. Packs flow through
+  `upgradeCustomDB → mergeContent → buildContent → validateContent`;
+  incomplete content is held back with a readable health report instead of
+  breaking the game.
+- `src/core/` — deterministic domain logic, UI-independent and fully
+  unit-tested: `state.js` (all transactions), `focus.js`, `programs.js`,
+  `mastery.js`, `relics.js`, `expeditions.js`, `crises.js`, `energy.js`,
+  `power.js`, `synergy.js`, `progression.js`, `validate.js`, `rng.js`.
+- `src/ui/` — the screens (Today, Collection, Character, Party, Worlds,
+  Journey, Node, Expeditions, Workshop, Programs, Mastery, Crisis, Settings)
+  plus the dev panel; screens only call core transactions and re-render.
 - `electron/` — desktop shell; save I/O over IPC, content loaded from disk.
-- `tests/` — Appendix B transaction invariants, rule correctness, and a full
-  greedy-bot playthrough proving a fresh save can complete the campaigns, take all
-  20 characters to 7★ / the current Gear Tier cap, and complete both Archives
-  using only in-game systems.
+- `tests/` — transaction invariants, per-system suites, a pack-upgrade suite,
+  World Hub conformance fixtures, and a full greedy-bot playthrough proving a
+  fresh save can complete the campaigns, take all 20 sample characters to 7★,
+  and reassemble both relics using only in-game systems.
 
 ## World Hub content
 
-Hero Collector can consume [World Hub](../WorldHub) publications (Package
+Hero Collector consumes [World Hub](../WorldHub) publications (Package
 Protocol 1, Application Contract 1). The authoritative contract lives at
 `worldhub/application-contract.json`.
 
@@ -112,19 +106,13 @@ Protocol 1, Application Contract 1). The authoritative contract lives at
   adapted, and still pass the game's own `validateContent()` before
   activation. A rejected package changes nothing; the previous publication is
   retained for *Roll back*.
-- **Pipeline** — a package adapts into the same custom-content database shape
-  the Creator produces, then flows through the existing
-  `mergeContent → buildContent → validateContent` pipeline. World Hub is the
-  content authority; the game engine (balance, formulas, recipes) stays
-  bundled here.
+- **Pipeline** — a package adapts into the internal content-pack shape, then
+  flows through the existing `mergeContent → buildContent → validateContent`
+  pipeline. World Hub is the content authority; the game engine (balance,
+  formulas, recipes) stays bundled here.
 - **Media** — packaged art is served through the narrow `hcpkg://` protocol,
   which resolves only files inside installed publication directories — no
   data URLs and no filesystem access from the renderer.
-- **Hub mode** — while a publication is active the Content Creator is retired
-  (navigation replaced by the World Hub screen, mutation IPC disabled) and
-  legacy Creator data stays untouched on disk; removing the publication
-  returns the app to legacy content. The Creator/merge path becomes removable
-  once real content parity is confirmed with your own worlds.
 - **Saves** — player state is app-owned and reconciles through the existing
   `syncSaveWithContent` behavior: characters that leave a publication go
   dormant in the save, never deleted. A one-time explicit legacy-ID → Hub-UUID

@@ -9,18 +9,13 @@ import { sceneImage } from './presentation.js';
 
 export function renderCampaign(store, root, arg) {
   const { content, state } = store;
-  // Journey holds the two campaigns that belong to no single world. A world's
-  // own chapters are reached through that world's hub, so they render here
-  // with a way back to it instead of a tab beside Main and Shadow.
-  const tabs = [['main', 'Main'], ['shadow', 'Shadow']];
-  const shared = new Set(tabs.map(([id]) => id));
+  // Journey holds the Main Campaign, the one path that belongs to no single
+  // world. A world's own chapters are reached through that world's hub, so
+  // they render here with a way back to it instead of a tab beside Main.
   const [argCampaign, argChapter] = (arg ?? '').split('/');
   const worldCampaign = content.worlds.find(candidate => candidate.campaignId === argCampaign) ?? null;
-  if (!worldCampaign) {
-    if (shared.has(argCampaign)) state.ui.campaignId = argCampaign;
-    if (!shared.has(state.ui.campaignId)) state.ui.campaignId = 'main';
-  }
-  const current = worldCampaign ? worldCampaign.campaignId : state.ui.campaignId;
+  if (!worldCampaign) state.ui.campaignId = 'main';
+  const current = worldCampaign ? worldCampaign.campaignId : 'main';
   const nodes = content.nodesByCampaign[current] ?? [];
   const chapters = [...new Set(nodes.map(node => node.chapter))].sort((a, b) => a - b);
   const remembered = store.ui.journeyChapterByCampaign ??= {};
@@ -52,16 +47,6 @@ export function renderCampaign(store, root, arg) {
     header.appendChild(h('p.journey-worlds-link',
       h('button.link', { onclick: () => store.go(`#/worlds/${worldCampaign.id}`) },
         `← ${worldCampaign.displayName}`)));
-  } else {
-    const tabBar = h('div.tab-bar');
-    for (const [id, label] of tabs) tabBar.appendChild(h('button.tab-btn' + (id === current ? '.active' : ''), {
-      onclick: () => {
-        const destination = remembered[id] ?? 1;
-        state.ui.campaignId = id;
-        store.save().then(() => store.go(`#/campaign/${id}/${destination}`));
-      }
-    }, label));
-    header.appendChild(tabBar);
   }
   page.appendChild(header);
   if (store.ui.lastSourceResult) page.appendChild(compactResult(store, store.ui.lastSourceResult));
@@ -152,18 +137,16 @@ function chapterPath(store, chapter, nodes) {
 
 function campaignName(content, id) {
   if (id === 'main') return 'Main';
-  if (id === 'shadow') return 'Shadow';
   return content.worlds.find(world => world.campaignId === id)?.displayName ?? 'Journey';
 }
 
 function chapterTitle(nodes, world, campaign, chapter) {
   if (nodes[0]?.chapterTitle) return nodes[0].chapterTitle;
   if (world) return `${world.displayName} · Chapter ${chapter}`;
-  return campaign === 'shadow' ? `Shadow Chapter ${chapter}` : `Main Chapter ${chapter}`;
+  return `Main Chapter ${chapter}`;
 }
 
 function chapterDescription(world, campaign, chapter) {
   if (world) return world.tagline;
-  if (campaign === 'shadow') return 'A parallel chapter of shard encounters, opening in the wake of the Main path.';
   return `Ten thresholds shape Chapter ${chapter}. Every clear moves the frontier one step farther.`;
 }

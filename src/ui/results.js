@@ -4,25 +4,28 @@ import { clearNode, checkClear, preferredPartyIndex } from '../core/state.js';
 
 export function resultIsMeaningful(result) {
   const rewards = result.rewards;
-  return !!(rewards.firstClear || rewards.objective || rewards.fragments?.length
+  return !!(rewards.firstClear || rewards.objective || rewards.relicPieces?.length
+    || rewards.revealed?.length || rewards.masteryEvents?.length
     || rewards.milestones?.length || rewards.energyRefunded || result.newlyReadyCharacters?.length);
 }
 
 export function resultPresentationMode(store, result) {
   const preference = store.state.settings.farmingResults ?? 'automatic';
-  if (result.rewards.firstClear || result.rewards.milestones?.length) return 'full';
+  if (result.rewards.firstClear || result.rewards.milestones?.length
+    || result.rewards.revealed?.length || result.rewards.relicPieces?.length
+    || result.rewards.masteryEvents?.length) return 'full';
   if (preference === 'full') return 'full';
   if (preference === 'compact') return 'compact';
   return resultIsMeaningful(result) ? 'full' : 'compact';
 }
 
 function compactBody(store, result) {
+  const focusTotal = (result.rewards.focusShards ?? []).reduce((sum, grant) => sum + grant.shards, 0);
   const primary = Object.entries(result.rewards.shards ?? {})[0];
   const materialCount = Object.values(result.rewards.materials ?? {}).reduce((sum, qty) => sum + qty, 0);
   return h('div.compact-result-line',
     h('span', `${result.node.displayName} · ${result.rewards.runs} run${result.rewards.runs === 1 ? '' : 's'}`),
-    primary ? h('span.numeral', `+${primary[1]} ${store.content.characterById[primary[0]].displayName} shard${primary[1] === 1 ? '' : 's'}`)
-      : h('span.numeral', `+${materialCount} materials`),
+    h('span.numeral', `+${materialCount} materials${focusTotal ? ` · +${focusTotal} Focus shard${focusTotal === 1 ? '' : 's'}` : ''}${primary ? ` · +${primary[1]} ${store.content.characterById[primary[0]].displayName}` : ''}`),
     h('span.caption', result.rewards.energyRefunded
       ? `⚡${result.rewards.energySpent} spent · ${result.rewards.energyRefunded} returned`
       : `⚡${result.rewards.energySpent} spent`));
@@ -47,16 +50,22 @@ export function showFullResults(store, result, { onClose, members, count } = {})
     const columns = h('div.reward-columns');
     const materials = Object.entries(rewards.materials ?? {});
     if (materials.length) columns.appendChild(materialColumn(store, materials));
-    for (const [characterId, qty] of Object.entries(rewards.shards ?? {})) {
+    const shardTotals = { ...(rewards.shards ?? {}) };
+    for (const grant of rewards.focusShards ?? []) {
+      shardTotals[grant.characterId] = (shardTotals[grant.characterId] ?? 0) + grant.shards;
+    }
+    for (const [characterId, qty] of Object.entries(shardTotals)) {
       columns.appendChild(shardColumn(store, characterId, qty));
     }
-    for (const fragmentId of rewards.fragments ?? []) columns.appendChild(fragmentColumn(store, fragmentId));
+    for (const pieceId of rewards.relicPieces ?? []) columns.appendChild(relicPieceColumn(store, pieceId));
     if (!columns.firstChild) columns.appendChild(h('div.reward-column', h('div.numeral', '—'), h('div', 'No drops this time')));
     modal.querySelector('.results-content').appendChild(columns);
 
     const unlocks = [
+      ...(rewards.revealed ?? []).map(id => `${store.content.characterById[id].displayName} was encountered — a new Development Focus target`),
       ...(result.newlyReadyCharacters ?? []).map(id => `${store.content.characterById[id].displayName} is ready to grow`),
       ...(rewards.milestones ?? []),
+      ...(rewards.masteryEvents ?? []).map(event => `${store.content.worldById[event.worldId]?.displayName ?? 'A world'} reached ${event.rankName} Mastery`),
       rewards.objective ? 'The optional objective is complete' : null
     ].filter(Boolean);
     // append() from dom.js, not Element.append: the conditional lines below are
@@ -114,25 +123,20 @@ function shardColumn(store, characterId, qty) {
     h('div.caption', `${fmt(cs.shards)} of ${fmt(need)} — ${fmt(Math.max(0, need - cs.shards))} from the next milestone`));
 }
 
-function fragmentColumn(store, fragmentId) {
-  const meta = store.content.fragmentById[fragmentId];
-  const relic = store.content.archives.flatMap(archive => archive.collections)
-    .flatMap(collection => collection.relics).find(item => item.id === meta?.relicId);
-  const image = relic ? store.content.images.relic[relic.id] : null;
-  const index = relic?.fragments.findIndex(fragment => fragment.id === fragmentId) ?? 0;
-  const complete = relic?.fragments.every(fragment => store.state.archive.fragments[fragment.id]);
-  const puzzle = h('div.relic.result-relic');
-  relic?.fragments.forEach((fragment, pieceIndex) => {
-    const owned = !!store.state.archive.fragments[fragment.id];
-    puzzle.appendChild(h(`div.relic-piece.${pieceIndex === 0 ? 'left' : 'right'}${owned && image ? '' : '.relic-piece--empty'}${pieceIndex === index ? `.new-piece.${pieceIndex === 0 ? 'from-left' : 'from-right'}` : ''}`, {
-      style: owned && image ? { backgroundImage: `url("${image}")` } : {}
-    }));
-  });
-  if (complete) puzzle.appendChild(h('div.relic-seam.just-joined'));
+function relicPieceColumn(store, pieceId) {
+  const piece = store.content.relicPieceById[pieceId];
+  const relic = piece ? store.content.relicByWorld[piece.world] : null;
+  const image = store.content.images.relic[pieceId] ?? null;
+  const ownedCount = relic ? relic.pieces.filter(entry => store.state.relics.pieces[entry.id]).length : 0;
+  const complete = relic && ownedCount === relic.pieces.length;
   return h('div.reward-column.fragment',
-    puzzle,
-    h('div.title', relic?.displayName ?? 'Archive fragment'),
-    h('div.caption', 'A new half has found its place.'));
+    image
+      ? h('img.result-relic-piece', { src: image, alt: '' })
+      : h('div.shard-icon', '🗿'),
+    h('div.title', piece?.displayName ?? 'Relic piece'),
+    h('div.caption', complete
+      ? `${relic.displayName} is whole — install it into a Program.`
+      : relic ? `${ownedCount} of ${relic.pieces.length} pieces of ${relic.displayName} recovered.` : 'A piece has found its place.'));
 }
 
 export function showResults(store, result, { onClose, compactRoot, members, count } = {}) {

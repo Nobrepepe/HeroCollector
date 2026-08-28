@@ -2,16 +2,18 @@ import { h, fmt } from './dom.js';
 import { characterPowerBreakdown } from '../core/power.js';
 import {
   promoteStar, checkPromoteStar, unlockCharacter, checkUnlockCharacter,
-  togglePin, isPinned, unlockedSkins, selectSkin
+  togglePin, isPinned, selectSkin
 } from '../core/state.js';
+import { unlockedSkins } from '../core/mastery.js';
+import { focusStatus, isRevealed } from '../core/focus.js';
 import { starline, activeSkin } from './shared.js';
 import { openFindSources } from './find-sources.js';
+import { openFocusModal } from './home.js';
 import { gearPanel, openGearDialog } from './gear.js';
 import { playPromotion, settlePromotion } from './promotion.js';
 import { promotionSnapshot, promotionConsequences, starName } from '../core/consequences.js';
 import { render } from '../app.js';
 import { characterExpedition } from '../core/expeditions.js';
-import { hqState } from '../core/hq.js';
 
 export function renderCharacter(store, root, characterId) {
   const { content, state } = store;
@@ -36,11 +38,10 @@ export function renderCharacter(store, root, characterId) {
     h('h1.display-xl', def.displayName),
     starline(cs.stars));
   const away = characterExpedition(state, characterId);
-  const staffed = content.worlds.flatMap(w => Object.entries(hqState(state, w.id).staff ?? {})
-    .flatMap(([facilityId, ids]) => ids.includes(characterId) ? [{ world: w, facilityId }] : []))[0];
-  if (away || staffed) body.appendChild(h('p.caption.character-assignments',
-    away ? `Expedition · ${away.name}, returns day ${away.returnDay}. ` : '',
-    staffed ? `HQ staff · ${staffed.world.hq?.facilities.find(f => f.id === staffed.facilityId)?.displayName}.` : ''));
+  const focusSlot = focusStatus(content, state).find(entry => entry.characterId === characterId) ?? null;
+  if (away || focusSlot) body.appendChild(h('p.caption.character-assignments',
+    away ? `Expedition · ${away.name}, back with the cycle on day ${state.expeditions.active?.returnDay}. ` : '',
+    focusSlot ? `${focusSlot.name} Development Focus · ${focusSlot.energyToNext}⚡ to the next shard.` : ''));
 
   if (cs.owned) body.appendChild(ownedProgress(store, def, cs, power));
   else body.appendChild(unownedProgress(store, def, cs));
@@ -84,6 +85,7 @@ function ownedProgress(store, def, cs, power) {
     const check = checkPromoteStar(store.content, store.state, def.id);
     wrap.appendChild(h('div.character-actions',
       h('button.btn.primary', { disabled: !check.ok, onclick: () => promoteWithFeedback(store, def.id) }, `Promote to ${cs.stars + 1}★`),
+      focusButton(store, def.id),
       pinButton(store, def.id)));
   } else wrap.appendChild(h('p.good', 'Seven stars — every shard milestone is complete.'));
   return wrap;
@@ -92,15 +94,26 @@ function ownedProgress(store, def, cs, power) {
 function unownedProgress(store, def, cs) {
   const tier = store.content.balance.acquisitionTiers[def.tier];
   const check = checkUnlockCharacter(store.content, store.state, def.id);
+  const revealed = isRevealed(store.state, def.id);
   return h('section.character-power',
-    h('div.eyebrow', 'Not yet met'),
+    h('div.eyebrow', revealed ? 'Revealed · not yet recruited' : 'Not yet met'),
     h('div.power-line', h('div.display-l', fmt(cs.shards)), h('div.caption', `of ${fmt(tier.cumulativeShards)} shards`)),
     h('div.progressbar', h('div', { style: { width: `${Math.min(100, cs.shards / tier.cumulativeShards * 100)}%` } })),
-    h('p', `${def.tier} acquisition · joins at ${tier.unlockStar}★.`),
+    h('p', revealed
+      ? `${def.tier} acquisition · joins at ${tier.unlockStar}★. Shards can already be pointed at them.`
+      : `${def.tier} acquisition · joins at ${tier.unlockStar}★. First-clear their encounter to reveal them.`),
     h('div.character-actions',
       h('button.btn.primary', { disabled: !check.ok, onclick: () => store.tx(() => unlockCharacter(store.content, store.state, def.id)) }, 'Meet them →'),
       h('button.link', { onclick: () => openFindSources(store, { type: 'shards', id: def.id }) }, 'Find shards'),
+      revealed ? focusButton(store, def.id) : null,
       pinButton(store, def.id)));
+}
+
+// Focus is the shard engine, so a revealed hero's page carries the assignment.
+function focusButton(store, characterId) {
+  const slot = focusStatus(store.content, store.state).find(entry => entry.characterId === characterId);
+  return h('button.link', { onclick: () => openFocusModal(store) },
+    slot ? `${slot.name} Focus ✓` : 'Set as Focus target');
 }
 
 function pinButton(store, characterId) {
