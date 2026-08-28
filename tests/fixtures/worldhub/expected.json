@@ -1,24 +1,24 @@
 {
   "appType": "hero-collector.content-pack",
-  "contractId": "3e4b8b27-a20b-4947-abb5-2764788a81c4",
+  "contractId": "cb389d44-98e9-4027-82e8-556446d39d7c",
   "contractVersion": 1,
-  "libraryId": "610a3e02-201b-44b3-bb68-3de26974f8e7",
-  "productionId": "dfe4caf4-55ed-4adf-82fa-8df531c6eb65",
-  "publicationV1": "efb19eb1-4271-440d-8345-1aa6520b6d00",
-  "publicationV2": "7433ef2e-1154-45ff-9b0d-ccfeb1f1a127",
-  "worldId": "8067fa4d-54c4-4255-a331-1b6cb90dc082",
+  "libraryId": "aa3d4ed2-fc20-4303-aaa0-86d8f3e18010",
+  "productionId": "803e6615-8ec1-458b-9ce0-45385d27cd7a",
+  "publicationV1": "d8e1ed71-b461-4ec6-aad5-33a605026c87",
+  "publicationV2": "ee30733c-dfcd-47fc-b698-084a4e1ea672",
+  "worldId": "cb308a36-42f4-4bbe-980e-238bc12d0861",
   "characterIds": [
-    "4eacd5e2-2562-4b9f-974b-65731a24c244",
-    "032b76f7-7232-4183-bff4-3e68bec2cc40",
-    "a3ff07ca-e6b0-42fc-8f3f-fbff21623bde",
-    "86ce300c-6eee-4922-b350-283651531f5f",
-    "3eab4c8e-a96a-4b04-adb2-a33964fc9071"
+    "44cd8ba2-c403-4c41-8a2b-e370785ed0ad",
+    "e1b8ca51-6a49-4c53-b6e7-4058e2b3c3e5",
+    "d2ce2f77-c662-4808-89c2-9fae9b18cee3",
+    "1f80c153-6d98-456d-bfc2-d87b3d169c39",
+    "e4feb34f-7e8a-44c9-a99f-83e1976efea1"
   ],
-  "renamedCharacterId": "4eacd5e2-2562-4b9f-974b-65731a24c244",
+  "renamedCharacterId": "44cd8ba2-c403-4c41-8a2b-e370785ed0ad",
   "retiredCharacterIds": [
-    "032b76f7-7232-4183-bff4-3e68bec2cc40",
-    "a3ff07ca-e6b0-42fc-8f3f-fbff21623bde",
-    "86ce300c-6eee-4922-b350-283651531f5f",
-    "3eab4c8e-a96a-4b04-adb2-a33964fc9071"
+    "e1b8ca51-6a49-4c53-b6e7-4058e2b3c3e5",
+    "d2ce2f77-c662-4808-89c2-9fae9b18cee3",
+    "1f80c153-6d98-456d-bfc2-d87b3d169c39",
+    "e4feb34f-7e8a-44c9-a99f-83e1976efea1"
   ]
 }

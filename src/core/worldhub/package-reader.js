@@ -113,7 +113,7 @@ export function loadPackage(root) {
     }
   }
   for (const character of characters) {
-    for (const ref of [character.portraitAssetId, character.fullBodyAssetId]) {
+    for (const ref of [character.portraitAssetId, character.tileAssetId]) {
       if (ref && !assetIds.has(ref)) throw new PackageError('A character profile references a missing asset.');
     }
   }
@@ -161,7 +161,6 @@ export function semanticValidation(pkg) {
   if (!(selections.hc_characters ?? []).length) throw new PackageError('The package selects no characters.');
   const values = pkg.content.values ?? {};
   if (!(values.hc_main_chapters ?? []).length) throw new PackageError('The package has no Main Campaign chapters.');
-  if (!(values.hc_shadow_chapters ?? []).length) throw new PackageError('The package has no Shadow Campaign chapters.');
   for (const worldId of selections.hc_worlds) {
     const nodes = (pkg.content.entityValues?.[worldId] ?? {}).hc_campaign_nodes ?? [];
     if (nodes.length !== 30) throw new PackageError('A world does not have exactly 30 campaign nodes.');

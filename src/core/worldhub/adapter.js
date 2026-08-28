@@ -1,8 +1,8 @@
 // Package-to-runtime adapter: turns a validated World Hub package into
-// the custom-content database shape the existing pipeline consumes
+// the content-pack database shape the existing pipeline consumes
 // (mergeContent -> buildContent -> validateContent). Nothing here
 // bypasses the game's own semantic validation.
-import { CUSTOM_DB_VERSION, defaultHq } from '../custom.js';
+import { CUSTOM_DB_VERSION } from '../custom.js';
 
 const DEFAULT_PALETTE = { primary: '#5a7a9e', accent: '#9ec3e8', dark: '#1c2733' };
 const SLOT_ORDER = ['attire', 'tool', 'accessory', 'keepsake', 'emblem', 'signature'];
@@ -67,12 +67,12 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
       description: entity.summary ?? '',
       lore: profile.biography ?? '',
       portrait: mediaUrl(setAsset('hc_portrait', hubId), ['square', 'thumbnail_square']),
-      fullBody: mediaUrl(setAsset('hc_full_body', hubId), ['portrait_9x16']),
+      fullBody: mediaUrl(setAsset('hc_full_body', hubId), ['full_body_9x16']),
       equipment,
       skins: (own.hc_skins ?? []).map((skin) => ({
         id: skin.skin_id,
         name: skin.skin_name,
-        portrait: skin.skin_art ? mediaUrl(skin.skin_art, ['portrait_9x16', 'square']) : null,
+        portrait: skin.skin_art ? mediaUrl(skin.skin_art, ['full_body_9x16', 'square']) : null,
         fullBody: null,
       })),
     };
@@ -83,10 +83,10 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
     const entity = entitiesById[hubId] ?? {};
     const profile = worldProfiles[hubId] ?? {};
     const own = entityValues[hubId] ?? {};
-    const chapterArt = setAssets('hc_chapter_art', hubId).map((assetId) => mediaUrl(assetId, ['landscape_16x9']));
+    const chapterArt = setAssets('hc_chapter_art', hubId).map((assetId) => mediaUrl(assetId, ['tile_16x9']));
     while (chapterArt.length < 3) chapterArt.push(null);
 
-    const world = {
+    return {
       id: hubId,
       status: 'published',
       displayName: entity.name ?? 'Unknown world',
@@ -97,8 +97,7 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
         accent: own.hc_palette_accent || DEFAULT_PALETTE.accent,
         dark: own.hc_palette_dark || DEFAULT_PALETTE.dark,
       },
-      image: mediaUrl(setAsset('hc_world_cover', hubId), ['landscape_16x9']),
-      hqImage: mediaUrl(setAsset('hc_hq_art', hubId), ['landscape_16x9']),
+      image: mediaUrl(setAsset('hc_world_cover', hubId), ['tile_16x9']),
       campaignChapterImages: chapterArt.slice(0, 3),
       campaignChapterTitles: own.hc_chapter_titles
         ?? [1, 2, 3].map((n) => `${entity.name} · Chapter ${n}`),
@@ -107,49 +106,26 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
         threshold: node.node_threshold,
         family: node.node_family,
         grade: node.node_grade,
-        shardCharacterId: node.node_shard_character || undefined,
+        encounterCharacterId: node.node_encounter_character || null,
       })),
       description: entity.summary ?? '',
       displayOrder: own.hc_world_display_order ?? 0,
-      worldAsset: {
-        id: `asset_${hubId}`,
-        displayName: own.hc_asset_name || `${entity.name} Asset`,
-        description: own.hc_asset_description || '',
-        icon: own.hc_asset_icon || '◆',
-      },
-      archive: {
-        collections: (own.hc_archive_collections ?? []).map((collection) => ({
-          name: collection.col_name,
-          rewardSkin: {
-            characterId: collection.col_reward_character || null,
-            skinId: collection.col_reward_character
-              ? findSkinId(characters, collection.col_reward_character, collection.col_reward_skin_name)
-              : null,
-          },
-          relics: (collection.col_relics ?? []).map((relic) => ({
-            name: relic.relic_name,
-            lore: relic.relic_lore || '',
-            image: relic.relic_art ? mediaUrl(relic.relic_art, ['square']) : null,
-          })),
+      relic: {
+        name: own.hc_relic_name || `The ${entity.name ?? 'World'} Relic`,
+        lore: own.hc_relic_lore || '',
+        image: null,
+        pieces: (own.hc_relic_pieces ?? []).map((piece) => ({
+          name: piece.piece_name,
+          lore: piece.piece_lore || '',
+          image: piece.piece_art ? mediaUrl(piece.piece_art, ['square']) : null,
         })),
-        fullSkin: {
-          characterId: own.hc_full_reward_character || null,
-          skinId: own.hc_full_reward_character
-            ? findSkinId(characters, own.hc_full_reward_character, own.hc_full_reward_skin_name)
-            : null,
-        },
       },
-      hq: null,
+      masterySkins: (own.hc_mastery_skins ?? []).map((entry) => ({
+        rank: entry.ms_rank,
+        characterId: entry.ms_character,
+        skinId: entry.ms_skin_id,
+      })),
     };
-    world.hq = defaultHq(world, own.hc_hq_signature || 'daily_free_reroll');
-    (own.hc_hq_facilities ?? []).forEach((authored, index) => {
-      const facility = world.hq.facilities[index];
-      if (!facility) return;
-      facility.displayName = authored.facility_name || facility.displayName;
-      facility.description = authored.facility_description || facility.description;
-      if (authored.facility_art) facility.image = mediaUrl(authored.facility_art, ['square']);
-    });
-    return world;
   });
 
   /* ---- campaigns ---- */
@@ -162,18 +138,7 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
       threshold: node.mnode_threshold,
       family: node.mnode_family,
       grade: node.mnode_grade,
-    })),
-  }));
-  const shadowChapters = (values.hc_shadow_chapters ?? []).map((chapter) => ({
-    status: 'published',
-    title: chapter.shadow_title || '',
-    image: null,
-    nodes: (chapter.shadow_nodes ?? []).map((node) => ({
-      name: node.snode_name,
-      threshold: node.snode_threshold,
-      family: node.snode_family,
-      grade: node.snode_grade,
-      shardCharacterId: node.snode_shard_character,
+      encounterCharacterId: node.mnode_encounter_character || null,
     })),
   }));
 
@@ -192,13 +157,13 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
   const productionSets = assetSets.hc_expedition_art ?? [];
   const expeditions = {
     settings: {
-      offerCount: 5, slotCount: 3, freeRerolls: 1, minimumFeasible: 2,
-      maxLongOffers: 1, generationAttempts: 40,
+      offerCount: 5, slotCount: 3, freeRerolls: 1, freePins: 1, minimumFeasible: 2,
+      generationAttempts: 40, cycleLengthDays: 4, cycleScaleBp: 40000,
       intelligenceCosts: { reroll: 1, pin: 1, reveal: 1 },
       resultMultipliersBp: { completed: 10000, successful: 12500, exceptional: 15000 },
     },
     images: {
-      global: productionSets.length ? mediaUrl(productionSets[0].assetId, ['landscape_16x9']) : null,
+      global: productionSets.length ? mediaUrl(productionSets[0].assetId, ['tile_16x9']) : null,
       worlds: {},
     },
     requirements: (values.hc_expedition_requirements ?? []).map((req) => ({
@@ -218,7 +183,6 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
       id: template.exptpl_id, enabled: true,
       world: template.exptpl_world || undefined,
       weight: template.exptpl_weight ?? 10,
-      durations: template.exptpl_durations ?? [4, 8],
       partySize: template.exptpl_party_size,
       requirementIds: template.exptpl_requirement_ids ?? [],
       requirementCount: template.exptpl_requirement_count ?? 0,
@@ -242,9 +206,9 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
     settings: {
       spawnChanceBp: 2500,
       grades: [
-        { id: 'local', displayName: 'Local Disturbance', minOwned: 5, minHqRank: 1, allowNoHq: true, frontCount: 2, teamSize: 2 },
-        { id: 'major', displayName: 'Major Crisis', minOwned: 8, minHqRank: 2, allowNoHq: false, frontCount: 3, teamSize: 2 },
-        { id: 'world', displayName: 'World Crisis', minOwned: 12, minHqRank: 3, allowNoHq: false, frontCount: 3, teamSize: 3 },
+        { id: 'local', displayName: 'Local Disturbance', minOwned: 5, minMasteryRank: 'unfamiliar', frontCount: 2, teamSize: 2 },
+        { id: 'major', displayName: 'Major Crisis', minOwned: 8, minMasteryRank: 'known', frontCount: 3, teamSize: 2 },
+        { id: 'world', displayName: 'World Crisis', minOwned: 12, minMasteryRank: 'established', frontCount: 3, teamSize: 3 },
       ],
     },
     definitions: (values.hc_crises ?? []).map((crisis) => ({
@@ -253,7 +217,7 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
       worldId: crisis.crisis_world,
       name: crisis.crisis_name,
       openingDescription: crisis.crisis_opening || '',
-      artwork: crisis.crisis_art ? mediaUrl(crisis.crisis_art, ['landscape_16x9']) : null,
+      artwork: crisis.crisis_art ? mediaUrl(crisis.crisis_art, ['tile_16x9']) : null,
       weight: crisis.crisis_weight ?? 10,
       minimumClearedNodes: crisis.crisis_min_cleared ?? 0,
       fronts: (crisis.crisis_fronts ?? []).map((front) => ({
@@ -281,33 +245,18 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
         type: crisis.crisis_boon_type,
         runs: crisis.crisis_boon_runs ?? undefined,
         qty: crisis.crisis_boon_qty ?? undefined,
-        bonusBp: crisis.crisis_boon_bonus_bp ?? undefined,
         prose: crisis.crisis_boon_prose || '',
       },
     })),
   };
 
   return {
-    // The adapter still emits the v12 shape (Shadow chapters, HQ, archive);
-    // upgradeCustomDB's v13 step folds it into the current model. The P4
-    // contract revision will make the adapter emit v13 natively.
-    version: 12,
+    version: CUSTOM_DB_VERSION,
     worlds,
     characters,
     factions,
     mainChapters,
-    shadowChapters,
     expeditions,
     crises,
   };
-}
-
-function findSkinId(characters, characterId, skinName) {
-  const character = characters.find((entry) => entry.id === characterId);
-  if (!character) return null;
-  if (skinName) {
-    const named = character.skins.find((skin) => skin.name === skinName);
-    if (named) return named.id;
-  }
-  return character.skins[0]?.id ?? null;
 }
