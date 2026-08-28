@@ -7,9 +7,15 @@
 // incomplete or unsafe is *held back* with a human-readable health note
 // instead of producing invalid content. The game itself stays in setup mode
 // until the content meets the minimum prerequisites to start a game.
-import { RANDOM_MATERIAL } from './resources.js';
+import { RANDOM_MATERIAL, INTELLIGENCE_ID } from './resources.js';
 
-export const CUSTOM_DB_VERSION = 12;
+export const CUSTOM_DB_VERSION = 13;
+
+// The four relic pieces of every world are found at these World Campaign
+// node numbers (of 30), so the completed relic matters during the campaign's
+// final third rather than only after completion.
+export const RELIC_PIECE_NODES = [4, 9, 15, 21];
+export const MASTERY_SKIN_RANKS = ['known', 'established', 'rooted', 'mastered'];
 
 export function emptyCustomDB() {
   return {
@@ -18,7 +24,6 @@ export function emptyCustomDB() {
     characters: [],
     factions: [],
     mainChapters: [],
-    shadowChapters: [],
     expeditions: emptyExpeditionLibrary(),
     crises: emptyCrisisLibrary()
   };
@@ -30,13 +35,15 @@ export function upgradeCustomDB(db) {
   const out = {
     ...emptyCustomDB(),
     ...db,
-    worlds: (db.worlds ?? []).map(w => ({
-      ...w,
-      campaignChapterImages: Array.from({ length: 3 }, (_, i) => w.campaignChapterImages?.[i] ?? null),
-      campaignChapterTitles: Array.from({ length: 3 }, (_, i) =>
-        w.campaignChapterTitles?.[i] ?? `${w.displayName || 'World'} · Chapter ${i + 1}`),
-      campaignNodes: (w.campaignNodes ?? []).map(nd => ({ ...nd })),
-      archive: w.archive ? {
+    worlds: (db.worlds ?? []).map(w => {
+      const world = {
+        ...w,
+        campaignChapterImages: Array.from({ length: 3 }, (_, i) => w.campaignChapterImages?.[i] ?? null),
+        campaignChapterTitles: Array.from({ length: 3 }, (_, i) =>
+          w.campaignChapterTitles?.[i] ?? `${w.displayName || 'World'} · Chapter ${i + 1}`),
+        campaignNodes: (w.campaignNodes ?? []).map(nd => ({ ...nd }))
+      };
+      if (w.archive) world.archive = {
         ...w.archive,
         collections: (w.archive.collections ?? []).map(col => ({
           ...col,
@@ -45,8 +52,11 @@ export function upgradeCustomDB(db) {
         })),
         skin: w.archive.skin ? { ...w.archive.skin } : undefined,
         fullSkin: w.archive.fullSkin ? { ...w.archive.fullSkin } : undefined
-      } : undefined
-    })),
+      };
+      if (w.relic) world.relic = { ...w.relic, pieces: (w.relic.pieces ?? []).map(piece => ({ ...piece })) };
+      if (w.masterySkins) world.masterySkins = w.masterySkins.map(entry => ({ ...entry }));
+      return world;
+    }),
     characters: (db.characters ?? []).map(character => ({
       ...character,
       skins: (character.skins ?? []).map(skin => ({ ...skin }))
@@ -55,12 +65,18 @@ export function upgradeCustomDB(db) {
     mainChapters: (db.mainChapters ?? []).map(ch => ({
       ...ch, nodes: (ch.nodes ?? []).map(nd => ({ ...nd }))
     })),
-    shadowChapters: (db.shadowChapters ?? []).map(ch => ({
-      ...ch, nodes: (ch.nodes ?? []).map(nd => ({ ...nd }))
-    })),
     expeditions: structuredClone(db.expeditions ?? emptyExpeditionLibrary()),
     crises: structuredClone(db.crises ?? emptyCrisisLibrary())
   };
+  // Pre-v13 packs still carry a Shadow Campaign; keep it normalized so the
+  // older ladder steps can read it. The v13 step folds and removes it.
+  if (oldVersion < 13) {
+    out.shadowChapters = (db.shadowChapters ?? []).map(ch => ({
+      ...ch, nodes: (ch.nodes ?? []).map(nd => ({ ...nd }))
+    }));
+  } else {
+    delete out.shadowChapters;
+  }
   // v1 -> v2: base-content overrides and removals no longer exist; chapters
   // now form the whole Main Campaign starting at Chapter 1.
   delete out.removedWorlds;
@@ -215,6 +231,122 @@ export function upgradeCustomDB(db) {
       }
     }
   }
+  // v12 -> v13: the goal-driven overhaul. The Shadow Campaign folds into Main
+  // Campaign encounters; the Headquarters economy (facilities, renown, World
+  // Assets) is removed; the fifteen-relic Archive becomes one four-piece world
+  // relic plus Mastery skins; Expeditions run on a shared cycle without
+  // per-template durations; Crisis grades gate on World Mastery rank.
+  if (oldVersion < 13) {
+    out.mainChapters.forEach((ch, ci) => {
+      ch.nodes.forEach((nd, i) => {
+        nd.encounterCharacterId ??= out.shadowChapters?.[ci]?.nodes?.[i]?.shardCharacterId ?? null;
+      });
+    });
+    delete out.shadowChapters;
+    // Renown and World Assets no longer exist. Where a reward list promised
+    // them, keep the promise meaningful: influence becomes Intelligence at
+    // roughly 20:1 and world reserves become material caches. Node rewards
+    // simply drop them (they only ever fed the removed Headquarters economy).
+    // `materialId` is what a former World Asset entry becomes: Expedition
+    // packages may use the roll-time RANDOM_MATERIAL sentinel, but rewards
+    // granted directly (Crisis caches, consolations) need a concrete material.
+    const mapEntry = (materialId) => (entry) => {
+      if (entry.kind !== 'resource') return entry;
+      if (entry.id === 'renown') {
+        const scale = (n) => Math.max(1, Math.floor((n ?? 0) / 20));
+        return entry.min !== undefined
+          ? { ...entry, id: INTELLIGENCE_ID, min: scale(entry.min), max: Math.max(scale(entry.min), scale(entry.max)) }
+          : { ...entry, id: INTELLIGENCE_ID, qty: scale(entry.qty) };
+      }
+      if (entry.id === '@associated_world_asset') {
+        const { id, ...rest } = entry;
+        return materialId === RANDOM_MATERIAL
+          ? { ...rest, kind: 'material', id: RANDOM_MATERIAL, grade: 'basic' }
+          : { ...rest, kind: 'material', id: materialId };
+      }
+      return entry;
+    };
+    const mapPackEntry = mapEntry(RANDOM_MATERIAL);
+    const mapDirectEntry = mapEntry('mat_metal_basic');
+    const dropHqEntries = (entries) => (entries ?? []).filter(entry =>
+      !(entry.kind === 'resource' && ['renown', '@associated_world_asset'].includes(entry.id)));
+    for (const world of out.worlds) {
+      for (const nd of world.campaignNodes) {
+        nd.encounterCharacterId ??= nd.shardCharacterId ?? null;
+        delete nd.shardCharacterId;
+        nd.repeatRewards = dropHqEntries(nd.repeatRewards);
+        nd.firstClearRewards = dropHqEntries(nd.firstClearRewards);
+      }
+      const collections = world.archive?.collections ?? [];
+      const allRelics = collections.flatMap(col => col.relics ?? []);
+      world.relic ??= {
+        name: `The ${world.displayName} Relic`,
+        lore: collections[0]?.name ? `Reassembled from the ${collections[0].name}.` : '',
+        image: null,
+        pieces: [0, 1, 2, 3].map(index => ({
+          name: allRelics[index]?.name ?? `Piece ${['I', 'II', 'III', 'IV'][index]}`,
+          lore: allRelics[index]?.lore ?? '',
+          image: allRelics[index]?.image ?? null
+        }))
+      };
+      if (!world.masterySkins?.length) {
+        world.masterySkins = [];
+        collections.slice(0, 3).forEach((col, index) => {
+          if (col.rewardSkin?.characterId && col.rewardSkin?.skinId) {
+            world.masterySkins.push({
+              rank: MASTERY_SKIN_RANKS[index],
+              characterId: col.rewardSkin.characterId,
+              skinId: col.rewardSkin.skinId
+            });
+          }
+        });
+        const full = world.archive?.fullSkin;
+        if (full?.characterId && full?.skinId) {
+          world.masterySkins.push({ rank: 'mastered', characterId: full.characterId, skinId: full.skinId });
+        }
+      }
+      delete world.archive;
+      delete world.hq;
+      delete world.hqImage;
+      delete world.worldAsset;
+    }
+    for (const chapter of out.mainChapters) {
+      for (const nd of chapter.nodes) {
+        nd.repeatRewards = dropHqEntries(nd.repeatRewards);
+        nd.firstClearRewards = dropHqEntries(nd.firstClearRewards);
+      }
+    }
+    for (const pack of out.expeditions.rewardPackages ?? []) {
+      pack.entries = (pack.entries ?? []).map(mapPackEntry);
+      pack.rare = (pack.rare ?? []).map(mapPackEntry);
+    }
+    for (const template of out.expeditions.templates ?? []) delete template.durations;
+    if (out.expeditions.fallbackTemplate) delete out.expeditions.fallbackTemplate.durations;
+    const settings = out.expeditions.settings ??= {};
+    delete settings.maxLongOffers;
+    settings.cycleLengthDays ??= 4;
+    settings.cycleScaleBp ??= 40000;
+    settings.freePins ??= 1;
+    const rankByHq = { 1: 'unfamiliar', 2: 'known', 3: 'established' };
+    for (const grade of out.crises?.settings?.grades ?? []) {
+      grade.minMasteryRank ??= rankByHq[grade.minHqRank] ?? 'unfamiliar';
+      delete grade.minHqRank;
+      delete grade.allowNoHq;
+    }
+    for (const definition of out.crises?.definitions ?? []) {
+      definition.consolationReward = (definition.consolationReward ?? []).map(mapDirectEntry);
+      for (const choice of definition.cacheChoices ?? []) {
+        choice.rewards = (choice.rewards ?? []).map(mapDirectEntry);
+      }
+      if (definition.boon?.type === 'next_hq_production_bp') {
+        definition.boon = { type: 'bonus_world_material_runs', runs: 3, qty: 1,
+          prose: 'The next three successful runs here return one additional normal material.' };
+      } else if (definition.boon?.type === 'world_expedition_renown_bp') {
+        definition.boon = { type: 'instant_intelligence', qty: 2,
+          prose: 'The response yields two Intelligence immediately.' };
+      }
+    }
+  }
   out.version = CUSTOM_DB_VERSION;
   return out;
 }
@@ -276,8 +408,8 @@ export function newCustomWorld(name) {
 export function emptyExpeditionLibrary() {
   return {
     settings: {
-      offerCount: 5, slotCount: 3, freeRerolls: 1, minimumFeasible: 2,
-      maxLongOffers: 1, generationAttempts: 40,
+      offerCount: 5, slotCount: 3, freeRerolls: 1, freePins: 1, minimumFeasible: 2,
+      generationAttempts: 40, cycleLengthDays: 4, cycleScaleBp: 40000,
       intelligenceCosts: { reroll: 1, pin: 1, reveal: 1 },
       resultMultipliersBp: { completed: 10000, successful: 12500, exceptional: 15000 }
     },
@@ -308,9 +440,9 @@ export function emptyCrisisLibrary() {
     settings: {
       spawnChanceBp: 2500,
       grades: [
-        { id: 'local', displayName: 'Local Disturbance', minOwned: 5, minHqRank: 1, allowNoHq: true, frontCount: 2, teamSize: 2 },
-        { id: 'major', displayName: 'Major Crisis', minOwned: 8, minHqRank: 2, allowNoHq: false, frontCount: 3, teamSize: 2 },
-        { id: 'world', displayName: 'World Crisis', minOwned: 12, minHqRank: 3, allowNoHq: false, frontCount: 3, teamSize: 3 }
+        { id: 'local', displayName: 'Local Disturbance', minOwned: 5, minMasteryRank: 'unfamiliar', frontCount: 2, teamSize: 2 },
+        { id: 'major', displayName: 'Major Crisis', minOwned: 8, minMasteryRank: 'known', frontCount: 3, teamSize: 2 },
+        { id: 'world', displayName: 'World Crisis', minOwned: 12, minMasteryRank: 'established', frontCount: 3, teamSize: 3 }
       ]
     },
     definitions: []
@@ -334,11 +466,10 @@ export function sampleCrisisLibrary(worlds) {
   const definition = (world, id, name, openingDescription, fronts, boon) => ({
     id, enabled: true, worldId: world.id, name, openingDescription, artwork: null,
     weight: 1, minimumClearedNodes: 0, fronts,
-    consolationReward: [{ kind: 'resource', id: 'renown', qty: 12 }],
+    consolationReward: [{ kind: 'resource', id: 'intelligence', qty: 1 }],
     cacheChoices: [
-      { id: `${id}_supply`, name: 'Field Supply', description: 'One more measured extension to the day.', rewards: [{ kind: 'resource', id: 'field_supply', qty: 1 }] },
+      { id: `${id}_supply`, name: 'Field Supply', description: 'One stored provision for a targeted push.', rewards: [{ kind: 'resource', id: 'field_supply', qty: 1 }] },
       { id: `${id}_intel`, name: 'Intelligence Brief', description: 'The response leaves useful knowledge behind.', rewards: [{ kind: 'resource', id: 'intelligence', qty: 2 }] },
-      { id: `${id}_assets`, name: `${world.worldAsset.displayName}`, description: 'The affected world keeps the recovered reserve.', rewards: [{ kind: 'resource', id: '@associated_world_asset', qty: 8 }] },
       { id: `${id}_materials`, name: 'Material Bundle', description: 'Practical salvage returns to the Workshop.', rewards: [{ kind: 'material', id: 'mat_metal_basic', qty: 8 }] }
     ],
     boon
@@ -442,12 +573,12 @@ export function sampleExpeditionLibrary(worlds) {
   ];
   const pkg = (id, entries, rare = []) => ({ id, displayName: id.replaceAll('_', ' '), entries, rare });
   lib.rewardPackages = [
-    pkg('development', [{ kind: 'resource', id: 'renown', min: 40, max: 60 }, { kind: 'resource', id: '@associated_world_asset', min: 4, max: 6 }]),
-    pkg('world_supply', [{ kind: 'resource', id: '@associated_world_asset', min: 10, max: 16 }, { kind: 'resource', id: 'renown', min: 10, max: 15 }]),
+    pkg('development', [{ kind: 'material', id: RANDOM_MATERIAL, grade: 'basic', min: 3, max: 5 }, { kind: 'resource', id: 'intelligence', min: 1, max: 1 }]),
+    pkg('world_supply', [{ kind: 'material', id: RANDOM_MATERIAL, grade: 'improved', min: 3, max: 5 }]),
     pkg('equipment_cache', [{ kind: 'material', id: RANDOM_MATERIAL, grade: 'basic', min: 4, max: 8 }, { kind: 'resource', id: 'intelligence', min: 1, max: 1 }]),
-    pkg('intelligence_brief', [{ kind: 'resource', id: 'intelligence', min: 1, max: 2 }, { kind: 'resource', id: 'renown', min: 8, max: 12 }]),
-    { ...pkg('character_lead', [{ kind: 'resource', id: 'renown', min: 18, max: 28 }], [{ kind: 'resource', id: 'intelligence', qty: 1, chanceBp: 7000 }]), shardPool: 'associated_or_any', shardRange: [2, 4] },
-    pkg('long_venture', [{ kind: 'resource', id: 'renown', min: 70, max: 95 }, { kind: 'resource', id: '@associated_world_asset', min: 14, max: 20 }], [{ kind: 'resource', id: 'intelligence', qty: 2, chanceBp: 8000 }])
+    pkg('intelligence_brief', [{ kind: 'resource', id: 'intelligence', min: 1, max: 2 }, { kind: 'material', id: RANDOM_MATERIAL, grade: 'basic', min: 2, max: 3 }]),
+    { ...pkg('character_lead', [{ kind: 'material', id: RANDOM_MATERIAL, grade: 'basic', min: 2, max: 4 }], [{ kind: 'resource', id: 'intelligence', qty: 1, chanceBp: 7000 }]), shardPool: 'associated_or_any', shardRange: [2, 4] },
+    pkg('long_venture', [{ kind: 'material', id: RANDOM_MATERIAL, grade: 'advanced', min: 3, max: 5 }], [{ kind: 'resource', id: 'intelligence', qty: 2, chanceBp: 8000 }])
   ];
   const reqs = lib.requirements.map(r => r.id), opts = lib.optionalObjectives.map(r => r.id);
   const titles = ['Quiet Roads, Useful Rumours', 'A Map Left Unfinished', 'Work Beyond the Gate'];
@@ -456,7 +587,7 @@ export function sampleExpeditionLibrary(worlds) {
   for (let i = 0; i < 15; i++) {
     lib.templates.push({
       id: `exp_template_${i + 1}`, enabled: true, world: scopes[i % scopes.length], weight: 1,
-      durations: i % 5 === 4 ? [2] : [1], partySize: [2, 3, 4][i % 3],
+      partySize: [2, 3, 4][i % 3],
       requirementIds: [reqs[i % reqs.length], reqs[(i + 2) % reqs.length]], requirementCount: i % 4 === 0 ? 2 : 1,
       optionalIds: [opts[i % opts.length], opts[(i + 1) % opts.length]],
       rewardPackageId: (scopes[i % scopes.length] === null
@@ -468,10 +599,10 @@ export function sampleExpeditionLibrary(worlds) {
   }
   const supply = {
     id: 'exp_template_field_supply', enabled: true, world: null, weight: 1,
-    durations: [1], partySize: 2, requirementIds: ['req_two_arch'], requirementCount: 1,
+    partySize: 2, requirementIds: ['req_two_arch'], requirementCount: 1,
     optionalIds: ['opt_two_worlds'], rewardPackageId: 'development', powerRatioBp: [9000, 10000],
     titles: ['A Field Cache Beyond the Gate'],
-    descriptions: ['A reliable route to the provisions that can carry one day a little further.'],
+    descriptions: ['A reliable route to the provisions that can carry a goal a little further.'],
     fixedRewards: [{ kind: 'resource', id: 'field_supply', qty: 1 }]
   };
   lib.templates.push(supply);
@@ -639,13 +770,11 @@ export function characterShardAssignments(db, characterId) {
 // prerequisites for a playable new save.
 export function gameReadiness(content) {
   const mainLen = (content.nodesByCampaign?.main ?? []).length;
-  const shadowLen = (content.nodesByCampaign?.shadow ?? []).length;
   const starting = content.characters.filter(d => d.starting);
   const checks = [
     { ok: content.worlds.length >= 1, text: `At least one published world in the game (currently ${content.worlds.length}).` },
-    { ok: starting.length >= 5, text: `At least 5 starting characters to form the first party (currently ${starting.length}). Mark Minor characters as “starting” in the Content Creator.` },
-    { ok: mainLen >= 10, text: `At least one live Main Campaign chapter (currently ${mainLen} nodes).` },
-    { ok: shadowLen >= 10, text: `At least one complete Shadow Campaign chapter (currently ${shadowLen} nodes).` }
+    { ok: starting.length >= 5, text: `At least 5 starting characters to form the first party (currently ${starting.length}). Mark Minor characters as “starting” in the World Hub production.` },
+    { ok: mainLen >= 10, text: `At least one live Main Campaign chapter (currently ${mainLen} nodes).` }
   ];
   return { ready: checks.every(c => c.ok), checks };
 }
@@ -669,10 +798,10 @@ export function mergeContent(systemRaw, db) {
     for (const nd of w.campaignNodes) {
       if (nd.threshold < t) { problems.push('campaign thresholds must never decrease'); break; }
       t = nd.threshold;
-      if (nd.shardCharacterId) {
-        const shardChar = db.characters.find(c => c.id === nd.shardCharacterId);
-        if (!shardChar) problems.push(`campaign shard source references unknown character ${nd.shardCharacterId}`);
-        else if (shardChar.worldId !== w.id) problems.push(`campaign shard source ${shardChar.displayName} belongs to another world`);
+      if (nd.encounterCharacterId) {
+        const encounterChar = db.characters.find(c => c.id === nd.encounterCharacterId);
+        if (!encounterChar) problems.push(`campaign encounter references unknown character ${nd.encounterCharacterId}`);
+        else if (encounterChar.worldId !== w.id) problems.push(`campaign encounter ${encounterChar.displayName} belongs to another world`);
       }
     }
     if (w.campaignNodes.length !== 30) problems.push('campaign must have exactly 30 nodes');
@@ -685,7 +814,7 @@ export function mergeContent(systemRaw, db) {
   }
   const liveWorldIds = new Set(acceptedWorlds.map(w => w.id));
 
-  // --- character candidates (existence); they also need a live shard source
+  // --- character candidates (existence); they also need a live encounter
   const slotOrder = systemRaw.characters.slotOrder;
   const candidates = db.characters.filter(c => liveWorldIds.has(c.worldId));
   for (const c of db.characters) {
@@ -696,7 +825,8 @@ export function mergeContent(systemRaw, db) {
   }
   const candidateIds = new Set(candidates.map(c => c.id));
 
-  // --- Main Campaign: material-only chapters 1..N, contiguous and monotonic
+  // --- Main Campaign: chapters 1..N, contiguous and monotonic; nodes may
+  // carry encounters that reveal heroes.
   const sourced = new Set();
   const mainNodes = [];
   let chainAlive = true;
@@ -745,6 +875,18 @@ export function mergeContent(systemRaw, db) {
       } else {
         node.firstClear = { materials: [{ materialId: material, qty: 3 }] };
       }
+      // An encounter: the first clear reveals this hero as a Development Focus
+      // target and grants a small deterministic shard stake.
+      if (nd.encounterCharacterId) {
+        if (candidateIds.has(nd.encounterCharacterId)) {
+          node.encounterCharacter = nd.encounterCharacterId;
+          node.firstClear.shards = { characterId: nd.encounterCharacterId, qty: 2 };
+          sourced.add(nd.encounterCharacterId);
+        } else {
+          const c = db.characters.find(x => x.id === nd.encounterCharacterId);
+          note('warn', `Main node ${num} encounter “${c?.displayName ?? nd.encounterCharacterId}” is not in the game (draft world?); the encounter was held back.`);
+        }
+      }
       if (nd.objective) node.objective = nd.objective;
       mainNodes.push(node);
       prevId = node.id;
@@ -752,63 +894,16 @@ export function mergeContent(systemRaw, db) {
     lastThreshold = ch.nodes[9].threshold;
   });
 
-  // --- Shadow Campaign: every node is a shard source. Chapters are validated
-  // independently because Shadow nodes mirror Main unlocks rather than forming
-  // their own progression chain.
-  const shadowNodes = [];
-  const liveMainIds = new Set(mainNodes.map(n => n.id));
-  (db.shadowChapters ?? []).forEach((ch, ci) => {
-    const chapterNum = ci + 1;
-    if (ch.status !== 'published' || db.mainChapters[ci]?.status !== 'published') return;
-    let reason = null;
-    if (!db.mainChapters[ci] || !liveMainIds.has(`main_${ci * 10 + 1}`)) reason = 'matching Main Campaign chapter is not live';
-    else if (ch.nodes.length !== 10) reason = 'chapter must have exactly 10 nodes';
-    let t = 0;
-    for (const [i, nd] of ch.nodes.entries()) {
-      if (reason) break;
-      if (!Number.isFinite(nd.threshold) || nd.threshold < t) reason = 'thresholds must never decrease within the chapter';
-      else if (!nd.shardCharacterId) reason = `node ${i + 1} needs a shard character`;
-      else if (!candidateIds.has(nd.shardCharacterId)) {
-        const c = db.characters.find(x => x.id === nd.shardCharacterId);
-        reason = `node ${i + 1} shard character “${c?.displayName ?? nd.shardCharacterId}” is not in the game (draft world?)`;
-      }
-      t = nd.threshold;
-    }
-    if (reason) {
-      note('warn', `Shadow Campaign Chapter ${chapterNum} is held back: ${reason}.`);
-      return;
-    }
-    ch.nodes.forEach((nd, i) => {
-      const num = ci * 10 + i + 1;
-      const material = matId(nd.family, nd.grade);
-      shadowNodes.push({
-        id: `shadow_${num}`, campaign: 'shadow', chapter: chapterNum, position: i + 1, number: num,
-        chapterTitle: ch.title || `Shadow Chapter ${chapterNum}`,
-        displayName: nd.name || `Shadow Node ${num}`,
-        type: 'shard',
-        threshold: nd.threshold,
-        material,
-        previous: null,
-        mirrorNode: `main_${num}`,
-        shardCharacter: nd.shardCharacterId, world: nd.worldId ?? null,
-        repeatRewards: structuredClone(nd.repeatRewards ?? []),
-        firstClearRewards: structuredClone(nd.firstClearRewards ?? []),
-        firstClear: { materials: [{ materialId: material, qty: 1 }], shards: { characterId: nd.shardCharacterId, qty: 2 } }
-      });
-      sourced.add(nd.shardCharacterId);
-    });
-  });
-
-  // Valid World Campaign assignments are also live acquisition sources.
+  // Valid World Campaign encounters are also live acquisition sources.
   for (const w of acceptedWorlds) {
-    for (const nd of w.campaignNodes) if (nd.shardCharacterId) sourced.add(nd.shardCharacterId);
+    for (const nd of w.campaignNodes) if (nd.encounterCharacterId) sourced.add(nd.encounterCharacterId);
   }
 
-  // --- characters: included only when acquirable (live shard source)
+  // --- characters: included only when reachable (starting or a live encounter)
   const included = [];
   for (const c of candidates) {
-    if (sourced.has(c.id)) included.push(c);
-    else note('warn', `Character “${c.displayName}” is held back: no live shard source. Assign one in a complete Shadow chapter or their World Campaign.`);
+    if (c.starting || sourced.has(c.id)) included.push(c);
+    else note('warn', `Character “${c.displayName}” is held back: no live encounter reveals them. Assign them to a Main Campaign or World Campaign node.`);
   }
   const characterDefs = included.map(c => ({
     id: c.id,
@@ -826,24 +921,35 @@ export function mergeContent(systemRaw, db) {
     equipmentLines: Object.fromEntries(slotOrder.map(s => [s, c.equipment[s]?.name || `${c.displayName}’s ${s}`]))
   }));
 
-  // --- world campaigns and archives (drop worlds with no live characters)
+  // --- world campaigns, relics, and Mastery skins (drop worlds with no live characters)
   const finalWorlds = [];
   const wcNodes = [];
-  const archives = [];
+  const relics = [];
   const liveCharsByWorld = {};
   for (const d of characterDefs) (liveCharsByWorld[d.world] ??= []).push(d);
   for (const w of acceptedWorlds) {
     const liveChars = liveCharsByWorld[w.id] ?? [];
     if (liveChars.length < 5) {
-      note('warn', `World “${w.displayName}” is held back: only ${liveChars.length} of its characters have live shard sources; five are required.`);
+      note('warn', `World “${w.displayName}” is held back: only ${liveChars.length} of its characters are reachable through live encounters; five are required.`);
       continue;
+    }
+    const masterySkins = [];
+    for (const entry of w.masterySkins ?? []) {
+      const skinChar = liveChars.find(d => d.id === entry.characterId);
+      const sourceCharacter = included.find(character => character.id === skinChar?.id);
+      const skin = sourceCharacter?.skins?.find(item => item.id === entry.skinId);
+      if (!MASTERY_SKIN_RANKS.includes(entry.rank) || !skinChar || !skin) {
+        note('warn', `World “${w.displayName}” Mastery skin at rank “${entry.rank}” references missing content and was held back.`);
+        continue;
+      }
+      masterySkins.push({ rank: entry.rank, characterId: skinChar.id, skinId: skin.id, skinName: skin.name });
     }
     finalWorlds.push({
       id: w.id, displayName: w.displayName, tagline: w.tagline,
       description: w.description ?? '', displayOrder: w.displayOrder ?? 0,
-      worldAsset: structuredClone(w.worldAsset), hq: structuredClone(w.hq),
       palette: w.palette, icon: w.icon,
-      campaignId: `wc_${w.id}`, archiveId: `archive_${w.id}`
+      campaignId: `wc_${w.id}`, relicId: `relic_${w.id}`,
+      masterySkins
     });
     w.campaignNodes.forEach((nd, idx) => {
       const num = idx + 1;
@@ -861,65 +967,46 @@ export function mergeContent(systemRaw, db) {
         previous: num === 1 ? null : `wc_${w.id}_${num - 1}`,
         repeatRewards: structuredClone(nd.repeatRewards ?? []),
         firstClearRewards: structuredClone(nd.firstClearRewards ?? []),
-        firstClear: { materials: [{ materialId: material, qty: 3 }], archiveFragment: `frag_${w.id}_${num}` }
+        firstClear: { materials: [{ materialId: material, qty: 3 }] }
       };
-      if (nd.shardCharacterId) {
-        node.shardCharacter = nd.shardCharacterId;
-        node.firstClear.shards = { characterId: nd.shardCharacterId, qty: 2 };
+      const pieceIndex = RELIC_PIECE_NODES.indexOf(num);
+      if (pieceIndex !== -1) node.firstClear.relicPiece = `relic_${w.id}_p${pieceIndex + 1}`;
+      if (nd.encounterCharacterId && candidateIds.has(nd.encounterCharacterId)) {
+        node.encounterCharacter = nd.encounterCharacterId;
+        node.firstClear.shards = { characterId: nd.encounterCharacterId, qty: 2 };
       }
       wcNodes.push(node);
     });
-    const rewardDef = (authored, fallbackId = null) => {
-      const skinChar = liveChars.find(d => d.id === authored?.characterId);
-      const sourceCharacter = included.find(character => character.id === skinChar?.id);
-      const skin = sourceCharacter?.skins?.find(item => item.id === authored?.skinId);
-      if (skinChar && skin) return {
-        type: 'skin', id: skin.id, characterId: skinChar.id, skinName: skin.name
-      };
-      if (!fallbackId || !liveChars[0]) return null;
-      return {
-        type: 'skin', id: fallbackId, characterId: liveChars[0].id,
-        skinName: `${liveChars[0].displayName} — Alternate Attire`
-      };
-    };
-    archives.push({
-      id: `archive_${w.id}`, world: w.id,
-      displayName: `${w.displayName} Archive`,
-      collections: w.archive.collections.map((col, c) => ({
-        id: `${w.id}_col_${c + 1}`,
-        displayName: col.name,
-        rewardSkin: rewardDef(col.rewardSkin),
-        legacyMilestoneText: col.milestoneReward || undefined,
-        relics: col.relics.map((relic, r) => {
-          const relicIndex = c * 5 + r;
-          const nodeA = relicIndex * 2 + 1, nodeB = relicIndex * 2 + 2;
-          return {
-            id: `${w.id}_relic_${relicIndex + 1}`,
-            displayName: relic.name,
-            position: r + 1,
-            lore: relic.lore || `${relic.name} — item ${r + 1} of the “${col.name}” collection.`,
-            fragments: [
-              { id: `frag_${w.id}_${nodeA}`, sourceNode: `wc_${w.id}_${nodeA}` },
-              { id: `frag_${w.id}_${nodeB}`, sourceNode: `wc_${w.id}_${nodeB}` }
-            ]
-          };
-        })
-      })),
-      fullReward: rewardDef(w.archive.fullSkin, `skin_${w.id}_full`)
+    const roman = ['I', 'II', 'III', 'IV'];
+    relics.push({
+      id: `relic_${w.id}`, world: w.id,
+      displayName: w.relic?.name || `The ${w.displayName} Relic`,
+      lore: w.relic?.lore || '',
+      pieces: RELIC_PIECE_NODES.map((nodeNum, index) => ({
+        id: `relic_${w.id}_p${index + 1}`,
+        position: index + 1,
+        displayName: w.relic?.pieces?.[index]?.name || `Piece ${roman[index]}`,
+        lore: w.relic?.pieces?.[index]?.lore || '',
+        sourceNode: `wc_${w.id}_${nodeNum}`
+      }))
     });
   }
   const finalWorldIds = new Set(finalWorlds.map(w => w.id));
   const characters = characterDefs.filter(d => finalWorldIds.has(d.world));
+  // Skins are authored on characters; Mastery milestones unlock them.
+  const skins = included
+    .filter(c => finalWorldIds.has(c.worldId))
+    .flatMap(c => (c.skins ?? []).map(skin => ({
+      id: skin.id, characterId: c.id, world: c.worldId, skinName: skin.name
+    })));
 
   // Authoring references may temporarily point at a world that is held back.
   // Keep the authored value in the DB, but never emit a dangling live reference.
-  for (const node of [...mainNodes, ...shadowNodes]) {
+  for (const node of mainNodes) {
     if (!node.world || finalWorldIds.has(node.world)) continue;
     const missingWorld = node.world;
     node.world = null;
-    node.repeatRewards = node.repeatRewards.filter(reward => reward.id !== '@associated_world_asset');
-    node.firstClearRewards = node.firstClearRewards.filter(reward => reward.id !== '@associated_world_asset');
-    note('warn', `${node.id} is live without its draft/held-back world ${missingWorld}; associated World Asset rewards were held back.`);
+    note('warn', `${node.id} is live without its draft/held-back world ${missingWorld}.`);
   }
 
   // --- pacing sanity: the starting five must be able to clear the first node
@@ -944,30 +1031,21 @@ export function mergeContent(systemRaw, db) {
 
   // --- images from the database
   const images = {
-    world: {}, headquarters: {}, expedition: {}, crisis: {}, chapter: {}, portrait: {},
-    fullBody: {}, equipment: {}, relic: {}, skin: {}, hq: {}, facility: {}
+    world: {}, expedition: {}, crisis: {}, chapter: {}, portrait: {},
+    fullBody: {}, equipment: {}, relic: {}, skin: {}
   };
   db.mainChapters.forEach((chapter, index) => {
     if (chapter.image) images.chapter[`main:${index + 1}`] = chapter.image;
   });
-  db.shadowChapters.forEach((chapter, index) => {
-    if (chapter.image) images.chapter[`shadow:${index + 1}`] = chapter.image;
-  });
   for (const w of db.worlds) {
     if (w.image) images.world[w.id] = w.image;
-    if (w.hqImage) images.headquarters[w.id] = w.hqImage;
-    (w.hq?.backgrounds ?? []).forEach((image, index) => {
-      if (image) images.hq[`${w.id}:${index + 1}`] = image;
-    });
-    for (const facility of w.hq?.facilities ?? []) {
-      if (facility.image) images.facility[facility.id] = facility.image;
-    }
     (w.campaignChapterImages ?? []).forEach((image, index) => {
       if (image) images.chapter[`wc_${w.id}:${index + 1}`] = image;
     });
-    w.archive.collections.forEach((col, c) => col.relics.forEach((relic, r) => {
-      if (relic.image) images.relic[`${w.id}_relic_${c * 5 + r + 1}`] = relic.image;
-    }));
+    if (w.relic?.image) images.relic[`relic_${w.id}`] = w.relic.image;
+    (w.relic?.pieces ?? []).forEach((piece, index) => {
+      if (piece.image) images.relic[`relic_${w.id}_p${index + 1}`] = piece.image;
+    });
   }
   if (db.expeditions?.images?.global) images.expedition.global = db.expeditions.images.global;
   for (const [worldId, image] of Object.entries(db.expeditions?.images?.worlds ?? {})) {
@@ -996,8 +1074,9 @@ export function mergeContent(systemRaw, db) {
     characters: { ...systemRaw.characters, characters },
     tags,
     recipes: systemRaw.recipes,
-    nodes: [...mainNodes, ...shadowNodes, ...wcNodes],
-    archives,
+    nodes: [...mainNodes, ...wcNodes],
+    relics,
+    skins,
     expeditions: normalizeExpeditionLibrary(db.expeditions, finalWorldIds, health),
     crises: normalizeCrisisLibrary(db.crises, new Set(finalWorlds.map(world => world.id)), health)
   };
@@ -1024,9 +1103,9 @@ function normalizeExpeditionLibrary(value, liveWorldIds, health) {
     health.push({ level: 'warn', text: `Expedition template “${template.id}” is held back with world ${template.world}.` });
     return false;
   });
-  lib.fallbackTemplate = lib.templates.find(t => t.partySize === 2 && t.durations?.includes(1))
+  lib.fallbackTemplate = lib.templates.find(t => t.partySize === 2)
     ?? {
-      id: 'fallback_simple', enabled: true, world: null, weight: 1, durations: [1], partySize: 2,
+      id: 'fallback_simple', enabled: true, world: null, weight: 1, partySize: 2,
       requirementIds: [], requirementCount: 0,
       optionalIds: [lib.optionalObjectives[0]?.id].filter(Boolean),
       rewardPackageId: lib.rewardPackages[0]?.id,

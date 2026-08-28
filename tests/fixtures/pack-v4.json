@@ -1,0 +1,1879 @@
+{
+  "version": 4,
+  "worlds": [
+    {
+      "id": "world_hidden_village",
+      "status": "published",
+      "displayName": "Eden Hidden Village",
+      "tagline": "A waterfall-veiled shinobi enclave waging a secret war against spirits, curses, and the masks of empire.",
+      "icon": "🏯",
+      "palette": {
+        "primary": "#53624b",
+        "accent": "#c65b71",
+        "dark": "#181621"
+      },
+      "image": null,
+      "campaignNodes": [
+        {
+          "name": "Waterfall Veil Approach",
+          "threshold": 9500,
+          "family": "metal",
+          "grade": "improved"
+        },
+        {
+          "name": "Cliff-Carved Gate",
+          "threshold": 9850,
+          "family": "fiber",
+          "grade": "improved"
+        },
+        {
+          "name": "Apothecary of Clear Sight",
+          "threshold": 10150,
+          "family": "mineral",
+          "grade": "improved"
+        },
+        {
+          "name": "Bells on the Training Roof",
+          "threshold": 10500,
+          "family": "compound",
+          "grade": "improved"
+        },
+        {
+          "name": "Kunoichi Trial Grounds",
+          "threshold": 10850,
+          "family": "mechanism",
+          "grade": "improved"
+        },
+        {
+          "name": "Rope Bridge in the Mist",
+          "threshold": 11150,
+          "family": "essence",
+          "grade": "improved"
+        },
+        {
+          "name": "Shinobi Archive Vault",
+          "threshold": 11500,
+          "family": "metal",
+          "grade": "improved"
+        },
+        {
+          "name": "Moonlit Watchtower",
+          "threshold": 11850,
+          "family": "fiber",
+          "grade": "improved"
+        },
+        {
+          "name": "Forest Perimeter Breach",
+          "threshold": 12150,
+          "family": "mineral",
+          "grade": "improved"
+        },
+        {
+          "name": "Lanterns at the Village Seal",
+          "threshold": 12500,
+          "family": "compound",
+          "grade": "improved"
+        },
+        {
+          "name": "Forgotten Shrine Road",
+          "threshold": 12800,
+          "family": "mineral",
+          "grade": "improved"
+        },
+        {
+          "name": "Foxfire Cedar Grove",
+          "threshold": 13150,
+          "family": "compound",
+          "grade": "improved"
+        },
+        {
+          "name": "Corrupted Wayside Altar",
+          "threshold": 13450,
+          "family": "mechanism",
+          "grade": "improved"
+        },
+        {
+          "name": "Oni Footprints in Snow",
+          "threshold": 13800,
+          "family": "essence",
+          "grade": "improved"
+        },
+        {
+          "name": "Hoshi’s Living Ward",
+          "threshold": 14150,
+          "family": "metal",
+          "grade": "improved"
+        },
+        {
+          "name": "Red Ravine",
+          "threshold": 14450,
+          "family": "fiber",
+          "grade": "improved"
+        },
+        {
+          "name": "Blue Silence Lake",
+          "threshold": 14800,
+          "family": "mineral",
+          "grade": "improved"
+        },
+        {
+          "name": "The Purple Guardian",
+          "threshold": 15150,
+          "family": "compound",
+          "grade": "improved"
+        },
+        {
+          "name": "Cavern of Spiritual Seams",
+          "threshold": 15450,
+          "family": "mechanism",
+          "grade": "improved"
+        },
+        {
+          "name": "Shrine That Holds the Mountain",
+          "threshold": 15800,
+          "family": "essence",
+          "grade": "improved"
+        },
+        {
+          "name": "Dangerous District Tea House",
+          "threshold": 16100,
+          "family": "mechanism",
+          "grade": "advanced"
+        },
+        {
+          "name": "Silver Threads Above the Alley",
+          "threshold": 16500,
+          "family": "essence",
+          "grade": "advanced"
+        },
+        {
+          "name": "Samurai Gate of Honor",
+          "threshold": 16850,
+          "family": "metal",
+          "grade": "advanced"
+        },
+        {
+          "name": "Gilded Geisha House",
+          "threshold": 17250,
+          "family": "fiber",
+          "grade": "advanced"
+        },
+        {
+          "name": "Court of a Thousand Masks",
+          "threshold": 17600,
+          "family": "mineral",
+          "grade": "advanced"
+        },
+        {
+          "name": "Memory Market at Midnight",
+          "threshold": 18000,
+          "family": "compound",
+          "grade": "advanced"
+        },
+        {
+          "name": "Beacon’s Procession",
+          "threshold": 18350,
+          "family": "mechanism",
+          "grade": "advanced"
+        },
+        {
+          "name": "False Saint’s Sanctuary",
+          "threshold": 18750,
+          "family": "essence",
+          "grade": "advanced"
+        },
+        {
+          "name": "Palace Roofs Under Foxfire",
+          "threshold": 19100,
+          "family": "metal",
+          "grade": "advanced"
+        },
+        {
+          "name": "Hidden War Revealed",
+          "threshold": 19500,
+          "family": "fiber",
+          "grade": "advanced"
+        }
+      ],
+      "archive": {
+        "collections": [
+          {
+            "name": "Veiled Village Records",
+            "rewardSkin": {
+              "characterId": "char_suzume",
+              "name": "Suzume — Festival of Silent Bells",
+              "portrait": null,
+              "fullBody": null
+            },
+            "relics": [
+              {
+                "name": "Silent Bell",
+                "lore": "Recovered from the Hidden Village’s secret war and catalogued behind the waterfall veil. Silent Bell is item 1 of “Veiled Village Records”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "First Mission Scroll",
+                "lore": "Recovered from the Hidden Village’s secret war and catalogued behind the waterfall veil. First Mission Scroll is item 2 of “Veiled Village Records”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Apothecary Clarity Pill Box",
+                "lore": "Recovered from the Hidden Village’s secret war and catalogued behind the waterfall veil. Apothecary Clarity Pill Box is item 3 of “Veiled Village Records”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Shinobi Code Tablet",
+                "lore": "Recovered from the Hidden Village’s secret war and catalogued behind the waterfall veil. Shinobi Code Tablet is item 4 of “Veiled Village Records”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Waterfall Gate Key",
+                "lore": "Recovered from the Hidden Village’s secret war and catalogued behind the waterfall veil. Waterfall Gate Key is item 5 of “Veiled Village Records”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              }
+            ]
+          },
+          {
+            "name": "Shrines and Hungry Spirits",
+            "rewardSkin": {
+              "characterId": "char_yuki",
+              "name": "Yuki — Shrine in Bloom",
+              "portrait": null,
+              "fullBody": null
+            },
+            "relics": [
+              {
+                "name": "Jagan Ward Patch",
+                "lore": "Recovered from the Hidden Village’s secret war and catalogued behind the waterfall veil. Jagan Ward Patch is item 1 of “Shrines and Hungry Spirits”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Ren’s Iron Prayer Bead",
+                "lore": "Recovered from the Hidden Village’s secret war and catalogued behind the waterfall veil. Ren’s Iron Prayer Bead is item 2 of “Shrines and Hungry Spirits”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Red-Blue Binding Seal",
+                "lore": "Recovered from the Hidden Village’s secret war and catalogued behind the waterfall veil. Red-Blue Binding Seal is item 3 of “Shrines and Hungry Spirits”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Forgotten Shrine Offering",
+                "lore": "Recovered from the Hidden Village’s secret war and catalogued behind the waterfall veil. Forgotten Shrine Offering is item 4 of “Shrines and Hungry Spirits”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Foxfire Cedar Talisman",
+                "lore": "Recovered from the Hidden Village’s secret war and catalogued behind the waterfall veil. Foxfire Cedar Talisman is item 5 of “Shrines and Hungry Spirits”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              }
+            ]
+          },
+          {
+            "name": "Masks of the Imperial Night",
+            "rewardSkin": {
+              "characterId": "char_kaguya",
+              "name": "Kaguya — Unwoven Gold",
+              "portrait": null,
+              "fullBody": null
+            },
+            "relics": [
+              {
+                "name": "Silver Thread Spool",
+                "lore": "Recovered from the Hidden Village’s secret war and catalogued behind the waterfall veil. Silver Thread Spool is item 1 of “Masks of the Imperial Night”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Gilded Memory Strand",
+                "lore": "Recovered from the Hidden Village’s secret war and catalogued behind the waterfall veil. Gilded Memory Strand is item 2 of “Masks of the Imperial Night”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Beacon’s Hand Mirror",
+                "lore": "Recovered from the Hidden Village’s secret war and catalogued behind the waterfall veil. Beacon’s Hand Mirror is item 3 of “Masks of the Imperial Night”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "False Saint’s Devouring Seal",
+                "lore": "Recovered from the Hidden Village’s secret war and catalogued behind the waterfall veil. False Saint’s Devouring Seal is item 4 of “Masks of the Imperial Night”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Porcelain Fox Mask Fragment",
+                "lore": "Recovered from the Hidden Village’s secret war and catalogued behind the waterfall veil. Porcelain Fox Mask Fragment is item 5 of “Masks of the Imperial Night”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              }
+            ]
+          }
+        ],
+        "fullSkin": {
+          "characterId": "char_kimiko",
+          "name": "Kimiko — Dawn Without the Mask",
+          "portrait": null,
+          "fullBody": null
+        }
+      }
+    },
+    {
+      "id": "world_magic_academy",
+      "status": "published",
+      "displayName": "Eden Magic Academy",
+      "tagline": "A colorful sanctuary where magical opposites, school friendships, and spectacular accidents find harmony.",
+      "icon": "🏰",
+      "palette": {
+        "primary": "#7063c8",
+        "accent": "#f0b6e7",
+        "dark": "#242049"
+      },
+      "image": null,
+      "campaignNodes": [
+        {
+          "name": "Prismatic Arrival Gate",
+          "threshold": 9500,
+          "family": "compound",
+          "grade": "improved"
+        },
+        {
+          "name": "First-Year Homeroom",
+          "threshold": 9850,
+          "family": "mechanism",
+          "grade": "improved"
+        },
+        {
+          "name": "Singed Textbook",
+          "threshold": 10150,
+          "family": "essence",
+          "grade": "improved"
+        },
+        {
+          "name": "Grounded Practice Hall",
+          "threshold": 10500,
+          "family": "metal",
+          "grade": "improved"
+        },
+        {
+          "name": "Alchemy Lab Tea Break",
+          "threshold": 10850,
+          "family": "fiber",
+          "grade": "improved"
+        },
+        {
+          "name": "Greenhouse Gone Wild",
+          "threshold": 11150,
+          "family": "mineral",
+          "grade": "improved"
+        },
+        {
+          "name": "Mist in the Library Stacks",
+          "threshold": 11500,
+          "family": "compound",
+          "grade": "improved"
+        },
+        {
+          "name": "Lightning on the Duelling Lawn",
+          "threshold": 11850,
+          "family": "mechanism",
+          "grade": "improved"
+        },
+        {
+          "name": "Dormitory Curfew Dash",
+          "threshold": 12150,
+          "family": "essence",
+          "grade": "improved"
+        },
+        {
+          "name": "Welcome Festival",
+          "threshold": 12500,
+          "family": "metal",
+          "grade": "improved"
+        },
+        {
+          "name": "Spatial Geometry Classroom",
+          "threshold": 12800,
+          "family": "essence",
+          "grade": "improved"
+        },
+        {
+          "name": "Misplaced Summoning Circle",
+          "threshold": 13150,
+          "family": "metal",
+          "grade": "improved"
+        },
+        {
+          "name": "Icebound Rulebook Trial",
+          "threshold": 13450,
+          "family": "fiber",
+          "grade": "improved"
+        },
+        {
+          "name": "Fire Safety Detention",
+          "threshold": 13800,
+          "family": "mineral",
+          "grade": "improved"
+        },
+        {
+          "name": "Love Potion Misdelivery",
+          "threshold": 14150,
+          "family": "compound",
+          "grade": "improved"
+        },
+        {
+          "name": "Pip’s Hedge Maze",
+          "threshold": 14450,
+          "family": "mechanism",
+          "grade": "improved"
+        },
+        {
+          "name": "Darkness in the Auditorium",
+          "threshold": 14800,
+          "family": "essence",
+          "grade": "improved"
+        },
+        {
+          "name": "Light Across the Observatory",
+          "threshold": 15150,
+          "family": "metal",
+          "grade": "improved"
+        },
+        {
+          "name": "Faculty Operations Office",
+          "threshold": 15450,
+          "family": "fiber",
+          "grade": "improved"
+        },
+        {
+          "name": "Midterm Practical: Controlled Chaos",
+          "threshold": 15800,
+          "family": "mineral",
+          "grade": "improved"
+        },
+        {
+          "name": "Moonlit School Ball",
+          "threshold": 16100,
+          "family": "fiber",
+          "grade": "advanced"
+        },
+        {
+          "name": "Spotlight and Shadow Backstage",
+          "threshold": 16500,
+          "family": "mineral",
+          "grade": "advanced"
+        },
+        {
+          "name": "Sun-Eclipse Challenge",
+          "threshold": 16850,
+          "family": "compound",
+          "grade": "advanced"
+        },
+        {
+          "name": "Hall of Complementary Elements",
+          "threshold": 17250,
+          "family": "mechanism",
+          "grade": "advanced"
+        },
+        {
+          "name": "Walking Tower Staircase",
+          "threshold": 17600,
+          "family": "essence",
+          "grade": "advanced"
+        },
+        {
+          "name": "Alchemy Fair Catastrophe",
+          "threshold": 18000,
+          "family": "metal",
+          "grade": "advanced"
+        },
+        {
+          "name": "Summoned Guests at Dinner",
+          "threshold": 18350,
+          "family": "fiber",
+          "grade": "advanced"
+        },
+        {
+          "name": "Garden Beneath the Academy",
+          "threshold": 18750,
+          "family": "mineral",
+          "grade": "advanced"
+        },
+        {
+          "name": "Heart of Eden’s Leyline",
+          "threshold": 19100,
+          "family": "compound",
+          "grade": "advanced"
+        },
+        {
+          "name": "Final Examination: Harmony",
+          "threshold": 19500,
+          "family": "mechanism",
+          "grade": "advanced"
+        }
+      ],
+      "archive": {
+        "collections": [
+          {
+            "name": "First-Year Misadventures",
+            "rewardSkin": {
+              "characterId": "char_ashley",
+              "name": "Ashley — Founders’ Festival Fireworks",
+              "portrait": null,
+              "fullBody": null
+            },
+            "relics": [
+              {
+                "name": "Singed Fire Primer",
+                "lore": "Preserved from an Academy semester where every lesson, friendship, and accident became part of Eden history. Singed Fire Primer is item 1 of “First-Year Misadventures”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Bridget’s Perfect Timetable",
+                "lore": "Preserved from an Academy semester where every lesson, friendship, and accident became part of Eden history. Bridget’s Perfect Timetable is item 2 of “First-Year Misadventures”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Pip’s Unauthorized Hall Pass",
+                "lore": "Preserved from an Academy semester where every lesson, friendship, and accident became part of Eden history. Pip’s Unauthorized Hall Pass is item 3 of “First-Year Misadventures”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Melted Detention Bell",
+                "lore": "Preserved from an Academy semester where every lesson, friendship, and accident became part of Eden history. Melted Detention Bell is item 4 of “First-Year Misadventures”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Welcome Festival Ribbon",
+                "lore": "Preserved from an Academy semester where every lesson, friendship, and accident became part of Eden history. Welcome Festival Ribbon is item 5 of “First-Year Misadventures”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              }
+            ]
+          },
+          {
+            "name": "Lessons in Complementary Magic",
+            "rewardSkin": {
+              "characterId": "char_malefia",
+              "name": "Malefia — Radiant Eclipse Formal",
+              "portrait": null,
+              "fullBody": null
+            },
+            "relics": [
+              {
+                "name": "Ice Geometry Compass",
+                "lore": "Preserved from an Academy semester where every lesson, friendship, and accident became part of Eden history. Ice Geometry Compass is item 1 of “Lessons in Complementary Magic”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Bottled Corridor Mist",
+                "lore": "Preserved from an Academy semester where every lesson, friendship, and accident became part of Eden history. Bottled Corridor Mist is item 2 of “Lessons in Complementary Magic”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Carol’s Lightning Medal",
+                "lore": "Preserved from an Academy semester where every lesson, friendship, and accident became part of Eden history. Carol’s Lightning Medal is item 3 of “Lessons in Complementary Magic”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Eclipse Challenge Card",
+                "lore": "Preserved from an Academy semester where every lesson, friendship, and accident became part of Eden history. Eclipse Challenge Card is item 4 of “Lessons in Complementary Magic”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Liadriel’s Glittering Bookmark",
+                "lore": "Preserved from an Academy semester where every lesson, friendship, and accident became part of Eden history. Liadriel’s Glittering Bookmark is item 5 of “Lessons in Complementary Magic”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              }
+            ]
+          },
+          {
+            "name": "The Faculty’s Impossible Semester",
+            "rewardSkin": {
+              "characterId": "char_aurora",
+              "name": "Aurora — Hearts-in-Bloom Faculty Dress",
+              "portrait": null,
+              "fullBody": null
+            },
+            "relics": [
+              {
+                "name": "Aurora’s Heart-Shaped Crucible",
+                "lore": "Preserved from an Academy semester where every lesson, friendship, and accident became part of Eden history. Aurora’s Heart-Shaped Crucible is item 1 of “The Faculty’s Impossible Semester”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Irina’s Spatial Master Key",
+                "lore": "Preserved from an Academy semester where every lesson, friendship, and accident became part of Eden history. Irina’s Spatial Master Key is item 2 of “The Faculty’s Impossible Semester”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Misplaced Summoning Chalk",
+                "lore": "Preserved from an Academy semester where every lesson, friendship, and accident became part of Eden history. Misplaced Summoning Chalk is item 3 of “The Faculty’s Impossible Semester”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Midterm Incident Report",
+                "lore": "Preserved from an Academy semester where every lesson, friendship, and accident became part of Eden history. Midterm Incident Report is item 4 of “The Faculty’s Impossible Semester”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              },
+              {
+                "name": "Final Harmony Diploma",
+                "lore": "Preserved from an Academy semester where every lesson, friendship, and accident became part of Eden history. Final Harmony Diploma is item 5 of “The Faculty’s Impossible Semester”; its two fragments trace the paired campaign incidents that returned it to the Archive.",
+                "image": null
+              }
+            ]
+          }
+        ],
+        "fullSkin": {
+          "characterId": "char_irina",
+          "name": "Irina — Midnight Observatory Uniform",
+          "portrait": null,
+          "fullBody": null
+        }
+      }
+    }
+  ],
+  "characters": [
+    {
+      "id": "char_suzume",
+      "worldId": "world_hidden_village",
+      "displayName": "Suzume",
+      "glyph": "S",
+      "color": "#8895a8",
+      "archetype": "achiever",
+      "tier": "minor",
+      "starting": true,
+      "faction": "faction_village_shadows",
+      "extraTags": [],
+      "description": "An aspiring kunoichi who turns relentless practice and silver bells into impossible stealth.",
+      "lore": "Born without a prodigy’s shortcuts, Suzume measures every movement against the bells woven into her hair and wrists. She longs to be seen by the village while training to become invisible, and studies Kimiko with equal parts jealousy, admiration, and concern.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Bell-Woven Shinobi Garb",
+          "image": null
+        },
+        "tool": {
+          "name": "Vibration Kunai",
+          "image": null
+        },
+        "accessory": {
+          "name": "Silver Training Bells",
+          "image": null
+        },
+        "keepsake": {
+          "name": "Kimiko Movement Notes",
+          "image": null
+        },
+        "emblem": {
+          "name": "Unseen Aspirant Mark",
+          "image": null
+        },
+        "signature": {
+          "name": "Measure of Absolute Silence",
+          "image": null
+        }
+      }
+    },
+    {
+      "id": "char_hoshi",
+      "worldId": "world_hidden_village",
+      "displayName": "Hoshi",
+      "glyph": "H",
+      "color": "#c7a85a",
+      "archetype": "caretaker",
+      "tier": "minor",
+      "starting": true,
+      "faction": "faction_spiritwardens",
+      "extraTags": [],
+      "description": "A patient exorcist-monk who shares his prayer beads—and occasionally his limbs—with the spirit Ren.",
+      "lore": "Hoshi crosses corrupted country as a wandering sanctuary. He believes compassion can redeem the arrogant chaos spirit bound to his iron beads; Ren believes he is merely waiting for the monk to crack.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Pilgrim Monk Robes",
+          "image": null
+        },
+        "tool": {
+          "name": "Iron Palm Wrappings",
+          "image": null
+        },
+        "accessory": {
+          "name": "Ren’s Iron Prayer Beads",
+          "image": null
+        },
+        "keepsake": {
+          "name": "Vow of Patient Mercy",
+          "image": null
+        },
+        "emblem": {
+          "name": "Living Ward Sutra",
+          "image": null
+        },
+        "signature": {
+          "name": "Ren’s Unbound Manifestation",
+          "image": null
+        }
+      }
+    },
+    {
+      "id": "char_ayame",
+      "worldId": "world_hidden_village",
+      "displayName": "Ayame",
+      "glyph": "A",
+      "color": "#f0cfda",
+      "archetype": "leader",
+      "tier": "minor",
+      "starting": true,
+      "faction": "faction_spiritwardens",
+      "extraTags": [],
+      "description": "A luminous noble whose pure soul comforts the cursed—and irresistibly attracts the dark.",
+      "lore": "Ayame leads through empathy rather than command. She bears crushing guilt for every protector endangered by her Beacon, yet remains the person most capable of calling Genjiro, Mei, and the others back to their humanity.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Highborn Beacon Silks",
+          "image": null
+        },
+        "tool": {
+          "name": "Ornate Prayer Mirror",
+          "image": null
+        },
+        "accessory": {
+          "name": "Handmade Guard Ribbons",
+          "image": null
+        },
+        "keepsake": {
+          "name": "Names of the Fallen",
+          "image": null
+        },
+        "emblem": {
+          "name": "Luminous Lotus Crest",
+          "image": null
+        },
+        "signature": {
+          "name": "Sanctuary of the Pure Soul",
+          "image": null
+        }
+      }
+    },
+    {
+      "id": "char_mei",
+      "worldId": "world_hidden_village",
+      "displayName": "Mei",
+      "glyph": "M",
+      "color": "#d9697d",
+      "archetype": "rebel",
+      "tier": "minor",
+      "starting": false,
+      "faction": "faction_hollow_masks",
+      "extraTags": [],
+      "description": "A cheerful tea-house server whose harmless mask conceals a predator armed with invisible silver threads.",
+      "lore": "Mei hunts people she considers pretenders while rationalizing her own perfect false persona. She searches for a genuinely authentic soul, uncertain whether she would protect it or delight in proving it can break.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Teahouse Server Kimono",
+          "image": null
+        },
+        "tool": {
+          "name": "Silver Killing Threads",
+          "image": null
+        },
+        "accessory": {
+          "name": "Callused Finger Guards",
+          "image": null
+        },
+        "keepsake": {
+          "name": "Genuine Soul Contract",
+          "image": null
+        },
+        "emblem": {
+          "name": "Smiling Server Pin",
+          "image": null
+        },
+        "signature": {
+          "name": "Puppeteer’s Web",
+          "image": null
+        }
+      }
+    },
+    {
+      "id": "char_tsubaki",
+      "worldId": "world_hidden_village",
+      "displayName": "Tsubaki",
+      "glyph": "T",
+      "color": "#a96b73",
+      "archetype": "freespirit",
+      "tier": "minor",
+      "starting": false,
+      "faction": "faction_village_shadows",
+      "extraTags": [],
+      "description": "A sake-loving sensory specialist who becomes terrifyingly precise when clarity pills restore her Open Gates.",
+      "lore": "Tsubaki drinks to dampen the agonizing supernatural noise she perceives everywhere. The village prizes her as its ultimate radar, but every mission that demands sobriety returns her to a world of unbearable clarity.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Sake-Stained Field Garb",
+          "image": null
+        },
+        "tool": {
+          "name": "Open-Gates Sensor Tags",
+          "image": null
+        },
+        "accessory": {
+          "name": "Apothecary Clarity Pills",
+          "image": null
+        },
+        "keepsake": {
+          "name": "Ever-Full Sake Gourd",
+          "image": null
+        },
+        "emblem": {
+          "name": "Village Radar Seal",
+          "image": null
+        },
+        "signature": {
+          "name": "One Minute of Perfect Silence",
+          "image": null
+        }
+      }
+    },
+    {
+      "id": "char_genjiro",
+      "worldId": "world_hidden_village",
+      "displayName": "Genjiro",
+      "glyph": "G",
+      "color": "#58606b",
+      "archetype": "achiever",
+      "tier": "medium",
+      "starting": false,
+      "faction": "faction_spiritwardens",
+      "extraTags": [],
+      "description": "A cursed ronin who hunts Yokai through the spiritual seams revealed by his parasitic Jagan.",
+      "lore": "Genjiro clings to samurai discipline while the Evil Eye whispers away his empathy. He seeks the demon that branded him, hoping revenge can become liberation before the hunter turns into the monster.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Weathered Ronin Haori",
+          "image": null
+        },
+        "tool": {
+          "name": "Spirit-Slayer Blade",
+          "image": null
+        },
+        "accessory": {
+          "name": "Jagan Eye Patch",
+          "image": null
+        },
+        "keepsake": {
+          "name": "Broken Clan Token",
+          "image": null
+        },
+        "emblem": {
+          "name": "Exorcist’s Knot",
+          "image": null
+        },
+        "signature": {
+          "name": "Demon-Seam Scabbard",
+          "image": null
+        }
+      }
+    },
+    {
+      "id": "char_kaguya",
+      "worldId": "world_hidden_village",
+      "displayName": "Kaguya",
+      "glyph": "K",
+      "color": "#d3ad63",
+      "archetype": "dreamer",
+      "tier": "medium",
+      "starting": false,
+      "faction": "faction_village_shadows",
+      "extraTags": [],
+      "description": "A high-society infiltrator whose gold-threaded kimono is woven from stolen memories and imperial secrets.",
+      "lore": "Kaguya is the village’s living archive and its most guarded asset. Emotional fragments from a thousand lives bleed into her own until she can barely hear the self buried beneath them.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Gilded Memory Kimono",
+          "image": null
+        },
+        "tool": {
+          "name": "Soul-Thread Folding Fan",
+          "image": null
+        },
+        "accessory": {
+          "name": "Imperial Secret Hairpin",
+          "image": null
+        },
+        "keepsake": {
+          "name": "Unstolen Childhood Memory",
+          "image": null
+        },
+        "emblem": {
+          "name": "Living Archive Crest",
+          "image": null
+        },
+        "signature": {
+          "name": "Unraveled Golden Thread",
+          "image": null
+        }
+      }
+    },
+    {
+      "id": "char_yuki",
+      "worldId": "world_hidden_village",
+      "displayName": "Yuki",
+      "glyph": "Y",
+      "color": "#76519c",
+      "archetype": "caretaker",
+      "tier": "major",
+      "starting": false,
+      "faction": "faction_spiritwardens",
+      "extraTags": [],
+      "description": "The purple synthesis of rival Red and Blue Oni, guarding the forgotten shrine that stabilizes her divided soul.",
+      "lore": "Yuki balances apocalyptic rage against bottomless sorrow. She trusts animals more easily than humans and protects the forgotten shrine because its ancient anchor is the only thing keeping two warring selves whole.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Shrinekeeper’s Living Armor",
+          "image": null
+        },
+        "tool": {
+          "name": "Harmonic Oni Kanabo",
+          "image": null
+        },
+        "accessory": {
+          "name": "Red-and-Blue Horn Rings",
+          "image": null
+        },
+        "keepsake": {
+          "name": "Rescued Bird’s Feather",
+          "image": null
+        },
+        "emblem": {
+          "name": "Forgotten Gods Seal",
+          "image": null
+        },
+        "signature": {
+          "name": "Purple Synthesis Core",
+          "image": null
+        }
+      }
+    },
+    {
+      "id": "char_kimiko",
+      "worldId": "world_hidden_village",
+      "displayName": "Kimiko",
+      "glyph": "K",
+      "color": "#ddd8d2",
+      "archetype": "achiever",
+      "tier": "major",
+      "starting": false,
+      "faction": "faction_village_shadows",
+      "extraTags": [],
+      "description": "The village’s perfect kunoichi, carrying centuries of lethal skill inside the identity-devouring Eternal Fox Mask.",
+      "lore": "Kimiko’s effortless mastery belongs to the ancestral voices consuming her. She envies strugglers like Suzume because their mistakes—and therefore their lives—remain truly their own.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Ancestral Kunoichi Garb",
+          "image": null
+        },
+        "tool": {
+          "name": "Thousand-Face Kunai",
+          "image": null
+        },
+        "accessory": {
+          "name": "Eternal Fox Mask",
+          "image": null
+        },
+        "keepsake": {
+          "name": "Forgotten Favorite Sweet",
+          "image": null
+        },
+        "emblem": {
+          "name": "Chorus-Bearer Seal",
+          "image": null
+        },
+        "signature": {
+          "name": "Kimiko’s Unwritten Face",
+          "image": null
+        }
+      }
+    },
+    {
+      "id": "char_sakura",
+      "worldId": "world_hidden_village",
+      "displayName": "Sakura",
+      "glyph": "S",
+      "color": "#eee7df",
+      "archetype": "leader",
+      "tier": "major",
+      "starting": false,
+      "faction": "faction_hollow_masks",
+      "extraTags": [],
+      "description": "A false saint who devours spirits, memories, and powers in pursuit of a world-ending Singular Peace.",
+      "lore": "Behind immaculate Miko robes, Sakura cultivates holiness as bait. She believes individuality is the source of suffering and seeks godhood by absorbing every soul into one consciousness: her own.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Immaculate Miko Robes",
+          "image": null
+        },
+        "tool": {
+          "name": "Soul-Harvesting Talismans",
+          "image": null
+        },
+        "accessory": {
+          "name": "Vein-Red Ribbons",
+          "image": null
+        },
+        "keepsake": {
+          "name": "First Devoured Prayer",
+          "image": null
+        },
+        "emblem": {
+          "name": "False Saint Halo",
+          "image": null
+        },
+        "signature": {
+          "name": "Divine Archive Seal",
+          "image": null
+        }
+      }
+    },
+    {
+      "id": "char_ashley",
+      "worldId": "world_magic_academy",
+      "displayName": "Ashley",
+      "glyph": "A",
+      "color": "#ee6b4d",
+      "archetype": "freespirit",
+      "tier": "minor",
+      "starting": true,
+      "faction": "faction_spark_stone",
+      "extraTags": [],
+      "description": "A first-year Fire student and human spark plug who turns every idea into an adventure before thinking twice.",
+      "lore": "Ashley talks at the speed of ignition and singes textbooks whenever excitement outruns control. Bridget complains through every spontaneous escapade and follows anyway.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Singe-Hem First-Year Uniform",
+          "image": null
+        },
+        "tool": {
+          "name": "Overcharged Fire Wand",
+          "image": null
+        },
+        "accessory": {
+          "name": "Emberproof Hair Ribbon",
+          "image": null
+        },
+        "keepsake": {
+          "name": "Bridget’s Spare Timetable",
+          "image": null
+        },
+        "emblem": {
+          "name": "First-Year Flame Crest",
+          "image": null
+        },
+        "signature": {
+          "name": "Uncontained Spark",
+          "image": null
+        }
+      }
+    },
+    {
+      "id": "char_bridget",
+      "worldId": "world_magic_academy",
+      "displayName": "Bridget",
+      "glyph": "B",
+      "color": "#9b8066",
+      "archetype": "caretaker",
+      "tier": "minor",
+      "starting": true,
+      "faction": "faction_spark_stone",
+      "extraTags": [],
+      "description": "A stoic first-year Ground student whose careful stability anchors Ashley’s fire and their shared misadventures.",
+      "lore": "Bridget maintains schedules, rules, and a permanently exhausted sigh. Her Ground magic is as dependable as her loyalty, including the loyalty she pretends not to feel for Ashley’s chaos.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Immaculate First-Year Uniform",
+          "image": null
+        },
+        "tool": {
+          "name": "Grounding Staff",
+          "image": null
+        },
+        "accessory": {
+          "name": "Stone-Set Planner Clasp",
+          "image": null
+        },
+        "keepsake": {
+          "name": "Ashley’s Burned Apology Note",
+          "image": null
+        },
+        "emblem": {
+          "name": "Foundation Magic Crest",
+          "image": null
+        },
+        "signature": {
+          "name": "Unshakable Anchor",
+          "image": null
+        }
+      }
+    },
+    {
+      "id": "char_elian",
+      "worldId": "world_magic_academy",
+      "displayName": "Elian",
+      "glyph": "E",
+      "color": "#a9d8ec",
+      "archetype": "achiever",
+      "tier": "minor",
+      "starting": false,
+      "faction": "faction_rulebook_wildcard",
+      "extraTags": [],
+      "description": "A high-strung second-year Ice student trying to calculate the correct formula for being liked.",
+      "lore": "Elian applies rules and precision to social life with endearingly disastrous results. Tix treats every failed calculation as an invitation to loosen the rulebook and follow the wind.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Regulation Second-Year Robes",
+          "image": null
+        },
+        "tool": {
+          "name": "Precision Ice Focus",
+          "image": null
+        },
+        "accessory": {
+          "name": "Perfect Attendance Brooch",
+          "image": null
+        },
+        "keepsake": {
+          "name": "Annotated Social Rulebook",
+          "image": null
+        },
+        "emblem": {
+          "name": "Frost Honors Crest",
+          "image": null
+        },
+        "signature": {
+          "name": "Calculated Perfect Introduction",
+          "image": null
+        }
+      }
+    },
+    {
+      "id": "char_tix",
+      "worldId": "world_magic_academy",
+      "displayName": "Tix",
+      "glyph": "T",
+      "color": "#6fc77d",
+      "archetype": "freespirit",
+      "tier": "minor",
+      "starting": false,
+      "faction": "faction_rulebook_wildcard",
+      "extraTags": [],
+      "description": "A whimsical Nature student followed by a fairy, runaway vines, and almost no awareness of social convention.",
+      "lore": "Tix talks to plants, wanders into hedges, and follows Pip’s worst ideas with complete confidence. She adores Elian and considers helping her relax a deeply serious magical project.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Vine-Tangled Second-Year Uniform",
+          "image": null
+        },
+        "tool": {
+          "name": "Wildgrowth Wand",
+          "image": null
+        },
+        "accessory": {
+          "name": "Pip’s Acorn Satchel",
+          "image": null
+        },
+        "keepsake": {
+          "name": "Elian’s Revised Rulebook",
+          "image": null
+        },
+        "emblem": {
+          "name": "Wandering Bloom Crest",
+          "image": null
+        },
+        "signature": {
+          "name": "Greenhouse That Followed Her Home",
+          "image": null
+        }
+      }
+    },
+    {
+      "id": "char_carol",
+      "worldId": "world_magic_academy",
+      "displayName": "Carol",
+      "glyph": "C",
+      "color": "#e8c34f",
+      "archetype": "leader",
+      "tier": "minor",
+      "starting": false,
+      "faction": "faction_spotlight_shadow",
+      "extraTags": [],
+      "description": "A charismatic third-year Lightning student whose confidence makes every corridor feel like a stage.",
+      "lore": "Carol loves the spotlight without needing its approval. Her constant game of provocation and banter with the unflappable Kin works because neither asks the other to become less themselves.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Third-Year Duelling Jacket",
+          "image": null
+        },
+        "tool": {
+          "name": "Lightning Conductor Baton",
+          "image": null
+        },
+        "accessory": {
+          "name": "Spotlight Earrings",
+          "image": null
+        },
+        "keepsake": {
+          "name": "Kin’s Deadpan Review",
+          "image": null
+        },
+        "emblem": {
+          "name": "Storm Stage Medal",
+          "image": null
+        },
+        "signature": {
+          "name": "Academy’s Brightest Thunder",
+          "image": null
+        }
+      }
+    },
+    {
+      "id": "char_kin",
+      "worldId": "world_magic_academy",
+      "displayName": "Kin",
+      "glyph": "K",
+      "color": "#6b7186",
+      "archetype": "rebel",
+      "tier": "medium",
+      "starting": false,
+      "faction": "faction_spotlight_shadow",
+      "extraTags": [],
+      "description": "A dry-witted Dark Elf and Mist student who manages the shadows while Carol commands the spotlight.",
+      "lore": "Kin is a loner by choice, observant enough to notice every room and composed enough to leave it unseen. Carol remains the rare person who can turn his silence into a game.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Mistweave Third-Year Coat",
+          "image": null
+        },
+        "tool": {
+          "name": "Vapor-Etching Dagger",
+          "image": null
+        },
+        "accessory": {
+          "name": "Dark-Elf Silver Earcuff",
+          "image": null
+        },
+        "keepsake": {
+          "name": "Carol’s Backstage Pass",
+          "image": null
+        },
+        "emblem": {
+          "name": "Quiet Wings Emblem",
+          "image": null
+        },
+        "signature": {
+          "name": "Shadow Behind the Spotlight",
+          "image": null
+        }
+      }
+    },
+    {
+      "id": "char_liadriel",
+      "worldId": "world_magic_academy",
+      "displayName": "Liadriel",
+      "glyph": "L",
+      "color": "#f3dc79",
+      "archetype": "caretaker",
+      "tier": "medium",
+      "starting": false,
+      "faction": "faction_sun_eclipse",
+      "extraTags": [],
+      "description": "The Academy’s radiant fourth-year idol, greeting every supposed enemy as a friend awaiting a hug.",
+      "lore": "Liadriel’s Light magic and kindness are equally impossible to hide. She interprets Malefia’s lifelong rivalry as affectionate play, to the Dark Queen’s endless theatrical despair.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Golden Fourth-Year Vestments",
+          "image": null
+        },
+        "tool": {
+          "name": "Sunbeam Scepter",
+          "image": null
+        },
+        "accessory": {
+          "name": "Glittering Halo Ribbon",
+          "image": null
+        },
+        "keepsake": {
+          "name": "Malefia’s First Challenge Letter",
+          "image": null
+        },
+        "emblem": {
+          "name": "Eden Idol Crest",
+          "image": null
+        },
+        "signature": {
+          "name": "Light That Calls Everyone Friend",
+          "image": null
+        }
+      }
+    },
+    {
+      "id": "char_malefia",
+      "worldId": "world_magic_academy",
+      "displayName": "Malefia",
+      "glyph": "M",
+      "color": "#49365f",
+      "archetype": "achiever",
+      "tier": "medium",
+      "starting": false,
+      "faction": "faction_sun_eclipse",
+      "extraTags": [],
+      "description": "A formidable Darkness student and self-proclaimed Dark Queen staging an epic rivalry Liadriel thinks is adorable.",
+      "lore": "Malefia treats every entrance as theatre and every contest as proof that shadow surpasses light. Liadriel’s compliments and hugs remain the one counterspell her oppressive darkness cannot defeat.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Gothic Fourth-Year Regalia",
+          "image": null
+        },
+        "tool": {
+          "name": "Umbral Parasol",
+          "image": null
+        },
+        "accessory": {
+          "name": "Obsidian Eclipse Choker",
+          "image": null
+        },
+        "keepsake": {
+          "name": "Liadriel’s Friendship Bracelet",
+          "image": null
+        },
+        "emblem": {
+          "name": "Dark Queen Crest",
+          "image": null
+        },
+        "signature": {
+          "name": "Grand Entrance of Endless Night",
+          "image": null
+        }
+      }
+    },
+    {
+      "id": "char_aurora",
+      "worldId": "world_magic_academy",
+      "displayName": "Aurora",
+      "glyph": "A",
+      "color": "#e99abd",
+      "archetype": "dreamer",
+      "tier": "medium",
+      "starting": false,
+      "faction": "faction_anchor_balloon",
+      "extraTags": [],
+      "description": "The Academy’s whimsical Love-Alchemy teacher, relationship counselor, and champion of creative sparks.",
+      "lore": "Aurora brews emotional teas, excuses inspired deadlines, and sees possibility in every magical accident. Irina supplies the structure that lets her warmth flourish without taking down the west wing.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Rose-Scented Alchemy Coat",
+          "image": null
+        },
+        "tool": {
+          "name": "Heart-Shaped Crucible",
+          "image": null
+        },
+        "accessory": {
+          "name": "Matchmaking Tea Vials",
+          "image": null
+        },
+        "keepsake": {
+          "name": "Irina’s First Detention Slip",
+          "image": null
+        },
+        "emblem": {
+          "name": "Love Alchemy Faculty Pin",
+          "image": null
+        },
+        "signature": {
+          "name": "Elixir of the Creative Spark",
+          "image": null
+        }
+      }
+    },
+    {
+      "id": "char_irina",
+      "worldId": "world_magic_academy",
+      "displayName": "Irina",
+      "glyph": "I",
+      "color": "#5962a5",
+      "archetype": "leader",
+      "tier": "major",
+      "starting": false,
+      "faction": "faction_anchor_balloon",
+      "extraTags": [],
+      "description": "The Spatial Summoning teacher whose perfect geometry keeps the Academy’s affectionate chaos operational.",
+      "lore": "Irina portals away explosions before handing out detention slips. Her precision masks fierce care for every student, while Aurora’s warmth keeps the Chief of Operations from becoming only a machine.",
+      "portrait": null,
+      "fullBody": null,
+      "equipment": {
+        "attire": {
+          "name": "Spatial Faculty Uniform",
+          "image": null
+        },
+        "tool": {
+          "name": "Geometric Summoning Compass",
+          "image": null
+        },
+        "accessory": {
+          "name": "Master Portal Keys",
+          "image": null
+        },
+        "keepsake": {
+          "name": "Aurora’s Impossible Lab Inventory",
+          "image": null
+        },
+        "emblem": {
+          "name": "Operations Faculty Seal",
+          "image": null
+        },
+        "signature": {
+          "name": "Academy in Perfect Alignment",
+          "image": null
+        }
+      }
+    }
+  ],
+  "factions": [
+    {
+      "id": "faction_village_shadows",
+      "displayName": "Village Shadows",
+      "explanation": "Shinobi trained to work inside the Hidden Village’s silence.",
+      "thresholds": [
+        {
+          "count": 2,
+          "bonusBp": 200
+        },
+        {
+          "count": 3,
+          "bonusBp": 400
+        }
+      ]
+    },
+    {
+      "id": "faction_spiritwardens",
+      "displayName": "Spiritwardens",
+      "explanation": "Protectors who stand between vulnerable souls and the supernatural dark.",
+      "thresholds": [
+        {
+          "count": 2,
+          "bonusBp": 200
+        },
+        {
+          "count": 3,
+          "bonusBp": 400
+        }
+      ]
+    },
+    {
+      "id": "faction_hollow_masks",
+      "displayName": "Hollow Masks",
+      "explanation": "Predators whose convincing public faces conceal terrible private hungers.",
+      "thresholds": [
+        {
+          "count": 2,
+          "bonusBp": 200
+        }
+      ]
+    },
+    {
+      "id": "faction_spark_stone",
+      "displayName": "Spark and Stone",
+      "explanation": "Ashley supplies momentum; Bridget makes sure it has somewhere safe to land.",
+      "thresholds": [
+        {
+          "count": 2,
+          "bonusBp": 200
+        }
+      ]
+    },
+    {
+      "id": "faction_rulebook_wildcard",
+      "displayName": "Rulebook and Wildcard",
+      "explanation": "Elian’s order and Tix’s freedom pull one another toward balance.",
+      "thresholds": [
+        {
+          "count": 2,
+          "bonusBp": 200
+        }
+      ]
+    },
+    {
+      "id": "faction_spotlight_shadow",
+      "displayName": "Spotlight and Shadow",
+      "explanation": "Carol commands the stage while Kin quietly manages its edges.",
+      "thresholds": [
+        {
+          "count": 2,
+          "bonusBp": 200
+        }
+      ]
+    },
+    {
+      "id": "faction_sun_eclipse",
+      "displayName": "Sun and Eclipse",
+      "explanation": "Liadriel’s warmth and Malefia’s darkness create their own harmony.",
+      "thresholds": [
+        {
+          "count": 2,
+          "bonusBp": 200
+        }
+      ]
+    },
+    {
+      "id": "faction_anchor_balloon",
+      "displayName": "Anchor and Balloon",
+      "explanation": "Irina gives Aurora structure; Aurora gives Irina room to breathe.",
+      "thresholds": [
+        {
+          "count": 2,
+          "bonusBp": 200
+        }
+      ]
+    }
+  ],
+  "mainChapters": [
+    {
+      "nodes": [
+        {
+          "name": "Cliffside Waterfall Path",
+          "threshold": 5500,
+          "family": "metal",
+          "grade": "basic"
+        },
+        {
+          "name": "First-Year Arrival Gate",
+          "threshold": 5700,
+          "family": "fiber",
+          "grade": "basic"
+        },
+        {
+          "name": "Bell-Silent Training Yard",
+          "threshold": 5950,
+          "family": "mineral",
+          "grade": "basic"
+        },
+        {
+          "name": "A Spark in the Alchemy Wing",
+          "threshold": 6150,
+          "family": "compound",
+          "grade": "basic"
+        },
+        {
+          "name": "Shrine Road Under Lanterns",
+          "threshold": 6400,
+          "family": "mechanism",
+          "grade": "basic",
+          "objective": {
+            "tagId": "tag_world_diversity",
+            "rule": "distinct_world_count",
+            "count": 2,
+            "text": "Clear with characters from 2 different worlds",
+            "reward": {
+              "materials": [
+                {
+                  "materialId": "mat_essence_basic",
+                  "qty": 3
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Detention in the Moving Greenhouse",
+          "threshold": 6600,
+          "family": "essence",
+          "grade": "basic"
+        },
+        {
+          "name": "Masks at the Moonlit Tea House",
+          "threshold": 6850,
+          "family": "metal",
+          "grade": "basic"
+        },
+        {
+          "name": "Mist-Lost Library",
+          "threshold": 7050,
+          "family": "fiber",
+          "grade": "basic"
+        },
+        {
+          "name": "Corruption Beneath the Torii",
+          "threshold": 7300,
+          "family": "mineral",
+          "grade": "basic"
+        },
+        {
+          "name": "Checkpoint: Two Edens, One Omen",
+          "threshold": 7500,
+          "family": "compound",
+          "grade": "basic"
+        }
+      ]
+    },
+    {
+      "nodes": [
+        {
+          "name": "The Jagan Tracks an Echo",
+          "threshold": 7800,
+          "family": "mechanism",
+          "grade": "improved"
+        },
+        {
+          "name": "Spatial Breach in Lecture Hall Three",
+          "threshold": 8100,
+          "family": "essence",
+          "grade": "improved"
+        },
+        {
+          "name": "Gold Threads in the Imperial Quarter",
+          "threshold": 8400,
+          "family": "metal",
+          "grade": "improved"
+        },
+        {
+          "name": "The Sun and Eclipse Duel",
+          "threshold": 8700,
+          "family": "fiber",
+          "grade": "improved"
+        },
+        {
+          "name": "The Forgotten Shrine Stirs",
+          "threshold": 9000,
+          "family": "mineral",
+          "grade": "improved",
+          "objective": {
+            "tagId": "faction_spiritwardens",
+            "rule": "tag_count",
+            "count": 2,
+            "text": "Clear with 2 Spiritwardens",
+            "reward": {
+              "materials": [
+                {
+                  "materialId": "mat_essence_improved",
+                  "qty": 3
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Summons Loose in the Courtyard",
+          "threshold": 9300,
+          "family": "compound",
+          "grade": "improved"
+        },
+        {
+          "name": "Foxfire Through the Waterfalls",
+          "threshold": 9600,
+          "family": "mechanism",
+          "grade": "improved"
+        },
+        {
+          "name": "The Heart-Shaped Crucible",
+          "threshold": 9900,
+          "family": "essence",
+          "grade": "improved"
+        },
+        {
+          "name": "The False Saint Opens the Gate",
+          "threshold": 10200,
+          "family": "metal",
+          "grade": "improved"
+        },
+        {
+          "name": "Checkpoint: Shadows Across the Academy",
+          "threshold": 10500,
+          "family": "fiber",
+          "grade": "improved"
+        }
+      ]
+    }
+  ],
+  "shadowChapters": [
+    {
+      "nodes": [
+        {
+          "name": "Bells Without Sound",
+          "threshold": 5500,
+          "family": "metal",
+          "grade": "basic",
+          "shardCharacterId": "char_suzume"
+        },
+        {
+          "name": "Spark in the First-Year Hall",
+          "threshold": 5700,
+          "family": "fiber",
+          "grade": "basic",
+          "shardCharacterId": "char_ashley"
+        },
+        {
+          "name": "Beads of the Bound Spirit",
+          "threshold": 5950,
+          "family": "mineral",
+          "grade": "basic",
+          "shardCharacterId": "char_hoshi"
+        },
+        {
+          "name": "Stone Beneath the Flame",
+          "threshold": 6150,
+          "family": "compound",
+          "grade": "basic",
+          "shardCharacterId": "char_bridget"
+        },
+        {
+          "name": "The Beacon Draws the Dark",
+          "threshold": 6400,
+          "family": "mechanism",
+          "grade": "basic",
+          "shardCharacterId": "char_ayame"
+        },
+        {
+          "name": "Rules Written in Ice",
+          "threshold": 6600,
+          "family": "essence",
+          "grade": "basic",
+          "shardCharacterId": "char_elian"
+        },
+        {
+          "name": "Silver Threads at the Tea House",
+          "threshold": 6850,
+          "family": "metal",
+          "grade": "basic",
+          "shardCharacterId": "char_mei"
+        },
+        {
+          "name": "The Hedge That Walked Away",
+          "threshold": 7050,
+          "family": "fiber",
+          "grade": "basic",
+          "shardCharacterId": "char_tix"
+        },
+        {
+          "name": "The Open Gates",
+          "threshold": 7300,
+          "family": "mineral",
+          "grade": "basic",
+          "shardCharacterId": "char_tsubaki"
+        },
+        {
+          "name": "Lightning Takes the Stage",
+          "threshold": 7500,
+          "family": "compound",
+          "grade": "basic",
+          "shardCharacterId": "char_carol"
+        }
+      ]
+    },
+    {
+      "nodes": [
+        {
+          "name": "The Jagan’s Whisper",
+          "threshold": 7800,
+          "family": "mechanism",
+          "grade": "improved",
+          "shardCharacterId": "char_genjiro"
+        },
+        {
+          "name": "Mist Behind the Spotlight",
+          "threshold": 8100,
+          "family": "essence",
+          "grade": "improved",
+          "shardCharacterId": "char_kin"
+        },
+        {
+          "name": "Gilded Memory Threads",
+          "threshold": 8400,
+          "family": "metal",
+          "grade": "improved",
+          "shardCharacterId": "char_kaguya"
+        },
+        {
+          "name": "A Light Without Enemies",
+          "threshold": 8700,
+          "family": "fiber",
+          "grade": "improved",
+          "shardCharacterId": "char_liadriel"
+        },
+        {
+          "name": "Red and Blue at the Shrine",
+          "threshold": 9000,
+          "family": "mineral",
+          "grade": "improved",
+          "shardCharacterId": "char_yuki"
+        },
+        {
+          "name": "The Eclipse Issues a Challenge",
+          "threshold": 9300,
+          "family": "compound",
+          "grade": "improved",
+          "shardCharacterId": "char_malefia"
+        },
+        {
+          "name": "Thousand Faces, One Mask",
+          "threshold": 9600,
+          "family": "mechanism",
+          "grade": "improved",
+          "shardCharacterId": "char_kimiko"
+        },
+        {
+          "name": "Love in the Alchemy Lab",
+          "threshold": 9900,
+          "family": "essence",
+          "grade": "improved",
+          "shardCharacterId": "char_aurora"
+        },
+        {
+          "name": "The False Saint’s Hunger",
+          "threshold": 10200,
+          "family": "metal",
+          "grade": "improved",
+          "shardCharacterId": "char_sakura"
+        },
+        {
+          "name": "Every Door in Its Place",
+          "threshold": 10500,
+          "family": "fiber",
+          "grade": "improved",
+          "shardCharacterId": "char_irina"
+        }
+      ]
+    }
+  ]
+}

@@ -38,9 +38,6 @@
   ],
   "gearSlotShareBp": 1000,
   "gearCompletionShareBp": 4000,
-  "shardChanceBp": 7000,
-  "shardPityAfterMisses": 1,
-  "shardAttemptsPerDay": 5,
   "synergyCapBp": 2500,
   "upcraftRatio": 5,
   "nodeDefaults": {
@@ -56,13 +53,6 @@
       "repeat": {
         "count": 2,
         "bonusChanceBp": 3500
-      }
-    },
-    "shard": {
-      "energy": 10,
-      "repeat": {
-        "count": 1,
-        "bonusChanceBp": 0
       }
     },
     "world": {
@@ -88,5 +78,90 @@
     }
   },
   "partySize": 5,
-  "partyPresetCount": 6
+  "partyPresetCount": 6,
+  "focus": {
+    "rates": {
+      "primary": 24,
+      "secondary": 30,
+      "longTerm": 40
+    }
+  },
+  "fieldSupply": {
+    "storageCap": 5,
+    "cacheEnergyValue": 30,
+    "shardGrant": 3,
+    "surgeBp": 500
+  },
+  "programs": {
+    "procurement": {
+      "threshold": 120,
+      "shipmentQty": 6,
+      "relicBonusQty": 2
+    },
+    "development": {
+      "threshold": 25,
+      "bonusShards": 1,
+      "relicThreshold": 20
+    },
+    "operations": {
+      "threshold": 2,
+      "relicThreshold": 1
+    }
+  },
+  "mastery": {
+    "ranks": [
+      {
+        "id": "unfamiliar",
+        "displayName": "Unfamiliar",
+        "at": 0
+      },
+      {
+        "id": "known",
+        "displayName": "Known",
+        "at": 200
+      },
+      {
+        "id": "established",
+        "displayName": "Established",
+        "at": 450
+      },
+      {
+        "id": "rooted",
+        "displayName": "Rooted",
+        "at": 700
+      },
+      {
+        "id": "mastered",
+        "displayName": "Mastered",
+        "at": 1000
+      }
+    ],
+    "weights": {
+      "campaign": 350,
+      "heroes": 350,
+      "gear": 200,
+      "relic": 100
+    },
+    "heroWeightsBp": {
+      "revealed": 1500,
+      "owned": 3500,
+      "stars": 5000
+    },
+    "milestones": {
+      "known": {
+        "supplies": 1,
+        "materialCache": 8
+      },
+      "established": {
+        "shardChoice": 15
+      },
+      "rooted": {
+        "supplies": 2,
+        "materialCache": 10
+      },
+      "mastered": {
+        "shardChoice": 25
+      }
+    }
+  }
 }
