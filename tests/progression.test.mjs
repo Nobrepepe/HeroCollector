@@ -9,7 +9,6 @@ import {
 import {
   analyzeEquipmentGoal, analyzePinnedGoals, allocateMaterialDemand
 } from '../src/core/progression.js';
-import { migratePlayerState } from '../src/core/migrate.js';
 import { validateSave } from '../src/core/validate.js';
 
 const content = loadContent();
@@ -138,41 +137,32 @@ test('party copy is independent, clear is scoped, and node preference falls back
   assert.equal(state.parties[0].members[1], null);
 });
 
-test('v1 migration preserves gameplay, is immutable/idempotent, and validates', () => {
-  const v1 = newPlayerState(content, NOW);
-  v1.schemaVersion = 1;
-  delete v1.ui;
-  delete v1.settings.farmingResults;
-  v1.energy = 77;
-  v1.inventory.materials.mat_metal_basic = 12;
-  v1.pins.push({ type: 'equipment', characterId: 'char_suzume', slot: 'attire' });
-  const original = structuredClone(v1);
-  const migrated = migratePlayerState(content, v1);
-  assert.deepEqual(v1, original);
-  assert.equal(migrated.schemaVersion, SCHEMA_VERSION);
-  assert.equal(migrated.energy, 77);
-  assert.equal(migrated.inventory.materials.mat_metal_basic, 12);
-  assert.deepEqual(
-    { sort: migrated.ui.roster.sort, direction: migrated.ui.roster.direction },
-    { sort: 'power', direction: 'desc' });
-  assert.deepEqual(migratePlayerState(content, migrated), migrated);
-  assert.equal(validateSave(content, migrated).ok, true);
-  migrated.ui.nodePartyById.main_1 = 99;
-  assert.equal(validateSave(content, migrated).ok, false);
+test('saves are schema 6 only — older schemas are refused, not adapted', () => {
+  const state = newPlayerState(content, NOW);
+  assert.equal(state.schemaVersion, SCHEMA_VERSION);
+  assert.equal(SCHEMA_VERSION, 6);
+  assert.equal(validateSave(content, state).ok, true);
+  const old = structuredClone(state);
+  old.schemaVersion = 5;
+  assert.equal(validateSave(content, old).ok, false);
+  state.ui.nodePartyById.main_1 = 99;
+  assert.equal(validateSave(content, state).ok, false);
 });
 
 test('import pipeline synchronizes removed live references before validation', () => {
-  const state = migratePlayerState(content, newPlayerState(content, NOW));
+  const state = newPlayerState(content, NOW);
   state.characters.char_removed_custom = {
     owned: true, stars: 3, shards: 9, gearTier: 1,
-    slots: {}, pity: false, skinUnlocked: false, selectedSkinId: null
+    slots: {}, revealed: true, selectedSkinId: null
   };
   state.parties[0].members[0] = 'char_removed_custom';
   state.pins.push({ type: 'equipment', characterId: 'char_removed_custom', slot: 'attire' });
+  state.focus.slots.primary.characterId = 'char_removed_custom';
   assert.equal(validateSave(content, state).ok, false);
   syncSaveWithContent(content, state);
   assert.equal(state.parties[0].members[0], null);
   assert.equal(state.pins.some(pin => pin.characterId === 'char_removed_custom'), false);
+  assert.equal(state.focus.slots.primary.characterId, null);
   assert.equal(state.characters.char_removed_custom.stars, 3);
   assert.equal(validateSave(content, state).ok, true);
 });

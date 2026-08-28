@@ -21,14 +21,18 @@ test('Crisis generation suppresses day one, uses eligibility, and snapshots dist
   assert.equal(generateCrisisForDay(content, state, fixedRng([0])), null);
 });
 
-test('Crisis grades use roster breadth and affected HQ rank', () => {
+test('Crisis grades use roster breadth and the affected world Mastery rank', () => {
   const state = newPlayerState(content, T0);
   const world = content.worlds[0];
   assert.equal(crisisGrade(content, state, world.id).id, 'local');
+  // Breadth alone is not enough for the top grade…
   content.characters.slice(0, 12).forEach(def => { state.characters[def.id].owned = true; });
-  for (const facility of world.hq.facilities) {
-    state.headquarters.worlds[world.id] ??= { facilities: {}, production: {}, staff: {}, claimedRanks: [] };
-    state.headquarters.worlds[world.id].facilities[facility.id] = 2;
+  assert.notEqual(crisisGrade(content, state, world.id).id, 'world');
+  // …the world itself must be Established: campaign clears + a broad roster.
+  content.characters.filter(def => def.world === world.id)
+    .forEach(def => { state.characters[def.id].owned = true; });
+  for (const node of content.nodesByCampaign[world.campaignId]) {
+    state.nodes[node.id] = { cleared: true, firstClearClaimed: true, objectiveClaimed: false };
   }
   assert.equal(crisisGrade(content, state, world.id).id, 'world');
 });
@@ -38,9 +42,10 @@ test('Front preview counts distinct favored tags and Crisis resolves and pays on
   state.dayNumber = 2;
   content.characters.slice(0, 12).forEach(def => { state.characters[def.id].owned = true; });
   const world = content.worlds[0];
-  for (const facility of world.hq.facilities) {
-    state.headquarters.worlds[world.id] ??= { facilities: {}, production: {}, staff: {}, claimedRanks: [] };
-    state.headquarters.worlds[world.id].facilities[facility.id] = 2;
+  content.characters.filter(def => def.world === world.id)
+    .forEach(def => { state.characters[def.id].owned = true; });
+  for (const node of content.nodesByCampaign[world.campaignId]) {
+    state.nodes[node.id] = { cleared: true, firstClearClaimed: true, objectiveClaimed: false };
   }
   const active = generateCrisisForDay(content, state, fixedRng([0, 0, .1, .2, .3, .4]));
   const ids = content.characters.slice(0, active.fronts.length * active.teamSize).map(def => def.id);

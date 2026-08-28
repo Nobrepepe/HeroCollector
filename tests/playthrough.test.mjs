@@ -1,8 +1,8 @@
 // Acceptance 14.1: a new save can progress from the first Main node through
 // both launch chapters, unlock all twenty characters to 7 Stars and the
-// content-derived Gear Tier cap,
-// and complete both World Campaigns and Archives — using only in-game
-// transactions (daily resets, clears, sweeps, crafting, promotions).
+// content-derived Gear Tier cap, and reassemble both world relics — using only
+// in-game transactions (daily resets, clears, sweeps, crafting, promotions,
+// Development Focus, Programs, Field Supplies, and Expedition cycles).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadContent } from './helpers.mjs';
@@ -16,15 +16,102 @@ import {
   craftComponent, upcraft, craftEquipment, completeGearTier, promoteStar,
   unlockCharacter, checkCompleteTier, checkPromoteStar, checkUnlockCharacter,
   checkCraftEquipment, maxCraftableComponents, nodeUnlocked, matQty, compQty,
-  maxSweepCount, shardAttemptsLeft, archiveStatus, worldCampaignUnlocked
+  maxSweepCount, worldCampaignUnlocked
 } from '../src/core/state.js';
+import { FOCUS_SLOTS, assignFocus, isRevealed } from '../src/core/focus.js';
+import { relicStatus } from '../src/core/relics.js';
+import { worldMasteryBreakdown, resolveMasteryChoice, pendingMasteryChoices } from '../src/core/mastery.js';
+import { setProcurementFamily, setDevelopmentHero } from '../src/core/programs.js';
+import { launchCycle, offerFeasibility, expeditionCharacterIds } from '../src/core/expeditions.js';
+import { useSupplyTutoring, previewSupplyTutoring } from '../src/core/energy.js';
 
 const content = loadContent();
 const DAY = 86400000;
-const GRADES = content.materialMeta.gradeOrder;
 
 function ownedIds(s) {
   return content.characters.filter(d => s.characters[d.id].owned).map(d => d.id);
+}
+
+// The whole shard journey for one hero is 450 cumulative; how much is left?
+function shardRemaining(s, id) {
+  const cs = s.characters[id];
+  const def = content.characterById[id];
+  const starCosts = content.balance.starShards;
+  if (!cs.owned) {
+    const tier = content.balance.acquisitionTiers[def.tier];
+    let rest = tier.cumulativeShards;
+    for (let star = tier.unlockStar; star < 7; star++) rest += starCosts[star];
+    return Math.max(0, rest - cs.shards);
+  }
+  let rest = 0;
+  for (let star = cs.stars; star < 7; star++) rest += starCosts[star];
+  return Math.max(0, rest - cs.shards);
+}
+
+// Point the three Focus slots at the revealed heroes closest to their next
+// milestone, the Development Programs at their worlds' neediest heroes, and
+// every Procurement at the family the bench is currently short of.
+function manageAllocation(s, shortages) {
+  const targets = content.characters
+    .filter(d => isRevealed(s, d.id) && shardRemaining(s, d.id) > 0)
+    .sort((a, b) => shardRemaining(s, a.id) - shardRemaining(s, b.id));
+  FOCUS_SLOTS.forEach((slot, index) => {
+    const target = targets[index];
+    if (target && s.focus.slots[slot].characterId !== target.id) {
+      assignFocus(content, s, slot, target.id);
+    }
+  });
+  const family = Object.keys(shortages).length
+    ? content.materialById[Object.entries(shortages).sort((a, b) => b[1] - a[1])[0][0]].family
+    : content.materialMeta.familyOrder[0];
+  for (const w of content.worlds) {
+    setProcurementFamily(content, s, w.id, family);
+    const worldTarget = targets.find(d => d.world === w.id);
+    if (worldTarget) setDevelopmentHero(content, s, w.id, worldTarget.id);
+  }
+  for (const choice of pendingMasteryChoices(content, s)) {
+    if (choice.kind === 'materialCache') {
+      resolveMasteryChoice(content, s, choice.worldId, choice.rankId, { family });
+    } else {
+      const hero = targets.find(d => d.world === choice.worldId);
+      if (hero) resolveMasteryChoice(content, s, choice.worldId, choice.rankId, { characterId: hero.id });
+    }
+  }
+  for (const target of targets) {
+    if (previewSupplyTutoring(content, s, target.id).ok) useSupplyTutoring(content, s, target.id);
+  }
+}
+
+// Launch every feasible route of a waiting board with disjoint parties.
+function runExpeditions(s) {
+  if (!s.expeditions.board || s.expeditions.active) return;
+  const busy = new Set(expeditionCharacterIds(s));
+  const selections = [];
+  for (const offer of s.expeditions.board.offers) {
+    if (selections.length >= content.expeditions.settings.slotCount) break;
+    const party = offerFeasibilityWithout(s, offer, busy);
+    if (!party) continue;
+    const selection = { offerId: offer.id, party };
+    if (offer.baseRewards.some(e => e.kind === 'shards' && e.choice)) {
+      const chosen = content.characters
+        .filter(d => (!offer.world || d.world === offer.world) && isRevealed(s, d.id) && shardRemaining(s, d.id) > 0)
+        .sort((a, b) => shardRemaining(s, a.id) - shardRemaining(s, b.id))[0]
+        ?? content.characters.find(d => !offer.world || d.world === offer.world);
+      if (!chosen) continue;
+      selection.shardChoiceCharacterId = chosen.id;
+    }
+    selections.push(selection);
+    for (const id of party) busy.add(id);
+  }
+  if (selections.length) launchCycle(content, s, selections);
+}
+
+// offerFeasibility excludes members of active routes; shadow the busy set in
+// as a fake route so already-selected heroes are not offered twice.
+function offerFeasibilityWithout(s, offer, busy) {
+  if (ownedIds(s).filter(id => !busy.has(id)).length < offer.partySize) return null;
+  const shadowed = { ...s, expeditions: { ...s.expeditions, active: { routes: [{ party: [...busy] }] } } };
+  return offerFeasibility(content, shadowed, offer).party;
 }
 
 // Best legal party for a node: candidates are top-power mixed and same-world picks.
@@ -128,7 +215,7 @@ function upcraftToward(s, materialId) {
   return acted;
 }
 
-test('full playthrough: campaign, roster, gear, and archives complete', { timeout: 300000 }, () => {
+test('full playthrough: campaign, roster, gear, and relics complete', { timeout: 300000 }, () => {
   const rng = makeRng(20260724);
   let now = Date.parse('2026-07-24T12:00:00');
   const s = newPlayerState(content, now);
@@ -141,8 +228,8 @@ test('full playthrough: campaign, roster, gear, and archives complete', { timeou
       return cs.owned && cs.stars === 7 && cs.gearTier === content.maxGearTier;
     });
     const mainDone = nodeState(s, 'main_20').cleared;
-    const archivesDone = content.worlds.every(w => archiveStatus(content, s, w.id).complete);
-    return allMaxed && mainDone && archivesDone;
+    const relicsDone = content.worlds.every(w => relicStatus(content, s, w.id).complete);
+    return allMaxed && mainDone && relicsDone;
   };
 
   while (!done() && day < maxDays) {
@@ -150,6 +237,8 @@ test('full playthrough: campaign, roster, gear, and archives complete', { timeou
     now += DAY;
     applyDailyReset(content, s, now);
     improve(s);
+    manageAllocation(s, materialShortages(s));
+    runExpeditions(s);
 
     let spent = true;
     while (spent && s.energy > 0) {
@@ -171,37 +260,18 @@ test('full playthrough: campaign, roster, gear, and archives complete', { timeou
       }
       if (spent) continue;
 
-      // 2. shard farming: sweep unlocked shard nodes for characters below 7★
-      for (const node of unlockedNodes(s).filter(n => n.shardCharacter)) {
-        if (s.characters[node.shardCharacter].stars >= 7) continue;
-        const left = shardAttemptsLeft(content, s, node);
-        if (left <= 0) continue;
-        const party = bestParty(s, node);
-        if (!party) continue;
-        const count = nodeState(s, node.id).cleared
-          ? Math.min(left, maxSweepCount(content, s, node.id))
-          : 1;
-        if (count < 1) continue;
-        if (checkClear(content, s, node.id, party, count).ok) {
-          clearNode(content, s, node.id, party, count, rng, now);
-          spent = true;
-        }
-      }
-      if (spent) { improve(s); continue; }
-
-      // 3. material farming: spread energy across every current shortage
+      // 2. material farming: spread energy across every current shortage.
+      // Every sweep also advances all three Focus meters — the shard economy
+      // and the gear economy share the same Energy.
       const shortages = Object.entries(materialShortages(s))
         .sort((a, b) => b[1] - a[1]);
       const nodesNow = unlockedNodes(s);
       for (const [matId] of shortages) {
         const mat = content.materialById[matId];
-        // prefer a freely repeatable node that drops it directly; else farm the
-        // family's best lower grade and upcraft
-        let source = nodesNow.filter(n => n.material === matId && !n.shardCharacter);
+        let source = nodesNow.filter(n => n.material === matId);
         if (source.length === 0) {
           const rank = content.materialMeta.grades[mat.grade].rank;
           source = nodesNow.filter(n => {
-            if (n.shardCharacter) return false;
             const m = content.materialById[n.material];
             return m.family === mat.family && content.materialMeta.grades[m.grade].rank < rank;
           }).sort((a, b) => content.materialMeta.grades[content.materialById[b.material].grade].rank
@@ -223,7 +293,8 @@ test('full playthrough: campaign, roster, gear, and archives complete', { timeou
       }
       if (spent) continue;
 
-      // 4. fallback: sweep the best cleared node to make some progress
+      // 3. fallback: sweep the best cleared node — the Energy still feeds the
+      // three Focus meters and the world's Procurement Program.
       const cleared = nodesNow.filter(n => nodeState(s, n.id).cleared)
         .sort((a, b) => b.number - a.number);
       for (const node of cleared) {
@@ -255,9 +326,11 @@ test('full playthrough: campaign, roster, gear, and archives complete', { timeou
     assert.equal(cs.gearTier, content.maxGearTier, `${d.id} gear tier ${cs.gearTier}`);
   }
   for (const w of content.worlds) {
-    const st = archiveStatus(content, s, w.id);
-    assert.ok(st.complete, `${w.id} archive ${st.relicsDone}/${st.relicsTotal}`);
-    assert.ok(s.characters[st.archive.fullReward.characterId].owned);
+    const st = relicStatus(content, s, w.id);
+    assert.ok(st.complete, `${w.id} relic ${st.ownedCount}/${st.total}`);
+    // with everything complete, the derived Mastery score lands exactly on max
+    const breakdown = worldMasteryBreakdown(content, s, w.id);
+    assert.equal(breakdown.score, breakdown.max, `${w.id} mastery ${JSON.stringify(breakdown)}`);
   }
   assert.ok(worldCampaignUnlocked(content, s, 'world_hidden_village').unlocked);
   assert.ok(worldCampaignUnlocked(content, s, 'world_magic_academy').unlocked);

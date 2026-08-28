@@ -7,15 +7,18 @@ import { equipmentRecipe, equipmentName } from './content.js';
 import { analyzeEquipmentGoal, analyzePinnedGoals } from './progression.js';
 import { makeRng } from './rng.js';
 import { grantRewardEntries } from './resources.js';
-import { generateExpeditionBoard, resolveDueExpeditions } from './expeditions.js';
-import { applyHqProduction, completeDueConstruction, dailyExpeditionAllowances } from './hq.js';
-import { FIELD_SUPPLY_ID, fieldSupplyLimits, frontierMomentumPreview, resetDailyEnergySystems } from './energy.js';
+import { generateCycleBoard, resolveDueCycle } from './expeditions.js';
+import { FIELD_SUPPLY_ID, fieldSupplyLimits, frontierMomentumPreview, resetDailyEnergySystems, surgedPower } from './energy.js';
+import { FOCUS_SLOTS, applyFocusEnergy, revealCharacter } from './focus.js';
+import { grantRelicPiece } from './relics.js';
+import { applyMasteryMilestones, unlockedSkins } from './mastery.js';
+import { addProcurementEnergy, addDevelopmentShards, deliverProgramPayouts } from './programs.js';
 import {
   consumeCrisisNodeBoons, crisisDayRng, crisisNodeRunModifiers,
   expireActiveCrisis, generateCrisisForDay
 } from './crises.js';
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 // ------------------------------------------------------------- new state
 export function newPlayerState(content, now = Date.now()) {
@@ -28,8 +31,7 @@ export function newPlayerState(content, now = Date.now()) {
       shards: 0,
       gearTier: 0,
       slots: emptySlots(content),
-      pity: false,
-      skinUnlocked: false,
+      revealed: !!def.starting,
       selectedSkinId: null
     };
   }
@@ -67,18 +69,27 @@ export function newPlayerState(content, now = Date.now()) {
         sort: 'power', direction: 'desc'
       },
       campaignId: 'main',
-      archiveCollapsed: { worlds: {}, collections: {} },
       nodePartyById: {}
     },
     progressLog: [],
     lastResetSummary: null,
     dayNumber: 1,
     expeditions: {
-      board: null, active: [], reports: [],
-      daily: { day: 1, freeRerolls: 1, freeRerollsUsed: 0, freePins: 0, freePinsUsed: 0 }
+      cycle: 1, board: null, active: null, reports: [],
+      allowances: { freeRerolls: 1, freeRerollsUsed: 0, freePins: 1, freePinsUsed: 0 }
     },
-    headquarters: { worlds: {}, construction: null },
-    energySystems: { daily: { day: 1, suppliesUsed: 0, momentumRefunded: 0 } },
+    focus: {
+      slots: {
+        primary: { characterId: null, progress: 0 },
+        secondary: { characterId: null, progress: 0 },
+        longTerm: { characterId: null, progress: 0 }
+      }
+    },
+    programs: {},
+    relics: { pieces: {} },
+    mastery: {},
+    surge: null,
+    energySystems: { daily: { day: 1, momentumRefunded: 0 } },
     crises: { active: null, lastSpawnDay: null, cycleSeen: [], history: [] }
   };
   applyDailyReset(content, state, now); // establishes the reset-day key
@@ -107,22 +118,22 @@ export function syncSaveWithContent(content, state) {
     if (!state.characters[def.id]) {
       state.characters[def.id] = {
         owned: false, stars: 0, shards: 0, gearTier: 0,
-        slots: emptySlots(content), pity: false, skinUnlocked: false, selectedSkinId: null
+        slots: emptySlots(content), revealed: false, selectedSkinId: null
       };
     }
     // Starting characters are granted at 1★ — including when content becomes
     // ready after the save was created, or a character is newly flagged.
     const cs = state.characters[def.id];
-    if (cs.selectedSkinId === undefined) {
-      const archive = content.archiveByWorld[def.world];
-      cs.selectedSkinId = cs.useSkin && archive?.fullReward?.characterId === def.id
-        ? archive.fullReward.id
-        : null;
+    cs.revealed ??= cs.owned;
+    cs.selectedSkinId ??= null;
+    if (cs.selectedSkinId && !content.skinById[cs.selectedSkinId]) {
+      cs.selectedSkinId = null;
+      report.push(`Cleared a selected skin for ${def.displayName} whose content is no longer live.`);
     }
-    delete cs.useSkin;
     if (def.starting && !cs.owned) {
       cs.owned = true;
       cs.stars = Math.max(1, cs.stars);
+      cs.revealed = true;
       report.push(`Granted starting character ${def.displayName}.`);
     }
   }
@@ -168,7 +179,7 @@ export function syncSaveWithContent(content, state) {
   if (state.pins.length < beforePins) report.push(`Removed ${beforePins - state.pins.length} pin(s) for missing content.`);
   state.ui ??= {
     roster: { world: 'all', archetype: 'all', faction: 'all', ownership: 'all', sort: 'power', direction: 'desc' },
-    campaignId: 'main', archiveCollapsed: { worlds: {}, collections: {} }, nodePartyById: {}
+    campaignId: 'main', nodePartyById: {}
   };
   state.ui.nodePartyById ??= {};
   for (const [nodeId, index] of Object.entries(state.ui.nodePartyById)) {
@@ -177,7 +188,7 @@ export function syncSaveWithContent(content, state) {
       report.push(`Removed an invalid saved party preference for ${nodeId}.`);
     }
   }
-  const campaigns = new Set(['main', 'shadow', ...content.worlds.map(w => w.campaignId)]);
+  const campaigns = new Set(['main', ...content.worlds.map(w => w.campaignId)]);
   if (!campaigns.has(state.ui.campaignId)) state.ui.campaignId = 'main';
   // The world last held on the Worlds stage; forget it if content dropped it.
   if (state.ui.selectedWorldId && !content.worldById[state.ui.selectedWorldId]) {
@@ -192,19 +203,44 @@ export function syncSaveWithContent(content, state) {
   if (!new Set(['all', 'owned', 'unowned', 'ready']).has(roster.ownership)) roster.ownership = 'all';
   if (!new Set(['name', 'power', 'stars', 'gearTier', 'ready']).has(roster.sort)) roster.sort = 'name';
   if (!new Set(['asc', 'desc']).has(roster.direction)) roster.direction = 'asc';
-  state.ui.archiveCollapsed ??= { worlds: {}, collections: {} };
-  const worldIds = new Set(content.worlds.map(w => w.id));
-  const collectionIds = new Set(content.archives.flatMap(a => a.collections.map(c => c.id)));
-  for (const id of Object.keys(state.ui.archiveCollapsed.worlds ?? {})) {
-    if (!worldIds.has(id)) delete state.ui.archiveCollapsed.worlds[id];
-  }
-  for (const id of Object.keys(state.ui.archiveCollapsed.collections ?? {})) {
-    if (!collectionIds.has(id)) delete state.ui.archiveCollapsed.collections[id];
-  }
   if (!Number.isInteger(state.activePartyIndex)
     || state.activePartyIndex < 0 || state.activePartyIndex >= state.parties.length) state.activePartyIndex = 0;
-  state.energySystems ??= { daily: { day: state.dayNumber, suppliesUsed: 0, momentumRefunded: 0 } };
+  state.energySystems ??= { daily: { day: state.dayNumber, momentumRefunded: 0 } };
   state.crises ??= { active: null, lastSpawnDay: null, cycleSeen: [], history: [] };
+  // Focus slots and Program choices must reference live, still-usable heroes;
+  // slot progress is kept either way (it belongs to the slot).
+  for (const slot of FOCUS_SLOTS) {
+    const entry = state.focus.slots[slot];
+    if (entry.characterId && (!content.characterById[entry.characterId] || !state.characters[entry.characterId])) {
+      entry.characterId = null;
+      report.push(`Cleared the ${slot} Focus slot: its hero is no longer in the game. The slot keeps its progress.`);
+    }
+  }
+  for (const [worldId, ps] of Object.entries(state.programs)) {
+    if (!content.worldById[worldId]) continue; // dormant, returns with the world
+    if (ps.procurement.family && !content.materialMeta.familyOrder.includes(ps.procurement.family)) {
+      ps.procurement.family = null;
+      report.push(`Cleared an unknown Procurement material family for ${worldId}.`);
+    }
+    if (ps.development.heroId) {
+      const def = content.characterById[ps.development.heroId];
+      if (!def || def.world !== worldId) {
+        ps.development.heroId = null;
+        report.push(`Cleared the Development hero for ${worldId}: they are no longer in the game.`);
+      }
+    }
+  }
+  // A waiting route board referencing content that left the game is simply
+  // regenerated; a launched cycle keeps running (reward grants are guarded).
+  if (state.expeditions.board) {
+    const stale = state.expeditions.board.offers.some(offer =>
+      (offer.world && !content.worldById[offer.world])
+      || offer.baseRewards.some(entry => entry.kind === 'shards' && entry.characterId && !content.characterById[entry.characterId]));
+    if (stale) {
+      state.expeditions.board = null;
+      report.push('Replaced the waiting route board: some routes referenced content that left the game.');
+    }
+  }
   const crisis = state.crises.active;
   if (crisis && (!content.worldById[crisis.worldId] || !content.crisisById[crisis.definitionId])) {
     expireActiveCrisis(state, 'The authored Crisis content left the game, so the response expired without penalty.');
@@ -219,31 +255,19 @@ export function syncSaveWithContent(content, state) {
       });
     }
   }
-  let supplyLimits = fieldSupplyLimits(content, state);
+  const supplyLimits = fieldSupplyLimits(content, state);
   if (supplyLimits.held > supplyLimits.storageCap) {
     state.inventory.resources[FIELD_SUPPLY_ID] = supplyLimits.storageCap;
-    report.push(`Field Supply storage fell to ${supplyLimits.storageCap}; ${supplyLimits.held - supplyLimits.storageCap} excess Suppl${supplyLimits.held - supplyLimits.storageCap === 1 ? 'y was' : 'ies were'} removed explicitly.`);
-  }
-  supplyLimits = fieldSupplyLimits(content, state);
-  if (supplyLimits.held + supplyLimits.reserved > supplyLimits.storageCap) {
-    for (let index = state.expeditions.active.length - 1; index >= 0; index--) {
-      const currentLimits = fieldSupplyLimits(content, state);
-      if (currentLimits.held + currentLimits.reserved <= currentLimits.storageCap) break;
-      const expedition = state.expeditions.active[index];
-      if (!(expedition.fixedRewards ?? []).some(entry => entry.id === FIELD_SUPPLY_ID)) continue;
-      state.expeditions.active.splice(index, 1);
-      if (expedition.sourceOffer && state.expeditions.board?.day === state.dayNumber) state.expeditions.board.offers.push(expedition.sourceOffer);
-      report.push(`Cancelled ${expedition.name} because changed Training capacity could no longer hold its promised Field Supply.`);
-    }
+    report.push(`Field Supply storage is ${supplyLimits.storageCap}; ${supplyLimits.held - supplyLimits.storageCap} excess Suppl${supplyLimits.held - supplyLimits.storageCap === 1 ? 'y was' : 'ies were'} removed explicitly.`);
   }
   return { changes: report, notices };
 }
 
 export function nodeState(state, nodeId) {
-  return state.nodes[nodeId] ?? { cleared: false, firstClearClaimed: false, objectiveClaimed: false, attemptsToday: 0 };
+  return state.nodes[nodeId] ?? { cleared: false, firstClearClaimed: false, objectiveClaimed: false };
 }
 function ensureNodeState(state, nodeId) {
-  if (!state.nodes[nodeId]) state.nodes[nodeId] = { cleared: false, firstClearClaimed: false, objectiveClaimed: false, attemptsToday: 0 };
+  if (!state.nodes[nodeId]) state.nodes[nodeId] = { cleared: false, firstClearClaimed: false, objectiveClaimed: false };
   return state.nodes[nodeId];
 }
 
@@ -276,35 +300,24 @@ export function applyDailyReset(content, state, now = Date.now()) {
   const days = daysBetweenKeys(state.lastResetKey, key);
   if (days <= 0) return null; // same day, or clock moved backward: never re-grant
   const before = state.energy;
-  const construction = [], production = [], expeditions = [];
+  const cycleReports = [], shipments = [];
   for (let elapsed = 0; elapsed < days; elapsed++) {
     state.dayNumber++;
     state.energy = Math.min(b.energy.storageCap, state.energy + b.energy.dailyGrant);
-    for (const ns of Object.values(state.nodes)) ns.attemptsToday = 0;
     resetDailyEnergySystems(state);
-    const built = completeDueConstruction(content, state);
-    if (built) construction.push(built);
-    production.push(...applyHqProduction(content, state));
-    expeditions.push(...resolveDueExpeditions(content, state));
+    const cycleReport = resolveDueCycle(content, state, dayRng(state, elapsed));
+    if (cycleReport) cycleReports.push(cycleReport);
+    shipments.push(...deliverProgramPayouts(content, state));
     if (state.crises?.active) expireActiveCrisis(state);
-    const pinned = state.expeditions.board?.offers.find(offer => offer.pinned) ?? null;
-    const allowances = dailyExpeditionAllowances(content, state);
-    state.expeditions.daily = {
-      day: state.dayNumber, ...allowances, freeRerollsUsed: 0, freePinsUsed: 0
-    };
-    if (content.expeditions?.templates?.length) {
-      generateExpeditionBoard(content, state, dayRng(state, elapsed), { seed: state.dayNumber, pinned });
-    } else {
-      state.expeditions.board = null;
-    }
   }
+  ensureExpeditionBoard(content, state);
   const crisis = generateCrisisForDay(content, state, crisisDayRng(state));
   state.lastResetKey = key;
   const summary = {
     days,
     energyGained: state.energy - before,
     energy: state.energy,
-    attemptsReset: true, construction, production, expeditions, crisis, acknowledged: false
+    cycleReports, shipments, crisis, acknowledged: false
   };
   state.lastResetSummary = summary;
   return summary;
@@ -317,10 +330,14 @@ function dayRng(state, salt = 0) {
   return makeRng(hash >>> 0);
 }
 
+// A cycle board is generated when none is waiting and no cycle is away — on a
+// new save, after content changes replaced a stale board, and after a cycle
+// resolves. The board then waits for the player indefinitely.
 export function ensureExpeditionBoard(content, state) {
   if (!state.expeditions || !content.expeditions?.templates?.length) return null;
-  if (state.expeditions.board?.day === state.dayNumber) return state.expeditions.board;
-  return generateExpeditionBoard(content, state, dayRng(state), { seed: state.dayNumber });
+  if (state.expeditions.active) return null;
+  if (state.expeditions.board) return state.expeditions.board;
+  return generateCycleBoard(content, state, dayRng(state));
 }
 
 // ------------------------------------------------------------- inventory
@@ -348,14 +365,6 @@ export function worldCampaignUnlocked(content, state, worldId) {
 }
 
 export function nodeUnlocked(content, state, node) {
-  if (node.campaign === 'shadow') {
-    const mirror = content.nodeById[node.mirrorNode];
-    if (!mirror) return { unlocked: false, reason: 'The matching Main Campaign node is not live yet.' };
-    if (!nodeState(state, mirror.id).cleared) {
-      return { unlocked: false, reason: `Clear Main ${mirror.number} — ${mirror.displayName} first.` };
-    }
-    return { unlocked: true, reason: '' };
-  }
   if (node.campaign !== 'main') {
     const wc = worldCampaignUnlocked(content, state, node.world);
     if (!wc.unlocked) {
@@ -374,13 +383,10 @@ export function nodeEnergyCost(content, node) {
   return content.balance.nodeDefaults[node.type].energy;
 }
 
-export function shardAttemptsLeft(content, state, node) {
-  if (!node.shardCharacter) return Infinity;
-  return Math.max(0, content.balance.shardAttemptsPerDay - nodeState(state, node.id).attemptsToday);
-}
-
 // Full availability check for a clear/sweep of `count` runs. Never spends
 // anything; returns { ok, reasons: [...] } so the UI can explain every block.
+// An armed Surge is applied to the Power gate when the party alone falls
+// short; `surgeApplied` reports that the Surge is what carries the attempt.
 export function checkClear(content, state, nodeId, members, count = 1) {
   const node = content.nodeById[nodeId];
   const reasons = [];
@@ -394,28 +400,30 @@ export function checkClear(content, state, nodeId, members, count = 1) {
   const legal = partyLegality(content, state, members, node);
   if (!legal.legal) reasons.push(legal.reason);
   let evalResult = null;
+  let surgeApplied = false;
   if (legal.legal) {
     evalResult = evaluateParty(content, state, members);
     if (evalResult.effectivePower < node.threshold) {
-      reasons.push(`Effective Power ${fmt(evalResult.effectivePower)} is below the required ${fmt(node.threshold)}. No Energy is spent on attempts that cannot succeed.`);
+      const surged = surgedPower(state, evalResult.effectivePower);
+      if (surged >= node.threshold) {
+        surgeApplied = true;
+      } else {
+        reasons.push(`Effective Power ${fmt(evalResult.effectivePower)} is below the required ${fmt(node.threshold)}. No Energy is spent on attempts that cannot succeed.`);
+      }
     }
   }
   const boon = crisisNodeRunModifiers(state, node, count);
   const paidRuns = count - boon.freeRuns;
   const cost = nodeEnergyCost(content, node) * paidRuns;
   if (state.energy < cost) reasons.push(`Not enough Energy (${state.energy}/${cost}). Energy refreshes at the daily reset.`);
-  const attempts = shardAttemptsLeft(content, state, node);
-  if (count > attempts) reasons.push(`Only ${attempts} shard attempt${attempts === 1 ? '' : 's'} left today (${content.balance.shardAttemptsPerDay} per day).`);
-  return { ok: reasons.length === 0, reasons, evalResult, cost, node, paidRuns, freeRuns: boon.freeRuns, boon };
+  return { ok: reasons.length === 0, reasons, evalResult, cost, node, paidRuns, freeRuns: boon.freeRuns, boon, surgeApplied };
 }
 
 export function maxSweepCount(content, state, nodeId) {
   const node = content.nodeById[nodeId];
   if (!node) return 0;
   const free = crisisNodeRunModifiers(state, node, Number.MAX_SAFE_INTEGER).freeRuns;
-  const byEnergy = free + Math.floor(state.energy / nodeEnergyCost(content, node));
-  const byAttempts = shardAttemptsLeft(content, state, node);
-  return Math.max(0, Math.min(byEnergy, byAttempts === Infinity ? byEnergy : byAttempts));
+  return Math.max(0, free + Math.floor(state.energy / nodeEnergyCost(content, node)));
 }
 
 // ------------------------------------------------------------- clear / sweep
@@ -435,29 +443,16 @@ export function clearNode(content, state, nodeId, members, count, rng, now = Dat
   const wasCleared = ns.cleared;
 
   state.energy -= check.cost;
-  if (node.shardCharacter) ns.attemptsToday += count;
 
-  const rewards = { materials: {}, shards: {}, fragments: [], milestones: [], firstClear: false, objective: false, pity: null,
+  const rewards = { materials: {}, shards: {}, relicPieces: [], milestones: [], firstClear: false, objective: false,
+    revealed: [], focusShards: [], masteryEvents: [], surgeUsed: false,
     energySpent: check.cost, energyRefunded: 0, paidRuns: check.paidRuns, freeRunsUsed: check.freeRuns, runs: count };
   const gainMat = (id, qty) => { rewards.materials[id] = (rewards.materials[id] ?? 0) + qty; };
-  const shardChar = node.shardCharacter ? state.characters[node.shardCharacter] : null;
 
   for (let run = 0; run < count; run++) {
     const def = b.nodeDefaults[node.type];
     gainMat(node.material, def.repeat.count);
     if (def.repeat.bonusChanceBp > 0 && rng.chanceBp(def.repeat.bonusChanceBp)) gainMat(node.material, 1);
-    if (node.shardCharacter) {
-      if (shardChar.stars >= 7) {
-        // At 7 Stars the shard drop is replaced by the node's normal
-        // guaranteed material reward (GDD 4.3).
-        gainMat(node.material, 1);
-      } else if (shardChar.pity || rng.chanceBp(b.shardChanceBp)) {
-        rewards.shards[node.shardCharacter] = (rewards.shards[node.shardCharacter] ?? 0) + 1;
-        shardChar.pity = false;
-      } else {
-        shardChar.pity = true;
-      }
-    }
   }
   if (check.boon.bonusMaterialRuns > 0 && check.boon.bonusMaterialQty > 0) {
     gainMat(node.material, check.boon.bonusMaterialRuns * check.boon.bonusMaterialQty);
@@ -466,13 +461,15 @@ export function clearNode(content, state, nodeId, members, count, rng, now = Dat
 
   if (!ns.firstClearClaimed && node.firstClear) {
     for (const m of node.firstClear.materials ?? []) gainMat(m.materialId, m.qty);
+    if (node.encounterCharacter && revealCharacter(content, state, node.encounterCharacter)) {
+      rewards.revealed.push(node.encounterCharacter);
+    }
     if (node.firstClear.shards) {
       rewards.shards[node.firstClear.shards.characterId] =
         (rewards.shards[node.firstClear.shards.characterId] ?? 0) + node.firstClear.shards.qty;
     }
-    if (node.firstClear.archiveFragment && !state.archive.fragments[node.firstClear.archiveFragment]) {
-      state.archive.fragments[node.firstClear.archiveFragment] = true;
-      rewards.fragments.push(node.firstClear.archiveFragment);
+    if (node.firstClear.relicPiece && grantRelicPiece(state, node.firstClear.relicPiece)) {
+      rewards.relicPieces.push(node.firstClear.relicPiece);
     }
     if (node.firstClear.milestone) rewards.milestones.push(node.firstClear.milestone);
     ns.firstClearClaimed = true;
@@ -480,11 +477,11 @@ export function clearNode(content, state, nodeId, members, count, rng, now = Dat
   }
   if (!wasCleared && node.firstClearRewards?.length) {
     rewards.extra ??= [];
-    rewards.extra.push(...grantRewardEntries(content, state, node.firstClearRewards, node.world));
+    rewards.extra.push(...grantRewardEntries(content, state, node.firstClearRewards));
   }
   if (node.repeatRewards?.length) {
     rewards.extra ??= [];
-    for (let run = 0; run < count; run++) rewards.extra.push(...grantRewardEntries(content, state, node.repeatRewards, node.world));
+    for (let run = 0; run < count; run++) rewards.extra.push(...grantRewardEntries(content, state, node.repeatRewards));
   }
 
   if (node.objective && !ns.objectiveClaimed && objectiveSatisfied(content, node.objective, members)) {
@@ -495,19 +492,48 @@ export function clearNode(content, state, nodeId, members, count, rng, now = Dat
 
   for (const [id, qty] of Object.entries(rewards.materials)) addMat(state, id, qty);
   for (const [charId, qty] of Object.entries(rewards.shards)) state.characters[charId].shards += qty;
-  if (shardChar && shardChar.stars < 7) {
-    rewards.pity = shardChar.pity
-      ? 'Guaranteed shard on the next attempt.'
-      : `Normal ${b.shardChanceBp / 100}% shard chance on the next attempt.`;
-  }
   ns.cleared = true;
   consumeCrisisNodeBoons(state, node, check.boon);
+  if (check.surgeApplied) {
+    state.surge = null;
+    rewards.surgeUsed = true;
+    logProgress(state, `A Field Surge carried the party through ${node.displayName}.`, now);
+  }
+
+  // Every point of Energy spent advances Development Focus and, when the node
+  // belongs to a world, that world's Procurement Program.
+  rewards.focusShards = applyFocusEnergy(content, state, check.cost);
+  if (node.world) addProcurementEnergy(content, state, node.world, check.cost);
+  const shardsByWorld = {};
+  const countShards = (characterId, qty) => {
+    const world = content.characterById[characterId]?.world;
+    if (world) shardsByWorld[world] = (shardsByWorld[world] ?? 0) + qty;
+  };
+  for (const [charId, qty] of Object.entries(rewards.shards)) countShards(charId, qty);
+  for (const grant of rewards.focusShards) countShards(grant.characterId, grant.shards);
+  for (const [world, qty] of Object.entries(shardsByWorld)) addDevelopmentShards(content, state, world, qty);
+
+  // Mastery can move for the node's world and for any world whose hero was
+  // just revealed; crossing a rank grants its milestone immediately.
+  const masteryWorlds = new Set();
+  if (node.world) masteryWorlds.add(node.world);
+  for (const characterId of rewards.revealed) {
+    const world = content.characterById[characterId]?.world;
+    if (world) masteryWorlds.add(world);
+  }
+  for (const world of masteryWorlds) {
+    rewards.masteryEvents.push(...applyMasteryMilestones(content, state, world, now));
+  }
+
   const momentum = frontierMomentumPreview(state, { firstClear: !wasCleared, energySpent: check.cost });
   if (momentum.energyRefunded > 0) {
     state.energy = Math.min(b.energy.storageCap, state.energy + momentum.energyRefunded);
     state.energySystems.daily.momentumRefunded += momentum.energyRefunded;
     rewards.energyRefunded = momentum.energyRefunded;
     logProgress(state, `Frontier Momentum returned ${momentum.energyRefunded} Energy after the first clear of ${node.displayName}.`, now);
+  }
+  for (const characterId of rewards.revealed) {
+    logProgress(state, `Encountered ${content.characterById[characterId].displayName} — now a Development Focus target.`, now);
   }
   if (!wasCleared) {
     logProgress(state, `First clear: ${node.displayName}${rewards.firstClear ? ' (first-clear rewards claimed)' : ''}`, now);
@@ -670,7 +696,8 @@ export function completeGearTier(content, state, characterId, now = Date.now()) 
   const def = content.characterById[characterId];
   const complete = cs.gearTier >= content.maxGearTier;
   logProgress(state, `${def.displayName} completed Gear Tier ${check.tier}${complete ? ' — Gear Complete!' : ''} (+${after - before} Power)`, now);
-  return { ok: true, tier: check.tier, powerBefore: before, powerAfter: after, gearComplete: complete };
+  const masteryEvents = applyMasteryMilestones(content, state, def.world, now);
+  return { ok: true, tier: check.tier, powerBefore: before, powerAfter: after, gearComplete: complete, masteryEvents };
 }
 
 // ------------------------------------------------------------- stars / unlock
@@ -694,8 +721,10 @@ export function promoteStar(content, state, characterId, now = Date.now()) {
   cs.stars += 1;
   cleanupCompletedPins(content, state);
   const after = characterPower(content, cs);
-  logProgress(state, `${content.characterById[characterId].displayName} promoted to ${cs.stars} Stars (+${after - before} Power)`, now);
-  return { ok: true, stars: cs.stars, powerBefore: before, powerAfter: after };
+  const def = content.characterById[characterId];
+  logProgress(state, `${def.displayName} promoted to ${cs.stars} Stars (+${after - before} Power)`, now);
+  const masteryEvents = applyMasteryMilestones(content, state, def.world, now);
+  return { ok: true, stars: cs.stars, powerBefore: before, powerAfter: after, masteryEvents };
 }
 
 export function checkUnlockCharacter(content, state, characterId) {
@@ -718,11 +747,13 @@ export function unlockCharacter(content, state, characterId, now = Date.now()) {
   const cs = state.characters[characterId];
   cs.shards -= check.tier.cumulativeShards;
   cs.owned = true;
+  cs.revealed = true;
   cs.stars = check.tier.unlockStar;
   cleanupCompletedPins(content, state);
   const def = content.characterById[characterId];
   logProgress(state, `Unlocked ${def.displayName} at ${cs.stars} Star${cs.stars > 1 ? 's' : ''}!`, now);
-  return { ok: true, stars: cs.stars };
+  const masteryEvents = applyMasteryMilestones(content, state, def.world, now);
+  return { ok: true, stars: cs.stars, masteryEvents };
 }
 
 // ------------------------------------------------------------- parties / pins
@@ -848,41 +879,7 @@ export function cleanupCompletedPins(content, state) {
   return { ok: true, removed: before - state.pins.length };
 }
 
-// ------------------------------------------------------------- archive status
-export function archiveStatus(content, state, worldId) {
-  const archive = content.archiveByWorld[worldId];
-  const collections = archive.collections.map(col => {
-    const relics = col.relics.map(relic => {
-      const owned = relic.fragments.filter(f => state.archive.fragments[f.id]).length;
-      return { relic, owned, total: relic.fragments.length, complete: owned === relic.fragments.length };
-    });
-    const complete = relics.every(r => r.complete);
-    return { collection: col, relics, complete };
-  });
-  const relicsDone = collections.reduce((s, c) => s + c.relics.filter(r => r.complete).length, 0);
-  const relicsTotal = collections.reduce((s, c) => s + c.relics.length, 0);
-  const fragmentsOwned = collections.reduce((s, c) => s + c.relics.reduce((x, r) => x + r.owned, 0), 0);
-  const complete = relicsDone === relicsTotal;
-  return { archive, collections, relicsDone, relicsTotal, fragmentsOwned, fragmentsTotal: relicsTotal * 2, complete };
-}
-
-export function unlockedSkins(content, state, characterId) {
-  const def = content.characterById[characterId];
-  if (!def) return [];
-  const archive = content.archiveByWorld[def.world];
-  if (!archive) return [];
-  const status = archiveStatus(content, state, def.world);
-  const skins = [];
-  status.collections.forEach(col => {
-    const reward = col.collection.rewardSkin;
-    if (col.complete && reward?.characterId === characterId) skins.push(content.skinById[reward.id]);
-  });
-  if (status.complete && archive.fullReward?.characterId === characterId) {
-    skins.push(content.skinById[archive.fullReward.id]);
-  }
-  return skins.filter(Boolean);
-}
-
+// ------------------------------------------------------------- skins
 export function selectSkin(content, state, characterId, skinId) {
   const cs = state.characters[characterId];
   if (!cs || !cs.owned) return { ok: false, reasons: ['Character not owned.'] };

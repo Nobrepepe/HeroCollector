@@ -65,9 +65,11 @@ test('the representative package builds valid, ready runtime content', () => {
   assert.equal(content.worlds[0].id, EXPECTED.worldId, 'hub uuid is the world identity');
   assert.equal(content.characters.length, EXPECTED.characterIds.length);
   assert.equal((content.nodesByCampaign.main ?? []).length, 10);
-  assert.equal((content.nodesByCampaign.shadow ?? []).length, 10);
+  assert.equal(content.nodesByCampaign.shadow, undefined, 'no Shadow Campaign remains');
   assert.equal((content.nodesByCampaign[`wc_${EXPECTED.worldId}`] ?? []).length, 30);
-  assert.ok(content.archiveByWorld[EXPECTED.worldId], 'archive present');
+  assert.ok(content.relicByWorld[EXPECTED.worldId], 'world relic present');
+  assert.equal(content.relicByWorld[EXPECTED.worldId].pieces.length, 4);
+  assert.ok(Object.keys(content.encounterNodesByCharacter).length >= 1, 'encounters reveal heroes');
   assert.ok(content.crises.definitions.length >= 1, 'crisis definitions live');
   assert.ok(content.expeditions.templates.length >= 1, 'expedition templates live');
 
@@ -80,14 +82,12 @@ test('every packaged art class resolves through the media path', () => {
   const { content } = buildFromFixture('valid-v1.zip');
   const images = content.images;
   assert.ok(images.world[EXPECTED.worldId]?.startsWith('hcpkg://'), 'world cover');
-  assert.ok(images.headquarters[EXPECTED.worldId]?.startsWith('hcpkg://'), 'hq art');
   for (const characterId of EXPECTED.characterIds) {
     assert.ok(images.portrait[characterId]?.startsWith('hcpkg://'), `portrait ${characterId}`);
   }
   assert.ok(Object.values(images.equipment).some((url) => url?.startsWith('hcpkg://')), 'equipment art');
-  assert.ok(Object.values(images.relic).some((url) => url?.startsWith('hcpkg://')), 'relic art');
+  assert.ok(Object.values(images.relic).some((url) => url?.startsWith('hcpkg://')), 'relic piece art');
   assert.ok(Object.values(images.crisis).some((url) => url?.startsWith('hcpkg://')), 'crisis art');
-  assert.ok(Object.values(images.facility).some((url) => url?.startsWith('hcpkg://')), 'facility art');
   assert.ok(Object.values(images.skin).length > 0, 'skin art');
 });
 

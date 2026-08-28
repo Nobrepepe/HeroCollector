@@ -10,8 +10,11 @@ import {
   newPlayerState, applyDailyReset, resetDayKey, clearNode, checkClear,
   craftComponent, upcraft, craftEquipment, completeGearTier, promoteStar,
   unlockCharacter, checkCraftEquipment, nodeState, worldCampaignUnlocked,
-  checkCompleteTier, unlockedSkins, selectSkin
+  checkCompleteTier, selectSkin, maxSweepCount
 } from '../src/core/state.js';
+import { unlockedSkins } from '../src/core/mastery.js';
+import { isRevealed } from '../src/core/focus.js';
+import { relicStatus } from '../src/core/relics.js';
 
 const content = loadContent();
 const DAY = 86400000;
@@ -134,52 +137,28 @@ test('clear: success consumes energy, awards first-clear once, unlocks sweep', (
   assert.ok(nodeState(s, 'main_1').cleared);
 });
 
-test('Shadow shard node: matching Main unlock, 5 attempts, pity, and 7-star fallback', () => {
+test('Encounters: the first clear reveals the hero, stakes two shards, exactly once', () => {
   const s = newPlayerState(content, T0);
   const party = ['char_suzume', 'char_hoshi', 'char_ayame', 'char_ashley', 'char_bridget'];
-  // Clear the matching Main path; Shadow nodes do not unlock one another.
   const rng = makeRng(7);
-  clearNode(content, s, 'main_1', party, 1, rng, T0);
-  clearNode(content, s, 'main_2', party, 1, rng, T0);
-  clearNode(content, s, 'main_3', party, 1, rng, T0);
-  const node = content.nodeById.shadow_3;
-  assert.equal(node.type, 'shard');
-  assert.equal(node.shardCharacter, 'char_hoshi');
-
-  const r = clearNode(content, s, 'shadow_3', party, 1, rng, T0);
+  s.energy = 1000;
+  // main_6 carries the first non-starting encounter (char_elian).
+  const node = content.nodeById.main_6;
+  assert.equal(node.encounterCharacter, 'char_elian');
+  assert.ok(!isRevealed(s, 'char_elian'));
+  for (let i = 1; i <= 5; i++) assert.ok(clearNode(content, s, `main_${i}`, party, 1, rng, T0).ok);
+  const r = clearNode(content, s, 'main_6', party, 1, rng, T0);
   assert.ok(r.ok);
-  // attempts cap
-  const r5 = checkClear(content, s, 'shadow_3', party, 5);
-  assert.ok(!r5.ok && r5.reasons.some(x => /attempt/.test(x)));
-  const r4 = clearNode(content, s, 'shadow_3', party, 4, rng, T0);
-  assert.ok(r4.ok);
-  assert.equal(nodeState(s, 'shadow_3').attemptsToday, 5);
-
-  // pity: force a miss then expect a guaranteed shard
-  const s2 = newPlayerState(content, T0);
-  clearNode(content, s2, 'main_1', party, 1, makeRng(1), T0);
-  clearNode(content, s2, 'main_2', party, 1, makeRng(1), T0);
-  clearNode(content, s2, 'main_3', party, 1, makeRng(1), T0);
-  s2.characters.char_hoshi.pity = true;
-  const shardsBefore = s2.characters.char_hoshi.shards;
-  const rr = clearNode(content, s2, 'shadow_3', party, 1, makeRng(999), T0);
-  // first-clear grants 2 fixed shards + guaranteed pity shard = 3
-  assert.equal(s2.characters.char_hoshi.shards, shardsBefore + 3);
-  assert.equal(s2.characters.char_hoshi.pity, false);
-  assert.ok(rr.ok);
-
-  // 7-star: shard roll replaced by guaranteed material
-  const s3 = newPlayerState(content, T0);
-  clearNode(content, s3, 'main_1', party, 1, makeRng(1), T0);
-  clearNode(content, s3, 'main_2', party, 1, makeRng(1), T0);
-  clearNode(content, s3, 'main_3', party, 1, makeRng(1), T0);
-  s3.characters.char_hoshi.stars = 7;
-  const matBefore = s3.inventory.materials[node.material] ?? 0;
-  const r3 = clearNode(content, s3, 'shadow_3', party, 1, makeRng(999), T0);
-  assert.ok(r3.ok);
-  assert.equal(Object.keys(r3.rewards.shards).length - (r3.rewards.firstClear ? 1 : 0), 0);
-  // repeat 1 mat + 7★ replacement 1 mat + first-clear 1 mat = at least 3
-  assert.ok((s3.inventory.materials[node.material] ?? 0) >= matBefore + 3);
+  assert.deepEqual(r.rewards.revealed, ['char_elian']);
+  assert.equal(s.characters.char_elian.shards, 2);
+  assert.ok(isRevealed(s, 'char_elian'));
+  // repeat clears grant no further encounter shards and reveal nothing new
+  const r2 = clearNode(content, s, 'main_6', party, 1, rng, T0);
+  assert.ok(r2.ok);
+  assert.deepEqual(r2.rewards.revealed, []);
+  assert.equal(s.characters.char_elian.shards, 2);
+  // sweeps are Energy-bound only: no per-day attempt limit exists anywhere
+  assert.equal(maxSweepCount(content, s, 'main_6'), Math.floor(s.energy / 6));
 });
 
 test('daily reset: adds 120 up to 240 cap, idempotent, backward clock grants nothing', () => {
@@ -307,35 +286,30 @@ test('world campaign: locked until five world characters owned; world nodes requ
   assert.ok(partyLegality(content, s, pure, wnode).legal);
   const r = clearNode(content, s, 'wc_world_hidden_village_1', pure, 1, makeRng(3), T0);
   assert.ok(r.ok);
-  assert.deepEqual(r.rewards.fragments, ['frag_world_hidden_village_1']);
-  // fragment only once
-  const r2 = clearNode(content, s, 'wc_world_hidden_village_1', pure, 1, makeRng(3), T0);
-  assert.deepEqual(r2.rewards.fragments, []);
 });
 
-test('World shard node keeps its archive reward and enforces the five-run cap', () => {
-  const node = content.nodeById.wc_world_hidden_village_1;
-  const oldShard = node.shardCharacter;
-  const oldFirstClear = node.firstClear;
-  node.shardCharacter = 'char_suzume';
-  node.firstClear = { ...oldFirstClear, shards: { characterId: 'char_suzume', qty: 2 } };
-  try {
-    const s = newPlayerState(content, T0);
-    const party = ['char_suzume', 'char_hoshi', 'char_ayame', 'char_mei', 'char_tsubaki'];
-    maxOut(content, s, party);
-    s.characters.char_suzume.stars = 1;
-    s.energy = 1000;
-    const first = clearNode(content, s, node.id, party, 1, makeRng(7), T0);
-    assert.ok(first.ok);
-    assert.deepEqual(first.rewards.fragments, ['frag_world_hidden_village_1']);
-    assert.ok(first.rewards.shards.char_suzume >= 2);
-    assert.ok(clearNode(content, s, node.id, party, 4, makeRng(8), T0).ok);
-    assert.equal(nodeState(s, node.id).attemptsToday, 5);
-    assert.ok(!checkClear(content, s, node.id, party, 1).ok);
-  } finally {
-    node.shardCharacter = oldShard;
-    node.firstClear = oldFirstClear;
+test('relic pieces: first-clearing nodes 4, 9, 15, 21 reassembles the world relic', () => {
+  const s = newPlayerState(content, T0);
+  const party = ['char_suzume', 'char_hoshi', 'char_ayame', 'char_mei', 'char_tsubaki'];
+  maxOut(content, s, party);
+  s.energy = 10000;
+  const rng = makeRng(11);
+  let pieceClears = 0;
+  for (let n = 1; n <= 21; n++) {
+    const r = clearNode(content, s, `wc_world_hidden_village_${n}`, party, 1, rng, T0);
+    assert.ok(r.ok, `node ${n}: ${r.reasons?.join('; ')}`);
+    if (r.rewards.relicPieces.length) {
+      pieceClears++;
+      assert.deepEqual(r.rewards.relicPieces, [`relic_world_hidden_village_p${pieceClears}`]);
+      assert.ok([4, 9, 15, 21].includes(n));
+    }
   }
+  assert.equal(pieceClears, 4);
+  const status = relicStatus(content, s, 'world_hidden_village');
+  assert.ok(status.complete);
+  // a repeat clear of a piece node never grants the piece again
+  const again = clearNode(content, s, 'wc_world_hidden_village_4', party, 1, rng, T0);
+  assert.deepEqual(again.rewards.relicPieces, []);
 });
 
 test('objective: one-time reward on a qualifying paid clear, never blocks progression', () => {
@@ -366,28 +340,31 @@ test('launch progression blocks crafting beyond the farmable material ceiling', 
   assert.match(conversion.reasons.join(' '), /campaign/i);
 });
 
-test('Archive collections and completion unlock independently selectable skins', () => {
+test('Mastery ranks unlock independently selectable skins', () => {
   const s = newPlayerState(content, T0);
-  const archive = content.archiveByWorld.world_hidden_village;
-  const collection = archive.collections[0];
-  const collectionSkin = collection.rewardSkin;
-  assert.deepEqual(unlockedSkins(content, s, collectionSkin.characterId), []);
+  const world = content.worldById.world_hidden_village;
+  const knownSkin = world.masterySkins.find(entry => entry.rank === 'known');
+  assert.deepEqual(unlockedSkins(content, s, knownSkin.characterId), []);
 
-  for (const relic of collection.relics) {
-    for (const fragment of relic.fragments) s.archive.fragments[fragment.id] = true;
+  // Clearing the whole World Campaign alone is 350 points: Known (200).
+  for (const node of content.nodesByCampaign.wc_world_hidden_village) {
+    s.nodes[node.id] = { cleared: true, firstClearClaimed: true, objectiveClaimed: false };
   }
-  assert.deepEqual(unlockedSkins(content, s, collectionSkin.characterId).map(x => x.id), [collectionSkin.id]);
-  assert.ok(selectSkin(content, s, collectionSkin.characterId, collectionSkin.id).ok);
-  assert.equal(s.characters[collectionSkin.characterId].selectedSkinId, collectionSkin.id);
+  assert.deepEqual(unlockedSkins(content, s, knownSkin.characterId).map(x => x.id), [knownSkin.skinId]);
+  s.characters[knownSkin.characterId].owned = true;
+  assert.ok(selectSkin(content, s, knownSkin.characterId, knownSkin.skinId).ok);
+  assert.equal(s.characters[knownSkin.characterId].selectedSkinId, knownSkin.skinId);
 
-  for (const col of archive.collections) {
-    for (const relic of col.relics) {
-      for (const fragment of relic.fragments) s.archive.fragments[fragment.id] = true;
-    }
+  // Everything maxed reaches Mastered (1000) and unlocks the final skin.
+  const roster = content.characters.filter(d => d.world === world.id).map(d => d.id);
+  maxOut(content, s, roster);
+  for (const id of roster) {
+    s.characters[id].revealed = true;
+    s.characters[id].gearTier = content.maxGearTier;
   }
-  const fullSkin = archive.fullReward;
-  assert.ok(unlockedSkins(content, s, fullSkin.characterId).some(x => x.id === fullSkin.id));
-  s.characters[fullSkin.characterId].owned = true;
-  assert.ok(selectSkin(content, s, fullSkin.characterId, fullSkin.id).ok);
-  assert.ok(!selectSkin(content, s, 'char_suzume', fullSkin.id).ok);
+  for (const piece of content.relicByWorld[world.id].pieces) s.relics.pieces[piece.id] = true;
+  const masteredSkin = world.masterySkins.find(entry => entry.rank === 'mastered');
+  assert.ok(unlockedSkins(content, s, masteredSkin.characterId).some(x => x.id === masteredSkin.skinId));
+  assert.ok(selectSkin(content, s, masteredSkin.characterId, masteredSkin.skinId).ok);
+  assert.ok(!selectSkin(content, s, 'char_suzume', masteredSkin.skinId).ok);
 });

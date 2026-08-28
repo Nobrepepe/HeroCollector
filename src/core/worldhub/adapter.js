@@ -288,7 +288,10 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
   };
 
   return {
-    version: CUSTOM_DB_VERSION,
+    // The adapter still emits the v12 shape (Shadow chapters, HQ, archive);
+    // upgradeCustomDB's v13 step folds it into the current model. The P4
+    // contract revision will make the adapter emit v13 natively.
+    version: 12,
     worlds,
     characters,
     factions,

@@ -140,10 +140,12 @@ function nextStar(content, state, characterId) {
     return { tone: 'quiet', text: `Seven stars. There is no shard milestone left for ${name} to reach.` };
   }
   const need = content.balance.starShards[cs.stars];
-  const source = (content.shardNodesByCharacter[characterId] ?? [])
-    .filter(node => nodeUnlocked(content, state, node).unlocked)
-    .sort((a, b) => a.number - b.number)[0];
-  const where = source ? ` ${nodeLabel(content, source)} still drops them.` : '';
+  const focusSlot = Object.entries(state.focus?.slots ?? {})
+    .find(([, entry]) => entry.characterId === characterId)?.[0] ?? null;
+  const slotName = { primary: 'Primary', secondary: 'Secondary', longTerm: 'Long-term' }[focusSlot];
+  const where = slotName
+    ? ` Your ${slotName} Focus is already earning them.`
+    : ' Development Focus is where they come from.';
   return {
     tone: 'quiet',
     text: `The ${starName(cs.stars + 1)} star asks ${fmt(need)} shards.${where}`

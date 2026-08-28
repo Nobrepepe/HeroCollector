@@ -36,21 +36,8 @@ export function characterPower(content, charState) {
   return characterPowerBreakdown(content, charState).total;
 }
 
-// Power a Training path grants to every character of its world, by level.
-// The Headquarters screen states this in words, so the table lives here rather
-// than being restated where it is rendered.
-const TRAINING_POWER_BY_LEVEL = [0, 25, 50, 100];
-
-export function trainingPowerBonus(level) {
-  return TRAINING_POWER_BY_LEVEL[level] ?? 0;
-}
-
 export function characterPowerForState(content, state, characterId) {
-  const def = content.characterById[characterId];
-  const base = characterPower(content, state.characters[characterId]);
-  const training = def ? content.worldById[def.world]?.hq?.facilities.find(f => f.category === 'training') : null;
-  const level = training ? state.headquarters?.worlds?.[def.world]?.facilities?.[training.id] ?? 0 : 0;
-  return base + trainingPowerBonus(level);
+  return characterPower(content, state.characters[characterId]);
 }
 
 export function maxCharacterPower(content) {

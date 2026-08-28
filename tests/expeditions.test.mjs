@@ -4,14 +4,18 @@ import { loadContent } from './helpers.mjs';
 import { newPlayerState, applyDailyReset } from '../src/core/state.js';
 import { makeRng } from '../src/core/rng.js';
 import {
-  cancelExpedition, evaluateRequirement, generateExpeditionBoard, launchExpedition,
-  offerFeasibility, previewExpedition, rerollOffer, togglePinOffer
+  cancelCycle, evaluateRequirement, generateCycleBoard, launchCycle,
+  offerFeasibility, previewExpedition, rerollOffer, togglePinOffer, resolveDueCycle
 } from '../src/core/expeditions.js';
 import { fieldSupplyLimits } from '../src/core/energy.js';
 
 const content = loadContent();
 const T0 = Date.parse('2026-07-25T12:00:00');
 const DAY = 86400000;
+
+function advanceDays(localContent, state, days) {
+  for (let d = 1; d <= days; d++) applyDailyReset(localContent, state, T0 + d * DAY);
+}
 
 test('requirements and result tiers are declarative and immediate', () => {
   const state = newPlayerState(content, T0);
@@ -24,48 +28,76 @@ test('requirements and result tiers are declarative and immediate', () => {
     partySize: 2, recommendedPower: 1,
     requirements: [{ type: 'party_size', count: 2, text: 'Send two.' }],
     optional: { type: 'distinct_archetypes', count: 1, text: 'Bring breadth.' },
-    baseRewards: [{ kind: 'resource', id: 'renown', qty: 10 }]
+    baseRewards: [{ kind: 'material', id: 'mat_metal_basic', qty: 10 }]
   };
   assert.equal(previewExpedition(content, state, offer, ids).tier, 'exceptional');
 });
 
-test('board persists, has five offers, and fallback keeps offers feasible', () => {
+test('the cycle board has five routes, stays feasible, and waits indefinitely', () => {
   const state = newPlayerState(content, T0);
-  const board = generateExpeditionBoard(content, state, makeRng(7), { seed: 7 });
+  const board = state.expeditions.board;
   assert.equal(board.offers.length, 5);
+  assert.equal(board.cycle, 1);
   assert.ok(board.offers.filter(o => offerFeasibility(content, state, o).feasible).length >= 2);
-  assert.equal(state.expeditions.board, board);
+  // days pass; the unlaunched board never expires or regenerates
+  const offerIds = board.offers.map(o => o.id);
+  advanceDays(content, state, 6);
+  assert.deepEqual(state.expeditions.board.offers.map(o => o.id), offerIds);
+  assert.equal(state.expeditions.cycle, 1);
 });
 
-test('a random-material reward draws every family at its authored grade', () => {
+test('recommended Power scales from the strongest owned heroes, not the roster average', () => {
   const state = newPlayerState(content, T0);
-  const drawn = new Set();
+  // Promote two heroes far above the rest; a 2-person route must price for them.
+  state.characters.char_suzume.stars = 7;
+  state.characters.char_suzume.gearTier = content.maxGearTier;
+  state.characters.char_hoshi.stars = 7;
+  state.characters.char_hoshi.gearTier = content.maxGearTier;
+  const board = generateCycleBoard(content, state, makeRng(3));
+  const twoPerson = board.offers.find(o => o.partySize === 2);
+  if (twoPerson) {
+    const topSum = 3530 * 2;
+    assert.ok(twoPerson.recommendedPower >= Math.round(topSum * 0.85), `${twoPerson.recommendedPower} prices the top pair`);
+  }
+});
+
+test('a random-material reward draws real materials at the authored grade', () => {
+  const state = newPlayerState(content, T0);
+  const basicFamilies = new Set();
   for (let seed = 0; seed < 40; seed++) {
-    const board = generateExpeditionBoard(content, state, makeRng(seed), { seed });
+    const board = generateCycleBoard(content, state, makeRng(seed));
     for (const offer of board.offers) {
       for (const reward of offer.baseRewards) {
         if (reward.kind !== 'material') continue;
         assert.ok(content.materialById[reward.id], `unresolved material ${reward.id}`);
-        assert.equal(content.materialById[reward.id].grade, 'basic');
-        drawn.add(content.materialById[reward.id].family);
+        if (reward.grade) assert.equal(content.materialById[reward.id].grade, reward.grade);
+        if (content.materialById[reward.id].grade === 'basic') basicFamilies.add(content.materialById[reward.id].family);
       }
     }
   }
-  assert.equal(drawn.size, content.materialMeta.familyOrder.length);
+  assert.equal(basicFamilies.size, content.materialMeta.familyOrder.length);
+});
+
+test('cycle rewards are visibly scaled up by cycleScaleBp on the board itself', () => {
+  const state = newPlayerState(content, T0);
+  const scaleBp = content.expeditions.settings.cycleScaleBp;
+  assert.ok(scaleBp > 10000);
+  const board = generateCycleBoard(content, state, makeRng(9));
+  const packageMax = Math.max(...content.expeditions.rewardPackages.flatMap(p => p.entries.map(e => e.max ?? 0)));
+  const anyLarge = board.offers.some(offer => offer.baseRewards.some(entry => (entry.qty ?? 0) > packageMax));
+  assert.ok(anyLarge, 'board quantities exceed unscaled authored maxima');
 });
 
 test('board generation supports libraries without a guaranteed Supply template', () => {
   const localContent = loadContent();
   localContent.expeditions.settings.guaranteedSupplyTemplateId = null;
   const state = newPlayerState(localContent, T0);
-
   assert.equal(state.expeditions.board.offers.length, 5);
   assert.equal(state.expeditions.board.offers.some(offer => offer.offerKind === 'supply'), false);
   assert.doesNotThrow(() => applyDailyReset(localContent, state, T0 + DAY));
-  assert.equal(state.expeditions.board.day, 2);
 });
 
-test('across-world offers never receive an impossible associated-world requirement', () => {
+test('across-world routes never receive an impossible associated-world requirement', () => {
   const localContent = loadContent();
   const template = structuredClone(localContent.expeditions.templates[0]);
   template.id = 'across_world_regression';
@@ -77,61 +109,147 @@ test('across-world offers never receive an impossible associated-world requireme
   localContent.expeditions.fallbackTemplate = template;
   localContent.expeditions.settings.guaranteedSupplyTemplateId = null;
   const state = newPlayerState(localContent, T0);
-
   assert.ok(state.expeditions.board.offers.every(offer => offer.world === null));
   assert.ok(state.expeditions.board.offers.every(offer =>
     !offer.requirements.some(requirement => requirement.world === '@associated')));
 });
 
-test('every board has exactly one fixed, unscaled Supply offer', () => {
+test('every board has exactly one fixed, unscaled Supply route', () => {
   for (let seed = 0; seed < 40; seed++) {
     const state = newPlayerState(content, T0);
-    const board = generateExpeditionBoard(content, state, makeRng(seed), { seed });
+    const board = generateCycleBoard(content, state, makeRng(seed));
     const offers = board.offers.filter(offer => offer.offerKind === 'supply');
     assert.equal(offers.length, 1);
     assert.deepEqual(offers[0].fixedRewards.map(entry => [entry.id, entry.qty]), [['field_supply', 1]]);
-    const ids = offerFeasibility(content, state, offers[0]).party;
-    if (ids) {
-      const preview = previewExpedition(content, state, offers[0], ids);
-      assert.equal(preview.rewards.find(entry => entry.id === 'field_supply').qty, 1);
-    }
   }
 });
 
-test('Supply launches reserve capacity and cancellation releases it', () => {
+test('launching the Supply route reserves capacity; cancelling the cycle releases it', () => {
   const state = newPlayerState(content, T0);
   const offer = state.expeditions.board.offers.find(item => item.offerKind === 'supply');
   const party = offerFeasibility(content, state, offer).party;
-  const launch = launchExpedition(content, state, offer.id, party);
-  assert.equal(launch.ok, true);
+  assert.ok(party, 'supply route is feasible');
+  const launch = launchCycle(content, state, [{ offerId: offer.id, party }]);
+  assert.equal(launch.ok, true, launch.reasons?.join('; '));
   assert.equal(fieldSupplyLimits(content, state).reserved, 1);
-  assert.equal(cancelExpedition(state, launch.active.id).ok, true);
+  assert.equal(cancelCycle(state).ok, true);
   assert.equal(fieldSupplyLimits(content, state).reserved, 0);
+  assert.ok(state.expeditions.board);
 });
 
-test('launch prevents duplicate assignment, snapshots, and cancellation is launch-day only', () => {
+test('a cycle launches together, blocks overlapping parties, and returns together', () => {
   const state = newPlayerState(content, T0);
-  const offer = state.expeditions.board.offers.find(o => offerFeasibility(content, state, o).feasible);
-  const party = offerFeasibility(content, state, offer).party;
-  const launched = launchExpedition(content, state, offer.id, party);
-  assert.equal(launched.ok, true);
-  const other = state.expeditions.board.offers.find(o => o.partySize === party.length);
-  if (other) assert.equal(launchExpedition(content, state, other.id, party).ok, false);
-  assert.equal(cancelExpedition(state, launched.active.id).ok, true);
-  const relaunchedOffer = state.expeditions.board.offers.find(o => offerFeasibility(content, state, o).feasible);
-  const relaunched = launchExpedition(content, state, relaunchedOffer.id, offerFeasibility(content, state, relaunchedOffer).party);
-  state.dayNumber++;
-  assert.equal(cancelExpedition(state, relaunched.active.id).ok, false);
+  const board = state.expeditions.board;
+  const feasible = board.offers
+    .map(offer => ({ offer, party: offerFeasibility(content, state, offer).party }))
+    .filter(entry => entry.party);
+  assert.ok(feasible.length >= 2);
+  // overlapping parties are rejected as one commitment
+  const overlap = launchCycle(content, state, [
+    { offerId: feasible[0].offer.id, party: feasible[0].party },
+    { offerId: feasible[1].offer.id, party: feasible[0].party.slice(0, feasible[1].offer.partySize) }
+  ]);
+  assert.equal(overlap.ok, false);
+  // disjoint parties launch together
+  const used = new Set(feasible[0].party);
+  const second = feasible.slice(1).map(entry => ({
+    ...entry, party: offerFeasibilityDisjoint(content, state, entry.offer, used)
+  })).find(entry => entry.party);
+  const selections = [{ offerId: feasible[0].offer.id, party: feasible[0].party }];
+  if (second) selections.push({ offerId: second.offer.id, party: second.party });
+  const launch = launchCycle(content, state, selections);
+  assert.equal(launch.ok, true, launch.reasons?.join('; '));
+  assert.equal(state.expeditions.board, null);
+  assert.equal(state.expeditions.active.returnDay, state.dayNumber + content.expeditions.settings.cycleLengthDays);
+  // nothing resolves early; everything resolves together at the return day
+  advanceDays(content, state, content.expeditions.settings.cycleLengthDays - 1);
+  assert.ok(state.expeditions.active);
+  advanceDays(content, state, content.expeditions.settings.cycleLengthDays);
+  assert.equal(state.expeditions.active, null);
+  assert.equal(state.expeditions.reports.length, 1);
+  assert.equal(state.expeditions.reports[0].routes.length, selections.length);
+  assert.equal(state.expeditions.cycle, 2);
+  assert.ok(state.expeditions.board); // the next board is already waiting
 });
 
-test('reroll usage and pin persistence consume the intended daily actions', () => {
+function offerFeasibilityDisjoint(localContent, state, offer, used) {
+  const ids = localContent.characters
+    .filter(d => state.characters[d.id]?.owned && !used.has(d.id)).map(d => d.id);
+  if (ids.length < offer.partySize) return null;
+  // greedy: try the first combination that previews valid
+  const combo = ids.slice(0, offer.partySize);
+  return previewExpedition(localContent, state, offer, combo).valid ? combo : null;
+}
+
+test('character-lead routes take a chosen revealed hero of the route world', () => {
+  const localContent = loadContent();
+  const lead = localContent.expeditions.templates.find(t =>
+    t.world && localContent.expeditions.rewardById[t.rewardPackageId]?.shardPool);
+  assert.ok(lead, 'sample library has a world-scoped character-lead template');
+  localContent.expeditions.templates = [lead];
+  localContent.expeditions.templateById = { [lead.id]: lead };
+  localContent.expeditions.fallbackTemplate = lead;
+  localContent.expeditions.settings.guaranteedSupplyTemplateId = null;
+  const state = newPlayerState(localContent, T0);
+  for (const def of localContent.characters) if (state.characters[def.id].owned) state.characters[def.id].stars = 3;
+  generateCycleBoard(localContent, state, makeRng(5));
+  const offer = state.expeditions.board.offers.find(o => o.baseRewards.some(e => e.kind === 'shards' && e.choice));
+  assert.ok(offer);
+  const party = offerFeasibility(localContent, state, offer).party;
+  assert.ok(party);
+  // no choice: refused
+  assert.equal(launchCycle(localContent, state, [{ offerId: offer.id, party }]).ok, false);
+  // a hero of another world: refused
+  const outsider = localContent.characters.find(d => d.world !== offer.world && state.characters[d.id].owned);
+  assert.equal(launchCycle(localContent, state, [{ offerId: offer.id, party, shardChoiceCharacterId: outsider.id }]).ok, false);
+  // a revealed hero of the route's world: accepted, and the shards land on them
+  const chosen = localContent.characters.find(d => d.world === offer.world && state.characters[d.id].owned);
+  const launch = launchCycle(localContent, state, [{ offerId: offer.id, party, shardChoiceCharacterId: chosen.id }]);
+  assert.equal(launch.ok, true, launch.reasons?.join('; '));
+  const shardsBefore = state.characters[chosen.id].shards;
+  advanceDays(localContent, state, localContent.expeditions.settings.cycleLengthDays);
+  assert.ok(state.characters[chosen.id].shards > shardsBefore);
+});
+
+test('rerolls and pins are per-cycle; a pinned unlaunched route carries to the next board', () => {
   const state = newPlayerState(content, T0);
   const first = state.expeditions.board.offers.find(offer => offer.offerKind !== 'supply');
   assert.equal(rerollOffer(content, state, first.id, makeRng(8)).ok, true);
-  assert.equal(state.expeditions.daily.freeRerollsUsed, 1);
-  const pinned = state.expeditions.board.offers[1];
-  state.expeditions.daily.freePins = 1;
+  assert.equal(state.expeditions.allowances.freeRerollsUsed, 1);
+  const pinned = state.expeditions.board.offers.find(offer => offer.offerKind !== 'supply');
   assert.equal(togglePinOffer(content, state, pinned.id).ok, true);
-  applyDailyReset(content, state, T0 + DAY);
+  assert.equal(state.expeditions.allowances.freePinsUsed, 1);
+  // launch a different route; the pinned one carries into the next cycle
+  const other = state.expeditions.board.offers
+    .filter(o => o.id !== pinned.id)
+    .map(o => ({ o, party: offerFeasibility(content, state, o).party }))
+    .find(entry => entry.party);
+  assert.ok(other);
+  assert.equal(launchCycle(content, state, [{ offerId: other.o.id, party: other.party }]).ok, true);
+  advanceDays(content, state, content.expeditions.settings.cycleLengthDays);
   assert.ok(state.expeditions.board.offers.some(o => o.id === pinned.id));
+  // fresh board, fresh allowances
+  assert.equal(state.expeditions.allowances.freeRerollsUsed, 0);
+  assert.equal(state.expeditions.allowances.freePinsUsed, 0);
+});
+
+test('an Operations boost visibly improves the next board routes of its world', () => {
+  const state = newPlayerState(content, T0);
+  const world = content.worlds[0];
+  state.programs[world.id] = {
+    procurement: { meter: 0, delivered: 0, family: null },
+    development: { meter: 0, delivered: 0, heroId: null },
+    operations: { meter: 0, delivered: 0, boostCycles: 1 },
+    relicSlot: null
+  };
+  // regenerate boards until one carries a route from that world
+  for (let seed = 0; seed < 60 && state.programs[world.id].operations.boostCycles > 0; seed++) {
+    generateCycleBoard(content, state, makeRng(seed));
+  }
+  assert.equal(state.programs[world.id].operations.boostCycles, 0);
+  const boosted = state.expeditions.board.offers.filter(o => o.world === world.id);
+  assert.ok(boosted.length >= 1);
+  for (const offer of boosted) {
+    assert.ok(offer.baseRewards.some(entry => entry.operations), 'boosted route shows its bonus bundle');
+  }
 });

@@ -1,12 +1,11 @@
 import { characterPowerForState } from './power.js';
-import { hqRank } from './hq.js';
+import { masteryRankAtLeast } from './mastery.js';
 import { grantRewardEntries } from './resources.js';
 import { fieldSupplyLimits, FIELD_SUPPLY_ID } from './energy.js';
 import { makeRng } from './rng.js';
 
 export const CRISIS_BOON_TYPES = new Set([
-  'free_world_node_runs', 'bonus_world_material_runs', 'world_expedition_renown_bp',
-  'next_hq_production_bp', 'instant_intelligence'
+  'free_world_node_runs', 'bonus_world_material_runs', 'instant_intelligence'
 ]);
 
 const shuffle = (rng, list) => {
@@ -27,11 +26,9 @@ export function crisisDayRng(state, day = state.dayNumber) {
 
 export function crisisGrade(content, state, worldId) {
   const owned = content.characters.filter(def => state.characters[def.id]?.owned).length;
-  const world = content.worldById[worldId];
-  const rank = world?.hq?.enabled ? hqRank(content, state, worldId) : 0;
   const grades = content.crises?.settings?.grades ?? [];
   return [...grades].reverse().find(grade => owned >= grade.minOwned
-    && (rank >= grade.minHqRank || (grade.allowNoHq && !world?.hq?.enabled))) ?? null;
+    && masteryRankAtLeast(content, state, worldId, grade.minMasteryRank)) ?? null;
 }
 
 export function eligibleCrisisDefinitions(content, state) {

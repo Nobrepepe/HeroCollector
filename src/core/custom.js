@@ -318,7 +318,7 @@ export function upgradeCustomDB(db) {
     }
     for (const pack of out.expeditions.rewardPackages ?? []) {
       pack.entries = (pack.entries ?? []).map(mapPackEntry);
-      pack.rare = (pack.rare ?? []).map(mapPackEntry);
+      if (Array.isArray(pack.rare)) pack.rare = pack.rare.map(mapPackEntry);
     }
     for (const template of out.expeditions.templates ?? []) delete template.durations;
     if (out.expeditions.fallbackTemplate) delete out.expeditions.fallbackTemplate.durations;

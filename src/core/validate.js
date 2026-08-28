@@ -282,10 +282,14 @@ export function validateContent(content) {
 }
 
 // Save-file validation: every ID the save references must exist in content.
+// Dormant progress (nodes, relic pieces, Mastery entries, character state for
+// content that left the game) is deliberately tolerated — it returns when the
+// content does.
 export function validateSave(content, state) {
   const errors = [];
-  if (![1, 2, 3, 4, 5].includes(state.schemaVersion)) errors.push(`Unsupported save schema ${state.schemaVersion}`);
-  if (!state.characters || !state.inventory || !state.nodes || !Array.isArray(state.parties)) {
+  if (state.schemaVersion !== 6) errors.push(`Unsupported save schema ${state.schemaVersion}`);
+  if (!state.characters || !state.inventory || !state.nodes || !Array.isArray(state.parties)
+    || !state.focus?.slots || typeof state.programs !== 'object' || !state.relics?.pieces || typeof state.mastery !== 'object') {
     return { ok: false, errors: ['Save is missing required gameplay state.'] };
   }
   for (const id of Object.keys(state.characters)) {
@@ -305,49 +309,119 @@ export function validateSave(content, state) {
   for (const [id, qty] of Object.entries(state.inventory.resources ?? {})) {
     if (!Number.isFinite(qty) || qty < 0) errors.push(`Invalid resource quantity: ${id}`);
   }
-  if (state.schemaVersion >= 3) {
-    if (!Number.isInteger(state.dayNumber) || state.dayNumber < 1) errors.push('Invalid logical day number');
-    if (!state.expeditions || !Array.isArray(state.expeditions.active) || !Array.isArray(state.expeditions.reports)) {
-      errors.push('Missing Expedition state');
-    }
-    if (!state.headquarters || typeof state.headquarters.worlds !== 'object') errors.push('Missing Headquarters state');
+  if (!Number.isInteger(state.dayNumber) || state.dayNumber < 1) errors.push('Invalid logical day number');
+
+  // --- Energy systems and Field Supplies
+  const daily = state.energySystems?.daily;
+  if (!daily || !Number.isInteger(daily.day)
+    || !Number.isInteger(daily.momentumRefunded) || daily.momentumRefunded < 0 || daily.momentumRefunded > 30) {
+    errors.push('Invalid daily Energy-system counters');
   }
-  if (state.schemaVersion >= 4) {
-    const daily = state.energySystems?.daily;
-    if (!daily || !Number.isInteger(daily.day) || !Number.isInteger(daily.suppliesUsed)
-      || !Number.isInteger(daily.momentumRefunded) || daily.suppliesUsed < 0 || daily.momentumRefunded < 0 || daily.momentumRefunded > 30) {
-      errors.push('Invalid daily Energy-system counters');
+  if (daily?.day !== state.dayNumber) errors.push('Daily Energy-system counters are for the wrong game day');
+  const supply = state.inventory.resources?.[FIELD_SUPPLY_ID] ?? 0;
+  const supplyLimits = fieldSupplyLimits(content, state);
+  if (!Number.isInteger(supply) || supply < 0 || supply > supplyLimits.storageCap) errors.push('Invalid Field Supply quantity');
+  if (supplyLimits.held + supplyLimits.reserved > supplyLimits.storageCap) errors.push('Field Supply promises exceed available storage');
+  if (state.surge !== null && (!Number.isInteger(state.surge?.bp) || state.surge.bp < 1)) errors.push('Invalid armed Surge');
+
+  // --- Development Focus
+  const focusIds = [];
+  for (const slot of ['primary', 'secondary', 'longTerm']) {
+    const entry = state.focus.slots[slot];
+    if (!entry) { errors.push(`Missing Focus slot ${slot}`); continue; }
+    const rate = content.balance.focus?.rates?.[slot];
+    if (!Number.isInteger(entry.progress) || entry.progress < 0 || (rate && entry.progress >= rate)) {
+      errors.push(`Invalid Focus progress in ${slot}`);
     }
-    if (daily?.day !== state.dayNumber) errors.push('Daily Energy-system counters are for the wrong game day');
-    const supply = state.inventory.resources?.[FIELD_SUPPLY_ID] ?? 0;
-    const supplyLimits = fieldSupplyLimits(content, state);
-    if (!Number.isInteger(supply) || supply < 0 || supply > supplyLimits.storageCap) errors.push('Invalid Field Supply quantity');
-    if (supplyLimits.held + supplyLimits.reserved > supplyLimits.storageCap) errors.push('Field Supply promises exceed available storage');
-    if (daily?.suppliesUsed > supplyLimits.dailyUseCap) errors.push('Field Supply uses exceed the daily limit');
-    if (!state.crises || !Array.isArray(state.crises.cycleSeen) || !Array.isArray(state.crises.history)) errors.push('Missing Crisis state');
-    if (state.crises?.lastSpawnDay !== null && (!Number.isInteger(state.crises.lastSpawnDay) || state.crises.lastSpawnDay < 2)) errors.push('Invalid last Crisis spawn day');
-    if (state.crises?.cycleSeen?.some(id => typeof id !== 'string')) errors.push('Invalid Crisis cycle history');
-    const active = state.crises?.active;
-    if (active) {
-      if (!content.crisisById[active.definitionId] || !content.worldById[active.worldId]) errors.push('Active Crisis references stale content');
-      if (!['planning', 'resolved'].includes(active.status)) errors.push('Invalid active Crisis status');
-      if (!Array.isArray(active.frontIds) || active.frontIds.length !== active.fronts?.length || new Set(active.frontIds).size !== active.frontIds.length) errors.push('Invalid active Crisis Front snapshot');
-      for (const frontId of active.frontIds ?? []) {
-        if (!Array.isArray(active.assignments?.[frontId]) || active.assignments[frontId].length !== active.teamSize) errors.push(`Invalid Crisis assignment slots for ${frontId}`);
+    if (entry.characterId !== null) {
+      if (!state.characters[entry.characterId]) errors.push(`Focus slot ${slot} references unknown character ${entry.characterId}`);
+      focusIds.push(entry.characterId);
+    }
+  }
+  if (new Set(focusIds).size !== focusIds.length) errors.push('The same hero occupies two Focus slots');
+
+  // --- World Programs
+  for (const [worldId, ps] of Object.entries(state.programs)) {
+    for (const program of ['procurement', 'development', 'operations']) {
+      if (!Number.isInteger(ps[program]?.meter) || ps[program].meter < 0) errors.push(`Invalid ${program} meter for ${worldId}`);
+      if (!Number.isInteger(ps[program]?.delivered) || ps[program].delivered < 0) errors.push(`Invalid ${program} delivery count for ${worldId}`);
+    }
+    if (ps.relicSlot !== null && !['procurement', 'development', 'operations'].includes(ps.relicSlot)) {
+      errors.push(`Invalid relic slot for ${worldId}`);
+    }
+    if (!content.worldById[worldId]) continue; // dormant world: structure only
+    if (ps.procurement.family !== null && !content.materialMeta.familyOrder.includes(ps.procurement.family)) {
+      errors.push(`Unknown Procurement family for ${worldId}`);
+    }
+    if (ps.development.heroId !== null && content.characterById[ps.development.heroId]?.world !== worldId) {
+      errors.push(`Invalid Development hero for ${worldId}`);
+    }
+  }
+
+  // --- relic pieces and Mastery
+  for (const [pieceId, value] of Object.entries(state.relics.pieces)) {
+    if (value !== true) errors.push(`Invalid relic piece state: ${pieceId}`);
+  }
+  const rankIds = new Set((content.balance.mastery?.ranks ?? []).map(rank => rank.id));
+  for (const [worldId, entry] of Object.entries(state.mastery)) {
+    if (!Array.isArray(entry.claimedRanks) || !Array.isArray(entry.pendingChoices)) {
+      errors.push(`Invalid Mastery state for ${worldId}`);
+      continue;
+    }
+    for (const rankId of entry.claimedRanks) {
+      if (rankIds.size && !rankIds.has(rankId)) errors.push(`Unknown claimed Mastery rank ${rankId} for ${worldId}`);
+    }
+    for (const choice of entry.pendingChoices) {
+      if (!['materialCache', 'shards'].includes(choice.kind) || !Number.isInteger(choice.qty) || choice.qty < 1) {
+        errors.push(`Invalid pending Mastery choice for ${worldId}`);
       }
-      const assigned = Object.values(active.assignments ?? {}).flat().filter(Boolean);
-      if (new Set(assigned).size !== assigned.length) errors.push('Active Crisis contains duplicate character assignments');
-      for (const id of assigned) if (!content.characterById[id] || !state.characters[id]?.owned) errors.push(`Active Crisis references unavailable character ${id}`);
-      if (active.cacheClaimed && !active.result?.cacheChoiceId) errors.push('Claimed Crisis Cache has no recorded choice');
-      if (active.status === 'resolved' && assigned.length !== active.frontIds.length * active.teamSize) errors.push('Resolved Crisis has an incomplete assignment');
-      if (active.boon && !CRISIS_BOON_TYPES.has(active.boon.type)) errors.push(`Invalid active Crisis boon ${active.boon.type}`);
     }
   }
-  for (const id of Object.keys(state.nodes)) {
-    if ((state.nodes[id].attemptsToday ?? 0) < 0) errors.push(`Negative attempt count: ${id}`);
+
+  // --- Expedition cycle
+  const expeditions = state.expeditions;
+  if (!expeditions || !Number.isInteger(expeditions.cycle) || expeditions.cycle < 1
+    || !Array.isArray(expeditions.reports)) {
+    errors.push('Missing Expedition state');
+  } else {
+    const allowances = expeditions.allowances;
+    if (!allowances || !Number.isInteger(allowances.freeRerollsUsed) || !Number.isInteger(allowances.freePinsUsed)) {
+      errors.push('Invalid Expedition allowances');
+    }
+    if (expeditions.board !== null && !Array.isArray(expeditions.board?.offers)) errors.push('Invalid route board');
+    const active = expeditions.active;
+    if (active !== null) {
+      if (!Array.isArray(active.routes) || !Number.isInteger(active.launchDay)
+        || !Number.isInteger(active.returnDay) || active.returnDay <= active.launchDay) {
+        errors.push('Invalid launched cycle');
+      } else {
+        const away = active.routes.flatMap(route => route.party);
+        if (new Set(away).size !== away.length) errors.push('A character is on two routes of the launched cycle');
+      }
+    }
   }
-  for (const id of Object.keys(state.archive.fragments)) {
-    if (typeof state.archive.fragments[id] !== 'boolean') errors.push(`Invalid fragment state: ${id}`);
+
+  // --- Crises
+  if (!state.crises || !Array.isArray(state.crises.cycleSeen) || !Array.isArray(state.crises.history)) errors.push('Missing Crisis state');
+  if (state.crises?.lastSpawnDay !== null && (!Number.isInteger(state.crises.lastSpawnDay) || state.crises.lastSpawnDay < 2)) errors.push('Invalid last Crisis spawn day');
+  if (state.crises?.cycleSeen?.some(id => typeof id !== 'string')) errors.push('Invalid Crisis cycle history');
+  const active = state.crises?.active;
+  if (active) {
+    if (!content.crisisById[active.definitionId] || !content.worldById[active.worldId]) errors.push('Active Crisis references stale content');
+    if (!['planning', 'resolved'].includes(active.status)) errors.push('Invalid active Crisis status');
+    if (!Array.isArray(active.frontIds) || active.frontIds.length !== active.fronts?.length || new Set(active.frontIds).size !== active.frontIds.length) errors.push('Invalid active Crisis Front snapshot');
+    for (const frontId of active.frontIds ?? []) {
+      if (!Array.isArray(active.assignments?.[frontId]) || active.assignments[frontId].length !== active.teamSize) errors.push(`Invalid Crisis assignment slots for ${frontId}`);
+    }
+    const assigned = Object.values(active.assignments ?? {}).flat().filter(Boolean);
+    if (new Set(assigned).size !== assigned.length) errors.push('Active Crisis contains duplicate character assignments');
+    for (const id of assigned) if (!content.characterById[id] || !state.characters[id]?.owned) errors.push(`Active Crisis references unavailable character ${id}`);
+    if (active.cacheClaimed && !active.result?.cacheChoiceId) errors.push('Claimed Crisis Cache has no recorded choice');
+    if (active.status === 'resolved' && assigned.length !== active.frontIds.length * active.teamSize) errors.push('Resolved Crisis has an incomplete assignment');
+    if (active.boon && !CRISIS_BOON_TYPES.has(active.boon.type)) errors.push(`Invalid active Crisis boon ${active.boon.type}`);
+  }
+  for (const [id, ns] of Object.entries(state.nodes)) {
+    if (typeof ns.cleared !== 'boolean') errors.push(`Invalid node state: ${id}`);
   }
   for (const party of state.parties) {
     if (!Array.isArray(party.members) || party.members.length !== content.balance.partySize) {
@@ -380,49 +454,40 @@ export function validateSave(content, state) {
     if (pin.type === 'equipment' && !content.characterMeta.slots[pin.slot]) {
       errors.push(`Pin references unknown equipment slot ${pin.slot}`);
     }
-    if (pin.type === 'character' && state.schemaVersion >= 2) {
+    if (pin.type === 'character') {
       if (!['unlock', 'promotion'].includes(pin.objective)) errors.push(`Shard pin ${pin.characterId} has an invalid objective`);
       if (!Number.isInteger(pin.targetStars) || pin.targetStars < 1 || pin.targetStars > 7) {
         errors.push(`Shard pin ${pin.characterId} has an invalid target`);
       }
     }
   }
-  if (state.schemaVersion >= 2) {
-    const ui = state.ui;
-    if (!ui || typeof ui !== 'object') {
-      errors.push('Missing UI preferences');
-    } else {
-      const roster = ui.roster ?? {};
-      const allowed = {
-        world: new Set(['all', ...content.worlds.map(w => w.id)]),
-        archetype: new Set(['all', ...Object.keys(content.archetypes)]),
-        faction: new Set(['all', ...content.tags.filter(t => t.category === 'faction').map(t => t.id)]),
-        ownership: new Set(['all', 'owned', 'unowned', 'ready']),
-        sort: new Set(['name', 'power', 'stars', 'gearTier', 'ready']),
-        direction: new Set(['asc', 'desc'])
-      };
-      for (const [key, values] of Object.entries(allowed)) {
-        if (!values.has(roster[key])) errors.push(`Invalid roster preference ${key}`);
-      }
-      const campaigns = new Set(['main', 'shadow', ...content.worlds.map(w => w.campaignId)]);
-      if (!campaigns.has(ui.campaignId)) errors.push(`Unknown campaign preference ${ui.campaignId}`);
-      for (const [nodeId, index] of Object.entries(ui.nodePartyById ?? {})) {
-        if (!content.nodeById[nodeId]) errors.push(`Party preference references unknown node ${nodeId}`);
-        if (!Number.isInteger(index) || index < 0 || index >= state.parties.length) {
-          errors.push(`Invalid party preference index for ${nodeId}`);
-        }
-      }
-      for (const [id, value] of Object.entries(ui.archiveCollapsed?.worlds ?? {})) {
-        if (!content.worldById[id] || typeof value !== 'boolean') errors.push(`Invalid Archive world preference ${id}`);
-      }
-      const collectionIds = new Set(content.archives.flatMap(a => a.collections.map(c => c.id)));
-      for (const [id, value] of Object.entries(ui.archiveCollapsed?.collections ?? {})) {
-        if (!collectionIds.has(id) || typeof value !== 'boolean') errors.push(`Invalid Archive collection preference ${id}`);
+  const ui = state.ui;
+  if (!ui || typeof ui !== 'object') {
+    errors.push('Missing UI preferences');
+  } else {
+    const roster = ui.roster ?? {};
+    const allowed = {
+      world: new Set(['all', ...content.worlds.map(w => w.id)]),
+      archetype: new Set(['all', ...Object.keys(content.archetypes)]),
+      faction: new Set(['all', ...content.tags.filter(t => t.category === 'faction').map(t => t.id)]),
+      ownership: new Set(['all', 'owned', 'unowned', 'ready']),
+      sort: new Set(['name', 'power', 'stars', 'gearTier', 'ready']),
+      direction: new Set(['asc', 'desc'])
+    };
+    for (const [key, values] of Object.entries(allowed)) {
+      if (!values.has(roster[key])) errors.push(`Invalid roster preference ${key}`);
+    }
+    const campaigns = new Set(['main', ...content.worlds.map(w => w.campaignId)]);
+    if (!campaigns.has(ui.campaignId)) errors.push(`Unknown campaign preference ${ui.campaignId}`);
+    for (const [nodeId, index] of Object.entries(ui.nodePartyById ?? {})) {
+      if (!content.nodeById[nodeId]) errors.push(`Party preference references unknown node ${nodeId}`);
+      if (!Number.isInteger(index) || index < 0 || index >= state.parties.length) {
+        errors.push(`Invalid party preference index for ${nodeId}`);
       }
     }
-    if (!['automatic', 'full', 'compact'].includes(state.settings?.farmingResults)) {
-      errors.push('Invalid farming result preference');
-    }
+  }
+  if (!['automatic', 'full', 'compact'].includes(state.settings?.farmingResults)) {
+    errors.push('Invalid farming result preference');
   }
   if (state.energy < 0) errors.push('Negative Energy');
   return { ok: errors.length === 0, errors };

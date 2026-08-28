@@ -51,7 +51,7 @@ const balance = {
   programs: {
     procurement: { threshold: 120, shipmentQty: 6, relicBonusQty: 2 },
     development: { threshold: 25, bonusShards: 1, relicThreshold: 20 },
-    operations:  { threshold: 2, relicThreshold: 1 }
+    operations:  { threshold: 2, relicThreshold: 1, bonusQty: 4 }
   },
   // World Mastery: a derived 0..1000 track per world. Weights must sum to the
   // final rank threshold. Hero weights are basis points of one hero's share.
