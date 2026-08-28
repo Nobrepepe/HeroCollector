@@ -51,6 +51,18 @@ function buildFromFixture(name) {
   return { pkg, db, merged, content, dir };
 }
 
+test('the page CSP admits packaged media, or no hub art can ever render', () => {
+  // Packaged art arrives as hcpkg:// URLs, used both as <img src> and as CSS
+  // background-image — CSP governs both with img-src. Without the scheme
+  // here every image in Hub mode is refused and the game renders artless.
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const csp = html.match(/http-equiv="Content-Security-Policy"\s+content="([^"]+)"/)?.[1];
+  assert.ok(csp, 'index.html declares a Content-Security-Policy');
+  const imgSrc = csp.split(';').map((part) => part.trim()).find((part) => part.startsWith('img-src'));
+  assert.ok(imgSrc, 'the policy declares img-src');
+  assert.ok(imgSrc.includes('hcpkg:'), `img-src must allow hcpkg: (is "${imgSrc}")`);
+});
+
 test('the representative package builds valid, ready runtime content', () => {
   const { pkg, merged, content } = buildFromFixture('valid-v1.zip');
 

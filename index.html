@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <!-- hcpkg: is the app's own narrow protocol for installed World Hub
+       publications; it resolves only files inside those directories. Packaged
+       art arrives through it, as <img src> and as CSS background-image — both
+       of which CSP governs with img-src. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: hcpkg:">
   <title>Hero Collector</title>
   <link rel="stylesheet" href="styles.css">
 </head>
