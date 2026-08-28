@@ -1,5 +1,16 @@
 # Hero Collector — Simulated Playthrough & Balance Report
 
+> **Superseded (2026-08-27).** This report describes the pre-overhaul economy
+> (Shadow shard RNG, HQ construction, renown/World Assets) and motivated the
+> goal-driven overhaul that replaced those systems. Its findings F-1 (roster-
+> average expedition pricing), F-3 (Field Supply daily-use mismatch), and the
+> dead world-asset economies (BUG-3) no longer apply. The rewritten
+> `scripts/playtest.mjs` is the current harness; headline results from it:
+> ~11.9 deterministic Focus shards per 120 Energy, every played day advances
+> both gear and heroes, one Expedition cycle per four days, and staggered
+> Mastery pacing (first world Known day ~17, Established ~78, Mastered ~527
+> on seed 20260806).
+
 **Date:** 2026-08-06 · **Branch:** `feature/goal-driven-qol-overhaul`
 **Content under test:** the live content pack exported from the running game —
 v11, **6 worlds, 66 characters, 300 nodes**, 15 Expedition templates, 2 Crises
