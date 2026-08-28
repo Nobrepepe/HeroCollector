@@ -4,6 +4,7 @@
 export function buildContent(raw) {
   const c = {
     version: raw.balance.contentVersion,
+    lineage: raw.lineage ?? null,
     balance: raw.balance,
     worlds: raw.worlds,
     archetypes: raw.archetypes,

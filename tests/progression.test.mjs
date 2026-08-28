@@ -149,6 +149,45 @@ test('saves are schema 6 only — older schemas are refused, not adapted', () =>
   assert.equal(validateSave(content, state).ok, false);
 });
 
+test('switching content packs resets shared Main progress, keeps world-scoped progress', () => {
+  const state = newPlayerState(content, NOW);
+  state.nodes.main_1 = { cleared: true, firstClearClaimed: true, objectiveClaimed: false };
+  const wcNode = content.nodes.find(n => n.campaign !== 'main');
+  state.nodes[wcNode.id] = { cleared: true, firstClearClaimed: true, objectiveClaimed: false };
+  // Same lineage: nothing is touched.
+  syncSaveWithContent(content, state);
+  assert.ok(state.nodes.main_1);
+  // A different pack: shared-campaign ids collide, so they reset; the
+  // world-scoped node stays (it returns with its world).
+  const original = content.lineage;
+  try {
+    content.lineage = 'production:another-pack';
+    const { changes } = syncSaveWithContent(content, state);
+    assert.equal(state.nodes.main_1, undefined);
+    assert.ok(state.nodes[wcNode.id]);
+    assert.equal(state.contentLineage, 'production:another-pack');
+    assert.ok(changes.some(text => /different content pack/.test(text)));
+    // Idempotent once recorded.
+    syncSaveWithContent(content, state);
+    assert.ok(state.nodes[wcNode.id]);
+  } finally {
+    content.lineage = original;
+    state.contentLineage = original;
+  }
+});
+
+test('a content switch refills the first party after dormant members detach', () => {
+  const state = newPlayerState(content, NOW);
+  state.parties[0].members = ['ghost_a', 'ghost_b', 'ghost_c', null, null];
+  for (const id of ['ghost_a', 'ghost_b', 'ghost_c']) {
+    state.characters[id] = { owned: true, stars: 1, shards: 0, gearTier: 0, slots: {}, revealed: true, selectedSkinId: null };
+  }
+  syncSaveWithContent(content, state);
+  const members = state.parties[0].members.filter(Boolean);
+  assert.ok(members.length >= 5 - 0 && members.length > 0, 'party was refilled');
+  assert.ok(members.every(id => content.characterById[id]), 'refilled only with live characters');
+});
+
 test('import pipeline synchronizes removed live references before validation', () => {
   const state = newPlayerState(content, NOW);
   state.characters.char_removed_custom = {

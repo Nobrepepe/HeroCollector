@@ -832,6 +832,12 @@ export function mergeContent(systemRaw, db) {
 
   const raw = {
     balance: systemRaw.balance,
+    // The pack's identity. Main Campaign node ids (main_1…) are shared across
+    // packs, so a save records the lineage it was playing; switching to a
+    // different pack resets that shared progress rather than silently
+    // treating another pack's campaign as already cleared. Hub packs carry
+    // their production id; anything else derives from its world identities.
+    lineage: db.lineage ?? `worlds:${db.worlds.map(w => w.id).sort().join('|')}`,
     worlds: finalWorlds,
     archetypes: systemRaw.archetypes,
     materials: systemRaw.materials,

@@ -48,6 +48,7 @@ export function newPlayerState(content, now = Date.now()) {
   const state = {
     schemaVersion: SCHEMA_VERSION,
     contentVersion: content.version,
+    contentLineage: content.lineage ?? null,
     createdAt: new Date(now).toISOString(),
     energy: b.energy.dailyGrant,
     lastResetKey: null,
@@ -113,6 +114,16 @@ export function emptySlots(content) {
 export function syncSaveWithContent(content, state) {
   const report = [];
   const notices = [];
+  // Main Campaign node ids (main_1…) are shared across content packs. When
+  // the save's pack lineage changes, that shared progress is reset so another
+  // pack's campaign is never treated as already cleared; world-scoped ids
+  // (wc_<worldId>_…) stay dormant and return with their world.
+  if ((state.contentLineage ?? null) !== (content.lineage ?? null)) {
+    const shared = Object.keys(state.nodes).filter(id => id.startsWith('main_') || id.startsWith('shadow_'));
+    for (const id of shared) delete state.nodes[id];
+    state.contentLineage = content.lineage ?? null;
+    if (shared.length) report.push(`Reset ${shared.length} shared-campaign node${shared.length === 1 ? '' : 's'}: this is a different content pack, so its Main Campaign starts fresh.`);
+  }
   for (const def of content.characters) {
     if (!state.characters[def.id]) {
       state.characters[def.id] = {
@@ -136,14 +147,6 @@ export function syncSaveWithContent(content, state) {
       report.push(`Granted starting character ${def.displayName}.`);
     }
   }
-  // Keep the first party preset usable: fill empty slots with owned characters.
-  const first = state.parties[0];
-  if (first && first.members.every(m => m === null)) {
-    const owned = content.characters.filter(d => state.characters[d.id]?.owned).map(d => d.id).slice(0, 5);
-    if (owned.length > 0) {
-      first.members = [...owned, ...Array(5 - owned.length).fill(null)];
-    }
-  }
   let dormant = 0;
   for (const id of Object.keys(state.characters)) {
     if (!content.characterById[id] && state.characters[id].owned) dormant++;
@@ -156,6 +159,17 @@ export function syncSaveWithContent(content, state) {
         party.members[i] = null;
         report.push(`Removed a missing character from party “${party.name}”.`);
       }
+    }
+  }
+  // Keep the first party preset usable: fill empty slots with owned
+  // characters. This runs after dormant members were detached, so a content
+  // switch leaves the player a usable party rather than an empty one.
+  const first = state.parties[0];
+  if (first && first.members.every(m => m === null)) {
+    const owned = content.characters.filter(d => state.characters[d.id]?.owned).map(d => d.id).slice(0, 5);
+    if (owned.length > 0) {
+      first.members = [...owned, ...Array(5 - owned.length).fill(null)];
+      report.push('Refilled the first party with your owned characters.');
     }
   }
   const beforePins = state.pins.length;

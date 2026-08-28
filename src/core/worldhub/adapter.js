@@ -261,6 +261,9 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
 
   return {
     version: CUSTOM_DB_VERSION,
+    // Stable across revisions of the same production, so republishing never
+    // resets shared-campaign progress — only switching productions does.
+    lineage: `production:${pkg.manifest.production.id}`,
     worlds,
     characters,
     factions,

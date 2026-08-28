@@ -7,7 +7,6 @@ import { createHash } from 'node:crypto';
 import { join, dirname, basename, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { extractZipSafely } from '../src/core/worldhub/zip-reader.js';
 import { loadPackage, semanticValidation, readCurrentPointer } from '../src/core/worldhub/package-reader.js';
 import { adaptPackageToCustomDb } from '../src/core/worldhub/adapter.js';
@@ -24,6 +23,13 @@ const hubRoot = () => join(app.getPath('userData'), 'worldhub-content');
 const hubPublications = () => join(hubRoot(), 'publications');
 const hubPointerPath = () => join(hubRoot(), 'current.json');
 const hubReceipts = () => join(hubRoot(), 'receipts');
+// Staging lives beside the publications directory so activation's atomic
+// rename never crosses filesystems (os.tmpdir() is often a tmpfs).
+function hubStagingDir() {
+  const dir = join(hubRoot(), 'staging');
+  mkdirSync(dir, { recursive: true });
+  return mkdtempSync(join(dir, 'stage-'));
+}
 const hubStaging = new Map(); // stagingId -> { dir, sourceType, sourcePath }
 
 function hubPointer() {
@@ -146,7 +152,7 @@ app.whenReady().then(() => {
       filters: [{ name: 'ZIP', extensions: ['zip'] }],
     });
     if (canceled || !filePaths[0]) return null;
-    const staging = mkdtempSync(join(tmpdir(), 'hc-worldhub-'));
+    const staging = hubStagingDir();
     try {
       extractZipSafely(readFileSync(filePaths[0]), staging);
       return hubStage(staging, 'zip', filePaths[0]);
@@ -170,7 +176,7 @@ app.whenReady().then(() => {
     if (!pointer) return { error: 'That folder is not a World Hub production folder (no current.json).' };
     const source = join(folder, 'publications', pointer.publicationId);
     if (!existsSync(source)) return { error: 'The linked folder’s active publication is missing.' };
-    const staging = mkdtempSync(join(tmpdir(), 'hc-worldhub-'));
+    const staging = hubStagingDir();
     try {
       cpSync(source, staging, { recursive: true });
       return hubStage(staging, 'folder', folder);
