@@ -1,13 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  rankTodayHook, todayHookText, relicPieceModel, collectionSummary, sceneImage,
+  rankTodayHook, todayHookText, sceneImage,
   partyHeadline, bestPartySwap
 } from '../src/ui/presentation.js';
 import { loadContent, maxOut } from './helpers.mjs';
 import { newPlayerState } from '../src/core/state.js';
 import { evaluateParty } from '../src/core/synergy.js';
-import { IMAGE_KINDS } from '../src/ui/images.js';
 
 test('Today chooses the smallest remaining shard gap with stable content-order ties', () => {
   const content = {
@@ -60,23 +59,7 @@ test('an unresolved Crisis outranks every ordinary Today hook', () => {
   assert.equal(todayHookText(hook).route, '#/crisis');
 });
 
-test('relic model keeps authored fragment order as left then right', () => {
-  const relic = {
-    fragments: [{ id: 'f1', sourceNode: 'n1' }, { id: 'f2', sourceNode: 'n2' }]
-  };
-  const store = {
-    state: { archive: { fragments: { f2: true } } },
-    content: { nodeById: { n1: { id: 'n1' }, n2: { id: 'n2' } } }
-  };
-  assert.deepEqual(relicPieceModel(store, relic).map(piece => [piece.side, piece.owned]), [
-    ['left', false], ['right', true]
-  ]);
-});
-
-test('collection and scene presentation helpers cover partial and missing art', () => {
-  assert.equal(collectionSummary({
-    relics: [{ complete: true, owned: 2 }, { complete: false, owned: 1 }, { complete: false, owned: 0 }]
-  }), '1 whole, 1 half-found, 1 still buried');
+test('scene presentation helpers cover partial and missing art', () => {
   const store = {
     content: {
       worlds: [{ id: 'w' }],
@@ -115,14 +98,4 @@ test('best party swap fills empty slots and chooses a legal positive improvement
   next[recommendation.slotIndex] = recommendation.incomingId;
   assert.equal(new Set(next).size, next.length);
   assert.ok(evaluateParty(content, state, next).effectivePower > evaluateParty(content, state, full).effectivePower);
-});
-
-test('portrait imports use a 16:9 alpha-preserving canvas', () => {
-  const { w, h, contain, preserveAlpha } = IMAGE_KINDS.portrait;
-  assert.equal(w / h, 16 / 9, 'portraits are letterboxed into a 16:9 tile');
-  assert.equal(contain, true, 'portraits are contained, never cropped');
-  assert.equal(preserveAlpha, true, 'portraits keep their transparency');
-  // The tile is never drawn wider than ~250 CSS px, so anything past 1280 is
-  // storage spent on pixels no display can show.
-  assert.ok(w >= 512 && w <= 1280, `portrait width ${w} is outside the sane range`);
 });

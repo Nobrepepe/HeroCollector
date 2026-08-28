@@ -1,6 +1,6 @@
 // Shared UI building blocks used by several screens.
-import { h, fmt, stars } from './dom.js';
-import { unlockedSkins } from '../core/state.js';
+import { h, fmt } from './dom.js';
+import { unlockedSkins } from '../core/mastery.js';
 import { characterPower } from '../core/power.js';
 
 // The character's selected, unlocked alternate skin, or null.
@@ -54,8 +54,13 @@ export function portrait(store, characterId, size = 'md', options = {}) {
   return el;
 }
 
-export function starline(n) {
-  return h('span.starline', { 'aria-label': `${n} of 7 stars` }, stars(n));
+// Each star is its own element so a promotion can address the slot it lands
+// in (design turn 13). Letter-spacing still applies per glyph, so the line
+// reads exactly as it did when it was a single string.
+export function starline(n, max = 7) {
+  return h('span.starline', { 'aria-label': `${n} of ${max} stars` },
+    Array.from({ length: max }, (_, i) =>
+      h(`i.star${i < n ? '.earned' : '.empty'}`, { 'aria-hidden': 'true' }, i < n ? '★' : '☆')));
 }
 
 export function charSub(store, def, cs) {
@@ -82,10 +87,11 @@ export function tagChips(store, def) {
 export function rewardEntryName(content, entry, worldId = null) {
   if (entry.kind === 'material') return content.materialById[entry.id]?.displayName ?? entry.id;
   if (entry.kind === 'shards') {
+    if (entry.choice) {
+      const world = content.worldById[entry.choice.world]?.displayName;
+      return world ? `shards for a chosen ${world} hero` : 'shards for a chosen hero';
+    }
     return `${content.characterById[entry.characterId]?.displayName ?? entry.characterId} shards`;
-  }
-  if (entry.id === '@associated_world_asset') {
-    return content.worldById[worldId]?.worldAsset?.displayName ?? 'the associated World Asset';
   }
   return content.resourceById[entry.id]?.displayName ?? entry.id;
 }
@@ -117,8 +123,17 @@ export function rewardChips(store, rewards) {
     const c = store.content.characterById[charId];
     chips.push(h('span.chip', `🧩 ${c.displayName} shard ×${qty}`));
   }
-  for (const fragId of rewards.fragments ?? []) {
-    chips.push(h('span.chip', '🏛️ Archive fragment'));
+  for (const grant of rewards.focusShards ?? []) {
+    const c = store.content.characterById[grant.characterId];
+    chips.push(h('span.chip', `🎯 ${c?.displayName ?? grant.characterId} shard ×${grant.shards} (Focus)`));
+  }
+  for (const characterId of rewards.revealed ?? []) {
+    const c = store.content.characterById[characterId];
+    chips.push(h('span.chip.good', `✨ ${c?.displayName ?? characterId} revealed`));
+  }
+  for (const pieceId of rewards.relicPieces ?? []) {
+    const piece = store.content.relicPieceById[pieceId];
+    chips.push(h('span.chip', `🗿 Relic piece: ${piece?.displayName ?? pieceId}`));
   }
   for (const m of rewards.milestones ?? []) chips.push(h('span.chip', `🏁 ${m}`));
   return h('div.reward-list', chips.length ? chips : h('span.muted', 'Nothing'));
@@ -127,7 +142,6 @@ export function rewardChips(store, rewards) {
 const NODE_TYPE_META = {
   ordinary: { icon: '🟢', label: 'Ordinary material node' },
   advanced: { icon: '🔵', label: 'Advanced material node' },
-  shard: { icon: '🧩', label: 'Character shard node' },
   world: { icon: '🏛️', label: 'World node' }
 };
 export function nodeTypeMeta(type) { return NODE_TYPE_META[type]; }
@@ -137,16 +151,11 @@ export function nodeRepeatText(store, node) {
   const m = store.content.materialById[node.material];
   let text = `${def.repeat.count} × ${m.displayName}`;
   if (def.repeat.bonusChanceBp > 0) text += ` (+1 with ${def.repeat.bonusChanceBp / 100}% chance)`;
-  if (node.shardCharacter) {
-    const c = store.content.characterById[node.shardCharacter];
-    text += `, shard roll for ${c.displayName}`;
-  }
   return text;
 }
 
 export function campaignLabel(store, node) {
   if (node.campaign === 'main') return 'Main';
-  if (node.campaign === 'shadow') return 'Shadow';
   return store.content.worldById[node.world].displayName;
 }
 

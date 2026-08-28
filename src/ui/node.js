@@ -1,8 +1,9 @@
 import { h, fmt, pct } from './dom.js';
 import {
-  nodeState, nodeUnlocked, nodeEnergyCost, shardAttemptsLeft, checkClear,
+  nodeState, nodeUnlocked, nodeEnergyCost, checkClear,
   clearNode, maxSweepCount, preferredPartyIndex, selectPartyPreset
 } from '../core/state.js';
+import { isRevealed } from '../core/focus.js';
 import { evaluateParty, objectiveSatisfied } from '../core/synergy.js';
 import { nodeTypeMeta, campaignLabel } from './shared.js';
 import { portrait, portraitSlot } from './shared.js';
@@ -36,7 +37,7 @@ export function renderNode(store, root, nodeId) {
         store.ui.pendingReopen = returnContext; store.ui.returnContext = null; store.go(returnContext.route);
       } else store.go(`#/campaign/${node.campaign}/${node.chapter}`);
     }
-  }, returnContext?.archive ? '← Archive' : '← Journey'));
+  }, returnContext?.mastery ? '← Mastery' : '← Journey'));
 
   const head = h('header.node-head',
     h('div.eyebrow', `${campaignLabel(store, node)} ${node.number} · chapter ${node.chapter} · ${meta.label}`),
@@ -171,15 +172,30 @@ function nodeRewards(store, node, ns) {
   }, h('span.node-material-icon', entry.material.icon), h('div.node-reward-copy',
     h('span.node-reward-name', entry.material.displayName),
     h('span.caption', `${entry.qty}${repeat.bonusChanceBp && entry.material.id === material.id ? `–${entry.qty + 1}` : ''} per run${node.firstClear?.materials?.some(item => item.materialId === entry.material.id) && !ns.firstClearClaimed ? ' · first-clear bonus' : ''}`))));
-  if (node.shardCharacter) {
-    const def = content.characterById[node.shardCharacter];
-    const cs = state.characters[node.shardCharacter];
-    const shardTitle = cs.stars >= 7
-      ? `${def.displayName} is at 7★; shard rolls become guaranteed material`
-      : `${def.displayName} shards; ${shardAttemptsLeft(content, state, node)} attempts today; ${cs.pity ? 'next shard guaranteed' : `${content.balance.shardChanceBp / 100}% chance, miss then guarantee`}`;
-    visual.appendChild(h('div.node-shard-reward', { title: shardTitle, 'aria-label': shardTitle },
+  if (node.encounterCharacter) {
+    const def = content.characterById[node.encounterCharacter];
+    const revealed = isRevealed(state, node.encounterCharacter);
+    const claimed = ns.firstClearClaimed;
+    const title = claimed
+      ? `${def.displayName} was encountered here`
+      : `First clear reveals ${def.displayName} as a Development Focus target and stakes ${node.firstClear?.shards?.qty ?? 2} shards`;
+    visual.appendChild(h('div.node-shard-reward', { title, 'aria-label': title },
       portrait(store, def.id, 'compact', { decorative: true }), h('div.node-reward-copy',
-        h('span.node-reward-name', def.displayName), h('span.caption', `🧩 shard chance · ${shardAttemptsLeft(content, state, node)} attempts`))));
+        h('span.node-reward-name', revealed ? def.displayName : 'Someone waits here'),
+        h('span.caption', claimed
+          ? '✨ encountered'
+          : revealed
+            ? `✨ +${node.firstClear?.shards?.qty ?? 2} shards on first clear`
+            : `✨ first clear reveals them · +${node.firstClear?.shards?.qty ?? 2} shards`))));
+  }
+  if (node.firstClear?.relicPiece && content.relicPieceById[node.firstClear.relicPiece]) {
+    const piece = content.relicPieceById[node.firstClear.relicPiece];
+    const owned = !!state.relics.pieces[piece.id];
+    visual.appendChild(h('div.node-material-reward', {
+      title: owned ? `${piece.displayName} was recovered here` : `First clear recovers ${piece.displayName}`
+    }, h('span.node-material-icon', '🗿'), h('div.node-reward-copy',
+      h('span.node-reward-name', piece.displayName),
+      h('span.caption', owned ? 'relic piece · recovered' : 'relic piece · on first clear'))));
   }
   rewards.appendChild(visual);
   return rewards;
@@ -198,13 +214,15 @@ function actionRow(store, node, ns, members, check, cost) {
   const momentum = frontierMomentumPreview(state, { firstClear: !ns.cleared, energySpent: check.cost });
   const costLine = check.freeRuns
     ? `This run is free; ${check.freeRuns} Crisis boon run will be used.` : `⚡ ${check.cost} of your ${state.energy}`;
-  const attempts = node.shardCharacter ? shardAttemptsLeft(content, state, node) : null;
   const maxAvailable = maxSweepCount(content, state, node.id);
   const max = Math.max(1, maxAvailable);
   wrap.appendChild(h('div.node-run-facts',
     h('div', h('span', 'Run once'), h('span.numeral', check.freeRuns ? 'Free' : `⚡ ${cost}`)),
     h('div', h('span', 'Maximum sweep'), h('span.numeral', maxAvailable ? `${maxAvailable} × ⚡ ${cost}` : 'Unavailable')),
-    attempts === null ? null : h('div', h('span', 'Attempts remaining'), h('span.numeral', `${attempts} / ${content.balance.shardAttemptsPerDay}`))));
+    h('div', h('span', 'Focus meters'), h('span.numeral', `+⚡ per run`))));
+  if (check.surgeApplied) {
+    wrap.appendChild(h('div.caption.good', `A Field Surge is armed — this attempt fights at +${content.balance.fieldSupply.surgeBp / 100}% and spends it.`));
+  }
   wrap.append(h('div.node-run-primary', h('button.btn.primary', { disabled: !check.ok, onclick: () => run(1) }, 'Run Node →'),
     h('div.caption', costLine), !ns.cleared ? h('div.caption.good', momentum.energyRefunded === check.cost && check.cost > 0
       ? `First clear — its ${check.cost} Energy returns.`

@@ -1,11 +1,12 @@
 // Content validation (GDD 12.4): every referenced ID exists, campaigns chain
-// correctly, thresholds never decrease, recipes are obtainable, Archive
-// fragments map 1:1 onto World Campaign first clears, and synergy definitions
+// correctly, thresholds never decrease, recipes are obtainable, relic pieces
+// map 1:1 onto their World Campaign first clears, and synergy definitions
 // stay inside the global cap. Produces a human-readable error list.
 import { equipmentRecipe } from './content.js';
 import { fieldSupplyLimits, FIELD_SUPPLY_ID } from './energy.js';
 import { RANDOM_MATERIAL, randomMaterialPool } from './resources.js';
 import { CRISIS_BOON_TYPES } from './crises.js';
+import { RELIC_PIECE_NODES, MASTERY_SKIN_RANKS } from './custom.js';
 
 export function validateContent(content) {
   const errors = [];
@@ -18,19 +19,6 @@ export function validateContent(content) {
     seen.add(id);
   };
   for (const w of content.worlds) uniq(w.id, 'world');
-  for (const w of content.worlds) {
-    if (!w.worldAsset?.id) err(`${w.id}: missing World Asset definition`);
-    else uniq(w.worldAsset.id, 'world resource');
-    if (w.hq?.enabled) {
-      if (w.hq.backgrounds?.length !== 3) err(`${w.id}: HQ needs three background slots`);
-      if (w.hq.facilities?.length !== 4) err(`${w.id}: HQ needs four facilities`);
-      if (w.hq.ranks?.length < 3) err(`${w.id}: HQ needs three rank thresholds`);
-      for (const facility of w.hq.facilities ?? []) {
-        uniq(facility.id, 'facility');
-        if (facility.levels?.length !== 3) err(`${facility.id}: facility needs three levels`);
-      }
-    }
-  }
   for (const m of content.materials) uniq(m.id, 'material');
   for (const k of content.components) uniq(k.id, 'component');
   for (const c of content.characters) uniq(c.id, 'character');
@@ -39,8 +27,11 @@ export function validateContent(content) {
   for (const n of content.nodes) {
     if (n.world && !content.worldById[n.world]) err(`${n.id}: unknown world ${n.world}`);
     for (const reward of [...(n.repeatRewards ?? []), ...(n.firstClearRewards ?? [])]) {
-      if (reward.kind === 'resource' && reward.id === '@associated_world_asset' && !n.world) {
-        err(`${n.id}: associated World Asset reward requires a world`);
+      if (reward.kind === 'resource' && !content.resourceById[reward.id]) {
+        err(`${n.id}: unknown resource reward ${reward.id}`);
+      }
+      if (reward.kind === 'material' && !content.materialById[reward.id]) {
+        err(`${n.id}: unknown material reward ${reward.id}`);
       }
     }
   }
@@ -52,7 +43,7 @@ export function validateContent(content) {
       if (!Number.isInteger(reward.min) || !Number.isInteger(reward.max) || reward.min < 0 || reward.max < reward.min) {
         err(`${pack.id}: invalid reward range`);
       }
-      if (reward.kind === 'resource' && reward.id !== '@associated_world_asset' && !content.resourceById[reward.id]) {
+      if (reward.kind === 'resource' && !content.resourceById[reward.id]) {
         err(`${pack.id}: unknown resource ${reward.id}`);
       }
       if (reward.kind === 'material' && reward.id === RANDOM_MATERIAL) {
@@ -81,7 +72,6 @@ export function validateContent(content) {
   if (guaranteedId) {
     const guaranteed = content.expeditions.templateById[guaranteedId];
     if (!guaranteed || guaranteed.enabled === false) err('Guaranteed Field Supply template is missing or disabled');
-    if (guaranteed && (guaranteed.durations?.length !== 1 || guaranteed.durations[0] !== 1)) err(`${guaranteedId}: guaranteed Supply template must last one day`);
     if (guaranteed && (guaranteed.fixedRewards?.length !== 1 || guaranteed.fixedRewards[0]?.id !== FIELD_SUPPLY_ID || guaranteed.fixedRewards[0]?.qty !== 1)) {
       err(`${guaranteedId}: guaranteed Supply template needs exactly one fixed Field Supply`);
     }
@@ -90,11 +80,13 @@ export function validateContent(content) {
   const crisisIds = new Set();
   const favoredIds = new Set([...content.worlds.map(world => world.id), ...Object.keys(content.archetypes), ...content.tags.map(tag => tag.id)]);
   const gradeIds = new Set();
+  const masteryRankIds = new Set((content.balance.mastery?.ranks ?? []).map(rank => rank.id));
   for (const grade of content.crises?.settings?.grades ?? []) {
     if (gradeIds.has(grade.id)) err(`Duplicate Crisis grade ${grade.id}`);
     gradeIds.add(grade.id);
-    if (!Number.isInteger(grade.minOwned) || grade.minOwned < 1 || !Number.isInteger(grade.minHqRank)
+    if (!Number.isInteger(grade.minOwned) || grade.minOwned < 1
       || !Number.isInteger(grade.frontCount) || grade.frontCount < 2 || !Number.isInteger(grade.teamSize) || grade.teamSize < 1) err(`${grade.id}: invalid Crisis grade settings`);
+    if (masteryRankIds.size && !masteryRankIds.has(grade.minMasteryRank)) err(`${grade.id}: unknown Mastery rank gate ${grade.minMasteryRank}`);
   }
   for (const definition of content.crises?.definitions ?? []) {
     if (crisisIds.has(definition.id)) err(`Duplicate Crisis ID: ${definition.id}`);
@@ -115,14 +107,13 @@ export function validateContent(content) {
     if (![3, 4].includes(definition.cacheChoices?.length)) err(`${definition.id}: needs three or four Emergency Cache choices`);
     if (!CRISIS_BOON_TYPES.has(definition.boon?.type)) err(`${definition.id}: unknown boon type ${definition.boon?.type}`);
     for (const choice of definition.cacheChoices ?? []) for (const reward of choice.rewards ?? []) {
-      if (reward.kind === 'resource' && reward.id !== '@associated_world_asset' && !content.resourceById[reward.id]) err(`${choice.id}: unknown Cache resource ${reward.id}`);
+      if (reward.kind === 'resource' && !content.resourceById[reward.id]) err(`${choice.id}: unknown Cache resource ${reward.id}`);
       if (reward.kind === 'material' && !content.materialById[reward.id]) err(`${choice.id}: unknown Cache material ${reward.id}`);
       if (!Number.isInteger(reward.qty) || reward.qty < 1) err(`${choice.id}: invalid Cache quantity`);
     }
     const boon = definition.boon;
     if (['free_world_node_runs', 'bonus_world_material_runs'].includes(boon?.type) && (!Number.isInteger(boon.runs) || boon.runs < 1)) err(`${definition.id}: boon needs a positive run count`);
     if (['bonus_world_material_runs', 'instant_intelligence'].includes(boon?.type) && (!Number.isInteger(boon.qty) || boon.qty < 1)) err(`${definition.id}: boon needs a positive quantity`);
-    if (['world_expedition_renown_bp', 'next_hq_production_bp'].includes(boon?.type) && (!Number.isInteger(boon.bonusBp) || boon.bonusBp < 1)) err(`${definition.id}: boon needs positive basis points`);
   }
 
   // --- characters: exactly one world and one archetype; valid references
@@ -134,9 +125,9 @@ export function validateContent(content) {
     for (const slot of content.characterMeta.slotOrder) {
       if (!c.equipmentLines[slot]) err(`${c.id}: missing equipment line for slot ${slot}`);
     }
-    // every unlockable/promotable character needs a reachable shard source
-    if ((content.shardNodesByCharacter[c.id] ?? []).length === 0) {
-      err(`${c.id}: no shard source node`);
+    // every non-starting character needs an encounter that reveals them
+    if (!c.starting && (content.encounterNodesByCharacter[c.id] ?? []).length === 0) {
+      err(`${c.id}: no encounter node reveals this character`);
     }
   }
 
@@ -182,26 +173,14 @@ export function validateContent(content) {
   }
 
   // --- campaigns: continuous previous chains, nondecreasing thresholds
-  for (const [campaign, nodes] of Object.entries(content.nodesByCampaign)) {
+  for (const nodes of Object.values(content.nodesByCampaign)) {
     const sorted = [...nodes].sort((a, b) => a.number - b.number);
     let prevThreshold = 0, prevId = null;
-    const shadowThresholds = {};
     for (const n of sorted) {
-      if (campaign === 'shadow') {
-        if (n.previous !== null) err(`${n.id}: Shadow nodes do not have a previous Shadow prerequisite`);
-        const mirror = content.nodeById[n.mirrorNode];
-        if (!mirror || mirror.campaign !== 'main' || mirror.number !== n.number) {
-          err(`${n.id}: invalid matching Main node ${n.mirrorNode}`);
-        }
-        const prior = shadowThresholds[n.chapter] ?? 0;
-        if (n.threshold < prior) err(`${n.id}: threshold ${n.threshold} decreases within Shadow chapter ${n.chapter}`);
-        shadowThresholds[n.chapter] = n.threshold;
-      } else {
-        if (n.previous !== prevId) err(`${n.id}: previous should be ${prevId}, is ${n.previous}`);
-        if (n.threshold < prevThreshold) err(`${n.id}: threshold ${n.threshold} decreases (prev ${prevThreshold})`);
-      }
+      if (n.previous !== prevId) err(`${n.id}: previous should be ${prevId}, is ${n.previous}`);
+      if (n.threshold < prevThreshold) err(`${n.id}: threshold ${n.threshold} decreases (prev ${prevThreshold})`);
       if (!content.materialById[n.material]) err(`${n.id}: unknown material ${n.material}`);
-      if (n.shardCharacter && !content.characterById[n.shardCharacter]) err(`${n.id}: unknown shard character`);
+      if (n.encounterCharacter && !content.characterById[n.encounterCharacter]) err(`${n.id}: unknown encounter character`);
       if (n.firstClear?.shards && !content.characterById[n.firstClear.shards.characterId]) {
         err(`${n.id}: unknown first-clear shard character ${n.firstClear.shards.characterId}`);
       }
@@ -214,22 +193,17 @@ export function validateContent(content) {
           if (!content.materialById[m.materialId]) err(`${n.id}: unknown objective material ${m.materialId}`);
         }
       }
-      if (campaign !== 'shadow') {
-        prevThreshold = n.threshold;
-        prevId = n.id;
-      }
+      prevThreshold = n.threshold;
+      prevId = n.id;
     }
   }
 
-  // --- every material every recipe needs must be reachable from a freely
-  // repeatable node: either dropped directly, or upcraftable from a lower
-  // grade of the same family that drops freely. Shard nodes are attempt-
-  // limited (5/day) and must never be a family's only source, or progression
-  // can soft-stall. Skipped while the game has no nodes at all (setup mode).
+  // --- every material every recipe needs must be reachable from a repeatable
+  // node: either dropped directly, or upcraftable from a lower grade of the
+  // same family that drops. Skipped while the game has no nodes (setup mode).
   if (content.nodes.length > 0) {
     const freeMinRankByFamily = {};
     for (const n of content.nodes) {
-      if (n.shardCharacter) continue;
       const m = content.materialById[n.material];
       if (!m) continue;
       const rank = content.materialMeta.grades[m.grade].rank;
@@ -246,48 +220,52 @@ export function validateContent(content) {
       const m = content.materialById[matId];
       const best = freeMinRankByFamily[m.family];
       if (best === undefined || best > content.materialMeta.grades[m.grade].rank) {
-        err(`Material ${matId} is required by recipes but no freely repeatable (non-shard) node drops ${m.family} at that grade or below`);
+        err(`Material ${matId} is required by recipes but no repeatable node drops ${m.family} at that grade or below`);
       }
     }
   }
 
-  // --- archives: fragments map to world-campaign first clears; totals complete every relic
+  // --- relics: exactly four pieces per world, each awarded by the first
+  // clear of its authored World Campaign node.
+  for (const w of content.worlds) {
+    if (!content.relicByWorld[w.id]) err(`${w.id}: world has no relic`);
+  }
+  const pieceIds = new Set();
+  for (const relic of content.relics) {
+    if (!content.worldById[relic.world]) err(`${relic.id}: unknown world ${relic.world}`);
+    if (relic.pieces?.length !== RELIC_PIECE_NODES.length) err(`${relic.id}: needs exactly ${RELIC_PIECE_NODES.length} pieces`);
+    for (const [index, piece] of (relic.pieces ?? []).entries()) {
+      if (pieceIds.has(piece.id)) err(`${relic.id}: duplicate piece ${piece.id}`);
+      pieceIds.add(piece.id);
+      const node = content.nodeById[piece.sourceNode];
+      if (!node) { err(`${piece.id}: unknown source node ${piece.sourceNode}`); continue; }
+      if (node.type !== 'world' || node.world !== relic.world) err(`${piece.id}: source ${node.id} is not a World Campaign node of ${relic.world}`);
+      if (node.number !== RELIC_PIECE_NODES[index]) err(`${piece.id}: source ${node.id} is not node ${RELIC_PIECE_NODES[index]}`);
+      if (node.firstClear?.relicPiece !== piece.id) err(`${piece.id}: source node ${node.id} does not award this piece`);
+    }
+  }
+  for (const n of content.nodes) {
+    if (n.firstClear?.relicPiece && !content.relicPieceById[n.firstClear.relicPiece]) {
+      err(`${n.id}: awards unknown relic piece ${n.firstClear.relicPiece}`);
+    }
+  }
+
+  // --- skins and Mastery skin milestones
   const skinIds = new Set();
-  for (const a of content.archives) {
-    const fragIds = new Set();
-    for (const col of a.collections) {
-      if (col.rewardSkin) {
-        if (skinIds.has(col.rewardSkin.id)) err(`Duplicate skin ID: ${col.rewardSkin.id}`);
-        skinIds.add(col.rewardSkin.id);
-        const skinChar = content.characterById[col.rewardSkin.characterId];
-        if (!skinChar) err(`${col.id}: collection skin references unknown character`);
-        else if (skinChar.world !== a.world) err(`${col.id}: collection skin character is from another world`);
-      }
-      for (const relic of col.relics) {
-        if (relic.fragments.length !== 2) err(`${relic.id}: needs exactly 2 fragments`);
-        for (const frag of relic.fragments) {
-          if (fragIds.has(frag.id)) err(`${a.id}: duplicate fragment ${frag.id}`);
-          fragIds.add(frag.id);
-          const node = content.nodeById[frag.sourceNode];
-          if (!node) { err(`${frag.id}: unknown source node ${frag.sourceNode}`); continue; }
-          if (node.type !== 'world') err(`${frag.id}: source ${node.id} is not a world node`);
-          if (node.firstClear?.archiveFragment !== frag.id) {
-            err(`${frag.id}: source node ${node.id} does not award this fragment`);
-          }
-        }
-      }
+  for (const skin of content.skins) {
+    if (skinIds.has(skin.id)) err(`Duplicate skin ID: ${skin.id}`);
+    skinIds.add(skin.id);
+    const skinChar = content.characterById[skin.characterId];
+    if (!skinChar) err(`${skin.id}: skin references unknown character`);
+    else if (skinChar.world !== skin.world) err(`${skin.id}: skin character is from another world`);
+  }
+  for (const w of content.worlds) {
+    for (const entry of w.masterySkins ?? []) {
+      if (!MASTERY_SKIN_RANKS.includes(entry.rank)) err(`${w.id}: unknown Mastery skin rank ${entry.rank}`);
+      const skin = content.skinById[entry.skinId];
+      if (!skin) err(`${w.id}: Mastery skin references unknown skin ${entry.skinId}`);
+      else if (skin.characterId !== entry.characterId || skin.world !== w.id) err(`${w.id}: Mastery skin ${entry.skinId} does not belong to that character and world`);
     }
-    const worldNodes = content.nodes.filter(n => n.world === a.world && n.firstClear?.archiveFragment);
-    if (worldNodes.length !== fragIds.size) {
-      err(`${a.id}: ${worldNodes.length} fragment-awarding nodes vs ${fragIds.size} required fragments`);
-    }
-    const skinChar = content.characterById[a.fullReward?.characterId];
-    if (a.fullReward?.id) {
-      if (skinIds.has(a.fullReward.id)) err(`Duplicate skin ID: ${a.fullReward.id}`);
-      skinIds.add(a.fullReward.id);
-    }
-    if (!skinChar) err(`${a.id}: full-archive skin references unknown character`);
-    else if (skinChar.world !== a.world) err(`${a.id}: skin character is from another world`);
   }
 
   // --- synergy: no single definition exceeds the global cap
@@ -304,10 +282,14 @@ export function validateContent(content) {
 }
 
 // Save-file validation: every ID the save references must exist in content.
+// Dormant progress (nodes, relic pieces, Mastery entries, character state for
+// content that left the game) is deliberately tolerated — it returns when the
+// content does.
 export function validateSave(content, state) {
   const errors = [];
-  if (![1, 2, 3, 4, 5].includes(state.schemaVersion)) errors.push(`Unsupported save schema ${state.schemaVersion}`);
-  if (!state.characters || !state.inventory || !state.nodes || !Array.isArray(state.parties)) {
+  if (state.schemaVersion !== 6) errors.push(`Unsupported save schema ${state.schemaVersion}`);
+  if (!state.characters || !state.inventory || !state.nodes || !Array.isArray(state.parties)
+    || !state.focus?.slots || typeof state.programs !== 'object' || !state.relics?.pieces || typeof state.mastery !== 'object') {
     return { ok: false, errors: ['Save is missing required gameplay state.'] };
   }
   for (const id of Object.keys(state.characters)) {
@@ -327,49 +309,119 @@ export function validateSave(content, state) {
   for (const [id, qty] of Object.entries(state.inventory.resources ?? {})) {
     if (!Number.isFinite(qty) || qty < 0) errors.push(`Invalid resource quantity: ${id}`);
   }
-  if (state.schemaVersion >= 3) {
-    if (!Number.isInteger(state.dayNumber) || state.dayNumber < 1) errors.push('Invalid logical day number');
-    if (!state.expeditions || !Array.isArray(state.expeditions.active) || !Array.isArray(state.expeditions.reports)) {
-      errors.push('Missing Expedition state');
-    }
-    if (!state.headquarters || typeof state.headquarters.worlds !== 'object') errors.push('Missing Headquarters state');
+  if (!Number.isInteger(state.dayNumber) || state.dayNumber < 1) errors.push('Invalid logical day number');
+
+  // --- Energy systems and Field Supplies
+  const daily = state.energySystems?.daily;
+  if (!daily || !Number.isInteger(daily.day)
+    || !Number.isInteger(daily.momentumRefunded) || daily.momentumRefunded < 0 || daily.momentumRefunded > 30) {
+    errors.push('Invalid daily Energy-system counters');
   }
-  if (state.schemaVersion >= 4) {
-    const daily = state.energySystems?.daily;
-    if (!daily || !Number.isInteger(daily.day) || !Number.isInteger(daily.suppliesUsed)
-      || !Number.isInteger(daily.momentumRefunded) || daily.suppliesUsed < 0 || daily.momentumRefunded < 0 || daily.momentumRefunded > 30) {
-      errors.push('Invalid daily Energy-system counters');
+  if (daily?.day !== state.dayNumber) errors.push('Daily Energy-system counters are for the wrong game day');
+  const supply = state.inventory.resources?.[FIELD_SUPPLY_ID] ?? 0;
+  const supplyLimits = fieldSupplyLimits(content, state);
+  if (!Number.isInteger(supply) || supply < 0 || supply > supplyLimits.storageCap) errors.push('Invalid Field Supply quantity');
+  if (supplyLimits.held + supplyLimits.reserved > supplyLimits.storageCap) errors.push('Field Supply promises exceed available storage');
+  if (state.surge !== null && (!Number.isInteger(state.surge?.bp) || state.surge.bp < 1)) errors.push('Invalid armed Surge');
+
+  // --- Development Focus
+  const focusIds = [];
+  for (const slot of ['primary', 'secondary', 'longTerm']) {
+    const entry = state.focus.slots[slot];
+    if (!entry) { errors.push(`Missing Focus slot ${slot}`); continue; }
+    const rate = content.balance.focus?.rates?.[slot];
+    if (!Number.isInteger(entry.progress) || entry.progress < 0 || (rate && entry.progress >= rate)) {
+      errors.push(`Invalid Focus progress in ${slot}`);
     }
-    if (daily?.day !== state.dayNumber) errors.push('Daily Energy-system counters are for the wrong game day');
-    const supply = state.inventory.resources?.[FIELD_SUPPLY_ID] ?? 0;
-    const supplyLimits = fieldSupplyLimits(content, state);
-    if (!Number.isInteger(supply) || supply < 0 || supply > supplyLimits.storageCap) errors.push('Invalid Field Supply quantity');
-    if (supplyLimits.held + supplyLimits.reserved > supplyLimits.storageCap) errors.push('Field Supply promises exceed available storage');
-    if (daily?.suppliesUsed > supplyLimits.dailyUseCap) errors.push('Field Supply uses exceed the daily limit');
-    if (!state.crises || !Array.isArray(state.crises.cycleSeen) || !Array.isArray(state.crises.history)) errors.push('Missing Crisis state');
-    if (state.crises?.lastSpawnDay !== null && (!Number.isInteger(state.crises.lastSpawnDay) || state.crises.lastSpawnDay < 2)) errors.push('Invalid last Crisis spawn day');
-    if (state.crises?.cycleSeen?.some(id => typeof id !== 'string')) errors.push('Invalid Crisis cycle history');
-    const active = state.crises?.active;
-    if (active) {
-      if (!content.crisisById[active.definitionId] || !content.worldById[active.worldId]) errors.push('Active Crisis references stale content');
-      if (!['planning', 'resolved'].includes(active.status)) errors.push('Invalid active Crisis status');
-      if (!Array.isArray(active.frontIds) || active.frontIds.length !== active.fronts?.length || new Set(active.frontIds).size !== active.frontIds.length) errors.push('Invalid active Crisis Front snapshot');
-      for (const frontId of active.frontIds ?? []) {
-        if (!Array.isArray(active.assignments?.[frontId]) || active.assignments[frontId].length !== active.teamSize) errors.push(`Invalid Crisis assignment slots for ${frontId}`);
+    if (entry.characterId !== null) {
+      if (!state.characters[entry.characterId]) errors.push(`Focus slot ${slot} references unknown character ${entry.characterId}`);
+      focusIds.push(entry.characterId);
+    }
+  }
+  if (new Set(focusIds).size !== focusIds.length) errors.push('The same hero occupies two Focus slots');
+
+  // --- World Programs
+  for (const [worldId, ps] of Object.entries(state.programs)) {
+    for (const program of ['procurement', 'development', 'operations']) {
+      if (!Number.isInteger(ps[program]?.meter) || ps[program].meter < 0) errors.push(`Invalid ${program} meter for ${worldId}`);
+      if (!Number.isInteger(ps[program]?.delivered) || ps[program].delivered < 0) errors.push(`Invalid ${program} delivery count for ${worldId}`);
+    }
+    if (ps.relicSlot !== null && !['procurement', 'development', 'operations'].includes(ps.relicSlot)) {
+      errors.push(`Invalid relic slot for ${worldId}`);
+    }
+    if (!content.worldById[worldId]) continue; // dormant world: structure only
+    if (ps.procurement.family !== null && !content.materialMeta.familyOrder.includes(ps.procurement.family)) {
+      errors.push(`Unknown Procurement family for ${worldId}`);
+    }
+    if (ps.development.heroId !== null && content.characterById[ps.development.heroId]?.world !== worldId) {
+      errors.push(`Invalid Development hero for ${worldId}`);
+    }
+  }
+
+  // --- relic pieces and Mastery
+  for (const [pieceId, value] of Object.entries(state.relics.pieces)) {
+    if (value !== true) errors.push(`Invalid relic piece state: ${pieceId}`);
+  }
+  const rankIds = new Set((content.balance.mastery?.ranks ?? []).map(rank => rank.id));
+  for (const [worldId, entry] of Object.entries(state.mastery)) {
+    if (!Array.isArray(entry.claimedRanks) || !Array.isArray(entry.pendingChoices)) {
+      errors.push(`Invalid Mastery state for ${worldId}`);
+      continue;
+    }
+    for (const rankId of entry.claimedRanks) {
+      if (rankIds.size && !rankIds.has(rankId)) errors.push(`Unknown claimed Mastery rank ${rankId} for ${worldId}`);
+    }
+    for (const choice of entry.pendingChoices) {
+      if (!['materialCache', 'shards'].includes(choice.kind) || !Number.isInteger(choice.qty) || choice.qty < 1) {
+        errors.push(`Invalid pending Mastery choice for ${worldId}`);
       }
-      const assigned = Object.values(active.assignments ?? {}).flat().filter(Boolean);
-      if (new Set(assigned).size !== assigned.length) errors.push('Active Crisis contains duplicate character assignments');
-      for (const id of assigned) if (!content.characterById[id] || !state.characters[id]?.owned) errors.push(`Active Crisis references unavailable character ${id}`);
-      if (active.cacheClaimed && !active.result?.cacheChoiceId) errors.push('Claimed Crisis Cache has no recorded choice');
-      if (active.status === 'resolved' && assigned.length !== active.frontIds.length * active.teamSize) errors.push('Resolved Crisis has an incomplete assignment');
-      if (active.boon && !CRISIS_BOON_TYPES.has(active.boon.type)) errors.push(`Invalid active Crisis boon ${active.boon.type}`);
     }
   }
-  for (const id of Object.keys(state.nodes)) {
-    if ((state.nodes[id].attemptsToday ?? 0) < 0) errors.push(`Negative attempt count: ${id}`);
+
+  // --- Expedition cycle
+  const expeditions = state.expeditions;
+  if (!expeditions || !Number.isInteger(expeditions.cycle) || expeditions.cycle < 1
+    || !Array.isArray(expeditions.reports)) {
+    errors.push('Missing Expedition state');
+  } else {
+    const allowances = expeditions.allowances;
+    if (!allowances || !Number.isInteger(allowances.freeRerollsUsed) || !Number.isInteger(allowances.freePinsUsed)) {
+      errors.push('Invalid Expedition allowances');
+    }
+    if (expeditions.board !== null && !Array.isArray(expeditions.board?.offers)) errors.push('Invalid route board');
+    const active = expeditions.active;
+    if (active !== null) {
+      if (!Array.isArray(active.routes) || !Number.isInteger(active.launchDay)
+        || !Number.isInteger(active.returnDay) || active.returnDay <= active.launchDay) {
+        errors.push('Invalid launched cycle');
+      } else {
+        const away = active.routes.flatMap(route => route.party);
+        if (new Set(away).size !== away.length) errors.push('A character is on two routes of the launched cycle');
+      }
+    }
   }
-  for (const id of Object.keys(state.archive.fragments)) {
-    if (typeof state.archive.fragments[id] !== 'boolean') errors.push(`Invalid fragment state: ${id}`);
+
+  // --- Crises
+  if (!state.crises || !Array.isArray(state.crises.cycleSeen) || !Array.isArray(state.crises.history)) errors.push('Missing Crisis state');
+  if (state.crises?.lastSpawnDay !== null && (!Number.isInteger(state.crises.lastSpawnDay) || state.crises.lastSpawnDay < 2)) errors.push('Invalid last Crisis spawn day');
+  if (state.crises?.cycleSeen?.some(id => typeof id !== 'string')) errors.push('Invalid Crisis cycle history');
+  const active = state.crises?.active;
+  if (active) {
+    if (!content.crisisById[active.definitionId] || !content.worldById[active.worldId]) errors.push('Active Crisis references stale content');
+    if (!['planning', 'resolved'].includes(active.status)) errors.push('Invalid active Crisis status');
+    if (!Array.isArray(active.frontIds) || active.frontIds.length !== active.fronts?.length || new Set(active.frontIds).size !== active.frontIds.length) errors.push('Invalid active Crisis Front snapshot');
+    for (const frontId of active.frontIds ?? []) {
+      if (!Array.isArray(active.assignments?.[frontId]) || active.assignments[frontId].length !== active.teamSize) errors.push(`Invalid Crisis assignment slots for ${frontId}`);
+    }
+    const assigned = Object.values(active.assignments ?? {}).flat().filter(Boolean);
+    if (new Set(assigned).size !== assigned.length) errors.push('Active Crisis contains duplicate character assignments');
+    for (const id of assigned) if (!content.characterById[id] || !state.characters[id]?.owned) errors.push(`Active Crisis references unavailable character ${id}`);
+    if (active.cacheClaimed && !active.result?.cacheChoiceId) errors.push('Claimed Crisis Cache has no recorded choice');
+    if (active.status === 'resolved' && assigned.length !== active.frontIds.length * active.teamSize) errors.push('Resolved Crisis has an incomplete assignment');
+    if (active.boon && !CRISIS_BOON_TYPES.has(active.boon.type)) errors.push(`Invalid active Crisis boon ${active.boon.type}`);
+  }
+  for (const [id, ns] of Object.entries(state.nodes)) {
+    if (typeof ns.cleared !== 'boolean') errors.push(`Invalid node state: ${id}`);
   }
   for (const party of state.parties) {
     if (!Array.isArray(party.members) || party.members.length !== content.balance.partySize) {
@@ -402,49 +454,40 @@ export function validateSave(content, state) {
     if (pin.type === 'equipment' && !content.characterMeta.slots[pin.slot]) {
       errors.push(`Pin references unknown equipment slot ${pin.slot}`);
     }
-    if (pin.type === 'character' && state.schemaVersion >= 2) {
+    if (pin.type === 'character') {
       if (!['unlock', 'promotion'].includes(pin.objective)) errors.push(`Shard pin ${pin.characterId} has an invalid objective`);
       if (!Number.isInteger(pin.targetStars) || pin.targetStars < 1 || pin.targetStars > 7) {
         errors.push(`Shard pin ${pin.characterId} has an invalid target`);
       }
     }
   }
-  if (state.schemaVersion >= 2) {
-    const ui = state.ui;
-    if (!ui || typeof ui !== 'object') {
-      errors.push('Missing UI preferences');
-    } else {
-      const roster = ui.roster ?? {};
-      const allowed = {
-        world: new Set(['all', ...content.worlds.map(w => w.id)]),
-        archetype: new Set(['all', ...Object.keys(content.archetypes)]),
-        faction: new Set(['all', ...content.tags.filter(t => t.category === 'faction').map(t => t.id)]),
-        ownership: new Set(['all', 'owned', 'unowned', 'ready']),
-        sort: new Set(['name', 'power', 'stars', 'gearTier', 'ready']),
-        direction: new Set(['asc', 'desc'])
-      };
-      for (const [key, values] of Object.entries(allowed)) {
-        if (!values.has(roster[key])) errors.push(`Invalid roster preference ${key}`);
-      }
-      const campaigns = new Set(['main', 'shadow', ...content.worlds.map(w => w.campaignId)]);
-      if (!campaigns.has(ui.campaignId)) errors.push(`Unknown campaign preference ${ui.campaignId}`);
-      for (const [nodeId, index] of Object.entries(ui.nodePartyById ?? {})) {
-        if (!content.nodeById[nodeId]) errors.push(`Party preference references unknown node ${nodeId}`);
-        if (!Number.isInteger(index) || index < 0 || index >= state.parties.length) {
-          errors.push(`Invalid party preference index for ${nodeId}`);
-        }
-      }
-      for (const [id, value] of Object.entries(ui.archiveCollapsed?.worlds ?? {})) {
-        if (!content.worldById[id] || typeof value !== 'boolean') errors.push(`Invalid Archive world preference ${id}`);
-      }
-      const collectionIds = new Set(content.archives.flatMap(a => a.collections.map(c => c.id)));
-      for (const [id, value] of Object.entries(ui.archiveCollapsed?.collections ?? {})) {
-        if (!collectionIds.has(id) || typeof value !== 'boolean') errors.push(`Invalid Archive collection preference ${id}`);
+  const ui = state.ui;
+  if (!ui || typeof ui !== 'object') {
+    errors.push('Missing UI preferences');
+  } else {
+    const roster = ui.roster ?? {};
+    const allowed = {
+      world: new Set(['all', ...content.worlds.map(w => w.id)]),
+      archetype: new Set(['all', ...Object.keys(content.archetypes)]),
+      faction: new Set(['all', ...content.tags.filter(t => t.category === 'faction').map(t => t.id)]),
+      ownership: new Set(['all', 'owned', 'unowned', 'ready']),
+      sort: new Set(['name', 'power', 'stars', 'gearTier', 'ready']),
+      direction: new Set(['asc', 'desc'])
+    };
+    for (const [key, values] of Object.entries(allowed)) {
+      if (!values.has(roster[key])) errors.push(`Invalid roster preference ${key}`);
+    }
+    const campaigns = new Set(['main', ...content.worlds.map(w => w.campaignId)]);
+    if (!campaigns.has(ui.campaignId)) errors.push(`Unknown campaign preference ${ui.campaignId}`);
+    for (const [nodeId, index] of Object.entries(ui.nodePartyById ?? {})) {
+      if (!content.nodeById[nodeId]) errors.push(`Party preference references unknown node ${nodeId}`);
+      if (!Number.isInteger(index) || index < 0 || index >= state.parties.length) {
+        errors.push(`Invalid party preference index for ${nodeId}`);
       }
     }
-    if (!['automatic', 'full', 'compact'].includes(state.settings?.farmingResults)) {
-      errors.push('Invalid farming result preference');
-    }
+  }
+  if (!['automatic', 'full', 'compact'].includes(state.settings?.farmingResults)) {
+    errors.push('Invalid farming result preference');
   }
   if (state.energy < 0) errors.push('Negative Energy');
   return { ok: errors.length === 0, errors };

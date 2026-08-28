@@ -21,15 +21,11 @@ const balance = {
   gearTierPower: [100, 120, 150, 180, 220, 260, 310, 360, 390, 410], // per tier 1..10
   gearSlotShareBp: 1000,        // each equipped piece grants 10% of tier power
   gearCompletionShareBp: 4000,  // completion bonus share
-  shardChanceBp: 7000,          // 70% shard drop
-  shardPityAfterMisses: 1,      // guaranteed after one miss
-  shardAttemptsPerDay: 5,       // per shard node
   synergyCapBp: 2500,           // global +25% cap
   upcraftRatio: 5,              // 5 same-grade materials -> 1 next grade
   nodeDefaults: {
     ordinary:  { energy: 6,  repeat: { count: 1, bonusChanceBp: 4000 } },
     advanced:  { energy: 8,  repeat: { count: 2, bonusChanceBp: 3500 } },
-    shard:     { energy: 10, repeat: { count: 1, bonusChanceBp: 0 } },
     world:     { energy: 10, repeat: { count: 2, bonusChanceBp: 0 } }
   },
   acquisitionTiers: {
@@ -38,7 +34,44 @@ const balance = {
     major:  { unlockStar: 7, cumulativeShards: 450 }
   },
   partySize: 5,
-  partyPresetCount: 6
+  partyPresetCount: 6,
+  // Development Focus: deterministic shard generation from Energy spent on any
+  // campaign node. Rates are Energy per shard; 120 Energy yields 5 + 4 + 3.
+  focus: { rates: { primary: 24, secondary: 30, longTerm: 40 } },
+  // Field Supplies are stored strategic consumables with three targeted modes;
+  // there is no daily use requirement and no plain Energy conversion.
+  fieldSupply: {
+    storageCap: 5,
+    cacheEnergyValue: 30,  // Requisition: guaranteed yield of this much Energy of sweeps
+    shardGrant: 3,         // Tutoring: shards granted to one revealed hero
+    surgeBp: 500           // Surge: +5% effective Power for one node attempt
+  },
+  // World Programs advance automatically through relevant play. Thresholds are
+  // meter sizes; an installed relic uses the relic* variants.
+  programs: {
+    procurement: { threshold: 120, shipmentQty: 6, relicBonusQty: 2 },
+    development: { threshold: 25, bonusShards: 1, relicThreshold: 20 },
+    operations:  { threshold: 2, relicThreshold: 1, bonusQty: 4 }
+  },
+  // World Mastery: a derived 0..1000 track per world. Weights must sum to the
+  // final rank threshold. Hero weights are basis points of one hero's share.
+  mastery: {
+    ranks: [
+      { id: 'unfamiliar',  displayName: 'Unfamiliar',  at: 0 },
+      { id: 'known',       displayName: 'Known',       at: 200 },
+      { id: 'established', displayName: 'Established', at: 450 },
+      { id: 'rooted',      displayName: 'Rooted',      at: 700 },
+      { id: 'mastered',    displayName: 'Mastered',    at: 1000 }
+    ],
+    weights: { campaign: 350, heroes: 350, gear: 200, relic: 100 },
+    heroWeightsBp: { revealed: 1500, owned: 3500, stars: 5000 },
+    milestones: {
+      known:       { supplies: 1, materialCache: 8 },
+      established: { shardChoice: 15 },
+      rooted:      { supplies: 2, materialCache: 10 },
+      mastered:    { shardChoice: 25 }
+    }
+  }
 };
 
 // ---------------------------------------------------------------- materials

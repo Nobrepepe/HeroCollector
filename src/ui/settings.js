@@ -2,8 +2,7 @@
 // confirmation preferences, save tools, credits.
 import { h } from './dom.js';
 import { exportSave, importSave } from '../platform.js';
-import { newPlayerState, syncSaveWithContent } from '../core/state.js';
-import { migratePlayerState } from '../core/migrate.js';
+import { newPlayerState, syncSaveWithContent, SCHEMA_VERSION } from '../core/state.js';
 import { validateSave } from '../core/validate.js';
 import { openModal, toast, render } from '../app.js';
 
@@ -61,13 +60,11 @@ export function renderSettings(store, root) {
       onclick: async () => {
         const imported = await importSave();
         if (!imported) { toast('Import canceled or unreadable.', 'error'); return; }
-        let migrated;
-        try {
-          migrated = migratePlayerState(content, imported);
-        } catch (error) {
-          toast(`Import migration failed: ${error instanceof Error ? error.message : String(error)}`, 'error');
+        if (imported.schemaVersion !== SCHEMA_VERSION) {
+          toast(`That save is schema ${imported.schemaVersion ?? 'unknown'}; this build plays schema ${SCHEMA_VERSION} saves only.`, 'error');
           return;
         }
+        const migrated = imported;
         // Match normal startup: clean stale live references while preserving
         // dormant progress before validating the imported state.
         syncSaveWithContent(content, migrated);

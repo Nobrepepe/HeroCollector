@@ -4,13 +4,15 @@ import {
   unlockCharacter, movePin, removePin
 } from '../core/state.js';
 import { analyzePinnedGoals } from '../core/progression.js';
-import { portrait, campaignLabel } from './shared.js';
+import { portrait, portraitSlot, campaignLabel } from './shared.js';
 import { openFindSources } from './find-sources.js';
 import { craftEquipmentWithConfirmation, openGearDialog } from './gear.js';
 import {
-  campaignFrontiers, rankTodayHook, todayHookText, sceneImage, selectedPartyPower
+  campaignFrontiers, rankTodayHook, todayHookText, sceneImage, selectedPartyPower, countWord
 } from './presentation.js';
-import { previewFieldSupplyUse } from '../core/energy.js';
+import { FOCUS_SLOTS, focusStatus, assignFocus, clearFocusSlot, isRevealed } from '../core/focus.js';
+import { openModal, render } from '../app.js';
+import { dressModal, modalHead, modalActions, modalDismiss } from './modal.js';
 
 export function renderHome(store, root) {
   const { content, state } = store;
@@ -56,6 +58,8 @@ export function renderHome(store, root) {
   contentCol.appendChild(h('div.fade-rule'));
   contentCol.appendChild(continueThread(store, frontier));
   contentCol.appendChild(h('div.fade-rule'));
+  contentCol.appendChild(focusThread(store));
+  contentCol.appendChild(h('div.fade-rule'));
   contentCol.appendChild(readyThread(store, ready));
   contentCol.appendChild(h('div.fade-rule'));
   contentCol.appendChild(trackingThread(store));
@@ -68,12 +72,107 @@ function routeSentence(store, hook) {
     ? `The response in ${store.content.worldById[hook.crisis.worldId].displayName} costs no Energy and closes at the next reset.`
     : 'One deterministic reward choice remains before the day closes.';
   if (hook.kind === 'shards') {
-    const sources = store.content.shardNodesByCharacter[hook.def.id] ?? [];
-    return sources.length ? `The quickest route is ${sources[0].displayName}.` : 'Their next shard source is still waiting to be authored.';
+    if (!isRevealed(store.state, hook.def.id)) {
+      const encounter = (store.content.encounterNodesByCharacter[hook.def.id] ?? [])[0];
+      return encounter ? `Their encounter waits at ${encounter.displayName}.` : 'Their encounter is still waiting to be authored.';
+    }
+    const slot = focusStatus(store.content, store.state).find(entry => entry.characterId === hook.def.id);
+    return slot
+      ? `Your ${slot.name} Focus is already earning them — every campaign run pays in.`
+      : 'Give them a Development Focus slot and every campaign run pays toward them.';
   }
   if (hook.kind === 'gear') return 'Every required component is already in your Workshop.';
   if (hook.kind === 'campaign') return `Your journey continues at ${hook.node.displayName}.`;
   return 'Explore the Journey or choose a goal to begin another thread.';
+}
+
+// The three Focus slots, read at a glance: who is set, how close the next
+// shard is, and where the Expedition cycle stands.
+function focusThread(store) {
+  const { content, state } = store;
+  const wrap = h('section.today-thread', h('div.eyebrow', 'Development Focus'));
+  const row = h('div.focus-thread-row');
+  for (const entry of focusStatus(content, state)) {
+    const def = entry.characterId ? content.characterById[entry.characterId] : null;
+    row.appendChild(h('button.focus-slot-card', {
+      onclick: () => openFocusModal(store),
+      'aria-label': def
+        ? `${entry.name} Focus: ${def.displayName}, ${entry.energyToNext} Energy to the next shard`
+        : `${entry.name} Focus is empty`
+    },
+    def ? portrait(store, entry.characterId, 'sm', { decorative: true })
+      : portraitSlot({ size: 'sm', state: 'empty', glyph: '+', decorative: true }),
+    h('div.grow',
+      h('div.focus-slot-name', def ? def.displayName : 'Empty slot'),
+      h('div.caption', `${entry.name} · 1 shard / ${entry.rate}⚡`),
+      h('div.progressbar', h('div', { style: { width: `${Math.min(100, entry.progress / entry.rate * 100)}%` } })),
+      entry.halted && def ? h('div.caption.warn', 'holding — they are maxed') : null)));
+  }
+  wrap.appendChild(row);
+  const active = state.expeditions.active;
+  wrap.appendChild(h('p.caption', active
+    ? `Every run advances all three meters. The Expedition cycle returns on day ${active.returnDay}.`
+    : state.expeditions.board
+      ? ['Every run advances all three meters. A route board is waiting — ',
+        h('button.link', { onclick: () => store.go('#/expeditions') }, 'plan the cycle →')]
+      : 'Every run advances all three meters.'));
+  return wrap;
+}
+
+// Assigning Focus is a modal rather than a screen: three slots, one list.
+export function openFocusModal(store) {
+  const { content, state } = store;
+  openModal((modal, close) => {
+    const paint = () => {
+      modal.replaceChildren();
+      dressModal(modal, { size: 'wide' });
+      modal.appendChild(modalHead('Development Focus', 'Who is the Energy for?',
+        { lead: 'Every point of Energy spent on campaign nodes advances all three meters. Reassign freely — each slot keeps its own progress.' }));
+      for (const entry of focusStatus(content, state)) {
+        const def = entry.characterId ? content.characterById[entry.characterId] : null;
+        modal.appendChild(h('div.focus-modal-slot',
+          h('div.focus-modal-slot-head',
+            h('span.strong', `${entry.name} — 1 shard per ${entry.rate}⚡`),
+            h('span.caption', def ? `${entry.energyToNext}⚡ to the next shard` : 'empty')),
+          h('div.focus-modal-slot-row',
+            def ? portrait(store, entry.characterId, 'sm', { decorative: true }) : portraitSlot({ size: 'sm', state: 'empty', glyph: '+', decorative: true }),
+            h('div.grow', def ? def.displayName : 'No hero assigned'),
+            h('button.link', { onclick: () => openFocusTargetList(store, entry.slot, () => paint()) }, def ? 'Change →' : 'Assign →'),
+            def ? h('button.link', {
+              onclick: () => store.tx(() => clearFocusSlot(state, entry.slot), { rerender: false }).then(paint)
+            }, 'Clear') : null)));
+      }
+      modal.appendChild(modalActions(modalDismiss('Done', () => { close(); render(); })));
+    };
+    paint();
+  });
+}
+
+function openFocusTargetList(store, slot, onDone) {
+  const { content, state } = store;
+  const targets = content.characters
+    .filter(def => isRevealed(state, def.id))
+    .filter(def => !(state.characters[def.id].owned && state.characters[def.id].stars >= 7));
+  openModal((modal, close) => {
+    dressModal(modal, { size: 'wide' });
+    modal.appendChild(modalHead('Development Focus', `Who takes the ${slot === 'longTerm' ? 'Long-term' : slot[0].toUpperCase() + slot.slice(1)} slot?`,
+      { lead: 'Any revealed hero below the 7-Star maximum — recruited or not.' }));
+    const list = h('div.supply-target-list');
+    for (const def of targets) {
+      const cs = state.characters[def.id];
+      list.appendChild(h('button.supply-target-row', {
+        onclick: () => store.tx(() => assignFocus(content, state, slot, def.id), { rerender: false })
+          .then(result => { if (result.ok) { close(); onDone(); } })
+      },
+      portrait(store, def.id, 'sm', { decorative: true }),
+      h('div.grow',
+        h('div', def.displayName, cs.owned ? h('span.small.muted', ` · ${cs.stars}★`) : h('span.small.muted', ' · not yet recruited')),
+        h('div.small.muted', `${fmt(cs.shards)} shards banked`))));
+    }
+    if (!targets.length) list.appendChild(h('p.muted', 'No revealed hero can grow right now. Encounter someone in a campaign first.'));
+    modal.appendChild(list);
+    modal.appendChild(modalActions(modalDismiss('Back', close)));
+  });
 }
 
 function continueThread(store, node) {
@@ -82,7 +181,6 @@ function continueThread(store, node) {
     wrap.appendChild(h('p.muted', 'Every currently available campaign is complete.'));
     return wrap;
   }
-  const supply = previewFieldSupplyUse(store.content, store.state);
   const scene = sceneImage(store, node);
   const selected = selectedPartyPower(store, node);
   const thresholdClass = selected.effective >= node.threshold ? 'good' : 'bad';
@@ -98,12 +196,13 @@ function continueThread(store, node) {
     h('div.continue-action',
       h('button.btn.primary', { onclick: () => store.go(`#/node/${node.id}`) }, 'Enter →'),
       h('div.caption', `⚡ ${store.content.balance.nodeDefaults[node.type].energy}`))));
-  if (store.state.energy < store.content.balance.nodeDefaults[node.type].energy && supply.ok) {
+  const held = store.state.inventory.resources?.field_supply ?? 0;
+  if (store.state.energy < store.content.balance.nodeDefaults[node.type].energy && held > 0) {
     wrap.appendChild(h('p.today-supply',
       h('span.today-supply-dot', { 'aria-hidden': 'true' }),
-      h('span', 'The day is spent, but one Field Supply is waiting. ',
+      h('span', `The day's Energy is spent, but ${countWord(held)} Field Suppl${held === 1 ? 'y' : 'ies'} wait${held === 1 ? 's' : ''} for a targeted push. `,
         h('button.link', { onclick: () => document.querySelector('.sidebar-energy')?.click() },
-          `Restore ${supply.restored} Energy →`))));
+          'Open the reserve →'))));
   }
   return wrap;
 }

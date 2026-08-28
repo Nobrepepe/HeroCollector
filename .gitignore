@@ -16,3 +16,6 @@ AGENT_README.md
 # Logs and platform noise
 *.log
 .DS_Store
+
+# Local hub-preview mirror for the browser preview
+.hub-preview/

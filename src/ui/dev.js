@@ -6,16 +6,34 @@ import { validateContent, validateSave } from '../core/validate.js';
 import { evaluateParty } from '../core/synergy.js';
 import { characterPowerBreakdown } from '../core/power.js';
 import { makeRng } from '../core/rng.js';
-import { applyDailyReset, newPlayerState, nodeState } from '../core/state.js';
+import { applyDailyReset, newPlayerState } from '../core/state.js';
 import { openModal, toast, render } from '../app.js';
 import { addResource } from '../core/resources.js';
-import { generateExpeditionBoard } from '../core/expeditions.js';
+import { generateCycleBoard } from '../core/expeditions.js';
+import { upgradeCustomDB } from '../core/custom.js';
+import { importJson } from '../platform.js';
 
 export function renderDev(store, root) {
   const { content, state } = store;
 
-  root.appendChild(h('p.warn.small', '🧪 Developer tools — these bypass normal play. Not part of the player experience. ',
-    h('button.link', { onclick: () => store.go('#/creator') }, 'Open the Content Creator'), ' to build worlds, characters, and campaigns.'));
+  root.appendChild(h('p.warn.small', '🧪 Developer tools — these bypass normal play. Not part of the player experience.'));
+
+  // ---------- content pack
+  const cp = h('div.panel');
+  cp.appendChild(h('h2', 'Content pack'));
+  cp.appendChild(h('p.small.muted', store.hubMode
+    ? 'A World Hub publication is active; importing a pack here is disabled until it is rolled back.'
+    : 'Import a content-pack JSON (any legacy version; it is upgraded on import). It replaces the bundled default until removed.'));
+  if (!store.hubMode) cp.appendChild(h('button.btn', {
+    onclick: async () => {
+      const raw = await importJson();
+      if (!raw) { toast('Import canceled or unreadable.', 'error'); return; }
+      store.customDB = upgradeCustomDB(raw);
+      const applied = await store.applyCustom({ rerender: true });
+      toast(applied.ok ? 'Content pack applied.' : 'The pack could not be applied — previous content is still active.', applied.ok ? 'info' : 'error');
+    }
+  }, 'Import content pack…'));
+  root.appendChild(cp);
 
   // ---------- grants
   const gr = h('div.panel');
@@ -24,11 +42,8 @@ export function renderDev(store, root) {
   gr.appendChild(h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' } },
     h('span', 'Amount:'), amount,
     h('button.btn.tiny', { onclick: () => act(() => { state.energy = Math.max(0, state.energy + num(amount)); }) }, '± Energy'),
-    h('button.btn.tiny', { onclick: () => act(() => addResource(state, 'renown', num(amount))) }, '± Renown'),
     h('button.btn.tiny', { onclick: () => act(() => addResource(state, 'intelligence', num(amount))) }, '± Intelligence'),
-    ...content.worlds.map(world => h('button.btn.tiny', {
-      onclick: () => act(() => addResource(state, world.worldAsset.id, num(amount)))
-    }, `± ${world.worldAsset.displayName}`)),
+    h('button.btn.tiny', { onclick: () => act(() => addResource(state, 'field_supply', num(amount))) }, '± Field Supply'),
     h('button.btn.tiny', {
       onclick: () => act(() => {
         for (const m of content.materials) {
@@ -51,6 +66,7 @@ export function renderDev(store, root) {
   gr.appendChild(h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginTop: '8px' } },
     charSel,
     h('button.btn.tiny', { onclick: () => act(() => { const cs = state.characters[charSel.value]; cs.shards = Math.max(0, cs.shards + num(amount)); }) }, '± Shards'),
+    h('button.btn.tiny', { onclick: () => act(() => { state.characters[charSel.value].revealed = true; }) }, 'Reveal'),
     h('button.btn.tiny', { onclick: () => act(() => { const cs = state.characters[charSel.value]; cs.owned = true; cs.stars = Math.min(7, Math.max(1, cs.stars + 1)); }) }, '+1 Star'),
     h('button.btn.tiny', {
       onclick: () => act(() => {
@@ -74,7 +90,7 @@ export function renderDev(store, root) {
       onclick: () => act(() => {
         for (const n of content.nodesByCampaign[campSel.value] ?? []) {
           if (n.chapter <= num(chapterN)) {
-            const ns = state.nodes[n.id] ?? (state.nodes[n.id] = { cleared: false, firstClearClaimed: false, objectiveClaimed: false, attemptsToday: 0 });
+            const ns = state.nodes[n.id] ?? (state.nodes[n.id] = { cleared: false, firstClearClaimed: false, objectiveClaimed: false });
             ns.cleared = true;
           }
         }
@@ -101,7 +117,6 @@ export function renderDev(store, root) {
         if (s) toast(`Reset applied: +${s.energyGained} Energy.`);
       })
     }, 'Advance one day & apply reset'),
-    h('button.btn.tiny', { onclick: () => act(() => { for (const ns of Object.values(state.nodes)) ns.attemptsToday = 0; }) }, 'Refresh attempts'),
     h('button.btn.tiny', { onclick: () => act(() => { state.devTimeOffsetMs = 0; }) }, 'Clear time offset')));
   root.appendChild(tm);
 
@@ -109,10 +124,10 @@ export function renderDev(store, root) {
   const boardSeed = h('input', { type: 'number', value: 12345, 'aria-label': 'Expedition board seed' });
   ex.append(boardSeed,
     h('button.btn.tiny', { onclick: () => act(() =>
-      generateExpeditionBoard(content, state, makeRng(num(boardSeed) >>> 0), { seed: num(boardSeed) >>> 0 })) }, 'Generate board'),
+      generateCycleBoard(content, state, makeRng(num(boardSeed) >>> 0))) }, 'Generate board'),
     h('button.btn.tiny', { onclick: () => act(() => {
-      for (const expedition of state.expeditions.active) expedition.returnDay = state.dayNumber;
-    }) }, 'Make active Expeditions due'),
+      if (state.expeditions.active) state.expeditions.active.returnDay = state.dayNumber;
+    }) }, 'Make the launched cycle due'),
     h('pre.small', JSON.stringify(state.expeditions.board, null, 2)));
   root.appendChild(ex);
 
@@ -130,23 +145,7 @@ export function renderDev(store, root) {
         store.rng = makeRng(seed);
       })
     }, 'Set seed'),
-    h('button.btn.tiny', { onclick: () => act(() => { state.rng = null; }) }, 'Clear seed'),
-    h('button.btn.tiny', {
-      onclick: () => {
-        const rng = makeRng(num(seedIn) >>> 0);
-        let hits = 0, pity = false, pityHits = 0;
-        const N = 1000;
-        for (let i = 0; i < N; i++) {
-          if (pity || rng.chanceBp(content.balance.shardChanceBp)) { hits++; if (pity) pityHits++; pity = false; }
-          else pity = true;
-        }
-        openModal((modal, close) => {
-          modal.appendChild(h('h2', 'Shard simulation'));
-          modal.appendChild(h('p', `${N} attempts with seed ${num(seedIn)}: ${hits} shards (${(hits / N * 100).toFixed(1)}%), ${pityHits} from pity.`));
-          modal.appendChild(h('button.btn', { onclick: close }, 'Close'));
-        });
-      }
-    }, 'Simulate 1,000 shard attempts')));
+    h('button.btn.tiny', { onclick: () => act(() => { state.rng = null; }) }, 'Clear seed')));
   root.appendChild(rg);
 
   // ---------- trace

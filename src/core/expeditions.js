@@ -1,10 +1,16 @@
+// Expeditions: an infrequent roster puzzle on a shared cycle. Each cycle
+// presents one board of routes; the player picks up to `slotCount`, assigns
+// every party together, and all selected routes launch and return together
+// after `cycleLengthDays`. The board waits for the player — it never expires —
+// and rerolls/pins are per-cycle allowances. Route rewards are scaled up by
+// `cycleScaleBp` to compensate for replacing daily boards with one allocation.
 import { characterPowerForState } from './power.js';
-import { hqExpeditionModifiers } from './hq.js';
 import {
   addResource, grantRewardEntries, INTELLIGENCE_ID, RANDOM_MATERIAL, randomMaterialPool, scaledRewards
 } from './resources.js';
 import { fieldSupplyLimits, FIELD_SUPPLY_ID } from './energy.js';
-import { activeCrisisBoon } from './crises.js';
+import { isRevealed } from './focus.js';
+import { addOperationsCompletion } from './programs.js';
 
 const pick = (rng, list) => list[Math.floor(rng.next() * list.length)];
 const shuffle = (rng, list) => {
@@ -17,11 +23,11 @@ const shuffle = (rng, list) => {
 };
 
 export function expeditionCharacterIds(state) {
-  return new Set((state.expeditions?.active ?? []).flatMap(item => item.party));
+  return new Set((state.expeditions?.active?.routes ?? []).flatMap(route => route.party));
 }
 
 export function characterExpedition(state, characterId) {
-  return (state.expeditions?.active ?? []).find(item => item.party.includes(characterId)) ?? null;
+  return (state.expeditions?.active?.routes ?? []).find(route => route.party.includes(characterId)) ?? null;
 }
 
 export function partySnapshot(content, state, ids) {
@@ -107,14 +113,15 @@ export function offerFeasibility(content, state, offer) {
 }
 
 // A @random_material entry draws one family at its authored grade when the
-// offer is built, so the board already shows which material the cache holds.
+// offer is built, so the board already shows which material the route holds.
 function rollRewardMaterial(content, entry, rng) {
   if (entry.kind !== 'material' || entry.id !== RANDOM_MATERIAL) return entry.id;
   const pool = randomMaterialPool(content, entry.grade ?? 'basic');
   return pool.length ? pick(rng, pool).id : entry.id;
 }
 
-function instantiateOffer(content, state, template, rng, day, position) {
+function instantiateOffer(content, state, template, rng, cycle, position) {
+  const settings = content.expeditions.settings;
   const requirementDefs = content.expeditions.requirementById;
   const optionalDefs = content.expeditions.optionalById;
   const world = template.world === '@any'
@@ -129,46 +136,52 @@ function instantiateOffer(content, state, template, rng, day, position) {
   const requirements = [{ type: 'party_size', count: template.partySize, text: `Send ${template.partySize} characters.` },
     ...reqIds.map(id => structuredClone(requirementDefs[id])).filter(Boolean)];
   const optional = structuredClone(optionalDefs[pick(rng, template.optionalIds)]);
-  const owned = content.characters.filter(d => state.characters[d.id]?.owned);
-  const average = owned.length ? owned.reduce((n, d) => n + characterPowerForState(content, state, d.id), 0) / owned.length : 1150;
+  // Recommended Power scales from the player's strongest heroes — the ones who
+  // would actually go — so investing in a squad is never punished.
+  const topPowers = content.characters.filter(d => state.characters[d.id]?.owned)
+    .map(d => characterPowerForState(content, state, d.id))
+    .sort((a, b) => b - a)
+    .slice(0, template.partySize);
+  while (topPowers.length < template.partySize) topPowers.push(1150);
   const ratio = template.powerRatioBp?.[0] ?? 10000;
   const ratioMax = template.powerRatioBp?.[1] ?? ratio;
   const sampledRatio = ratio + Math.floor(rng.next() * (ratioMax - ratio + 1));
   const packageDef = content.expeditions.rewardById[template.rewardPackageId];
+  const scale = qty => Math.max(1, Math.floor(qty * (settings.cycleScaleBp ?? 10000) / 10000));
   const rewards = (packageDef?.entries ?? []).map(entry => ({
     ...entry, id: rollRewardMaterial(content, entry, rng),
-    qty: entry.min + Math.floor(rng.next() * (entry.max - entry.min + 1))
+    qty: scale(entry.min + Math.floor(rng.next() * (entry.max - entry.min + 1)))
   }));
-  const rare = packageDef?.rare?.length ? structuredClone(pick(rng, packageDef.rare)) : null;
-  const duration = template.durations.length === 1 ? template.durations[0] : pick(rng, template.durations);
+  const rare = packageDef?.rare?.length
+    ? { ...structuredClone(pick(rng, packageDef.rare)) } : null;
+  if (rare) rare.qty = scale(rare.qty ?? 1);
   if (packageDef?.shardPool) {
-    const candidates = content.characters.filter(def => !world || def.world === world);
-    if (candidates.length) {
-      const range = packageDef.shardRange ?? [2, 4];
-      rewards.push({ kind: 'shards', characterId: pick(rng, candidates).id,
-        qty: range[0] + Math.floor(rng.next() * (range[1] - range[0] + 1)) });
-    }
+    // A character-lead route lets the player CHOOSE a revealed hero from the
+    // route's world at launch, rather than receiving a random one.
+    const range = packageDef.shardRange ?? [2, 4];
+    rewards.push({ kind: 'shards', choice: { world },
+      qty: scale(range[0] + Math.floor(rng.next() * (range[1] - range[0] + 1))) });
   }
   return {
-    id: `offer_${day}_${position}_${Math.floor(rng.next() * 0xffffffff).toString(36)}`,
+    id: `offer_${cycle}_${position}_${Math.floor(rng.next() * 0xffffffff).toString(36)}`,
     templateId: template.id, name: pick(rng, template.titles), description: pick(rng, template.descriptions),
-    world, duration, partySize: template.partySize, requirements, optional,
-    recommendedPower: Math.max(1, Math.round(average * template.partySize * sampledRatio / 10000)),
-    offerKind: template.id === content.expeditions.settings.guaranteedSupplyTemplateId ? 'supply' : 'standard',
+    world, partySize: template.partySize, requirements, optional,
+    recommendedPower: Math.max(1, Math.round(topPowers.reduce((n, p) => n + p, 0) * sampledRatio / 10000)),
+    offerKind: template.id === settings.guaranteedSupplyTemplateId ? 'supply' : 'standard',
     baseRewards: rewards, fixedRewards: (template.fixedRewards ?? []).map(entry => ({ ...structuredClone(entry), fixed: true })), rareReward: rare, rareRevealed: false,
     rareRoll: Math.floor(rng.next() * 10000), pinned: false
   };
 }
 
-export function generateExpeditionBoard(content, state, rng, { seed = null, pinned = null } = {}) {
+export function generateCycleBoard(content, state, rng, { pinned = null } = {}) {
   const settings = content.expeditions.settings;
+  const cycle = state.expeditions.cycle;
   const offers = pinned ? [{ ...structuredClone(pinned), pinned: false }] : [];
   const guaranteed = content.expeditions.templateById?.[settings.guaranteedSupplyTemplateId]
     ?? content.expeditions.templates.find(template => template.id === settings.guaranteedSupplyTemplateId);
   if (guaranteed && guaranteed.enabled !== false && !offers.some(offer => offer.offerKind === 'supply')) {
-    offers.push(instantiateOffer(content, state, guaranteed, rng, state.dayNumber, offers.length));
+    offers.push(instantiateOffer(content, state, guaranteed, rng, cycle, offers.length));
   }
-  let longCount = offers.filter(o => o.duration === 2).length;
   const templates = content.expeditions.templates.filter(t => t.enabled !== false && t.id !== settings.guaranteedSupplyTemplateId);
   for (let position = offers.length; position < settings.offerCount; position++) {
     if (!templates.length) break;
@@ -176,135 +189,203 @@ export function generateExpeditionBoard(content, state, rng, { seed = null, pinn
     for (let attempt = 0; attempt < settings.generationAttempts; attempt++) {
       const weighted = templates.flatMap(t => Array(Math.max(1, t.weight ?? 1)).fill(t));
       const template = pick(rng, weighted);
-      const candidate = instantiateOffer(content, state, template, rng, state.dayNumber, position);
-      if (candidate.duration === 2 && longCount >= settings.maxLongOffers) continue;
+      const candidate = instantiateOffer(content, state, template, rng, cycle, position);
       if (offers.some(o => o.templateId === candidate.templateId && o.requirements[1]?.type === candidate.requirements[1]?.type)) continue;
       chosen = candidate; break;
     }
-    chosen ??= instantiateOffer(content, state, content.expeditions.fallbackTemplate, rng, state.dayNumber, position);
-    if (chosen.duration === 2) longCount++;
+    chosen ??= instantiateOffer(content, state, content.expeditions.fallbackTemplate, rng, cycle, position);
     offers.push(chosen);
   }
   // Replace hard offers until the configured minimum is met where possible.
   let feasible = offers.filter(o => offerFeasibility(content, state, o).feasible).length;
   for (let i = offers.length - 1; i >= 0 && feasible < settings.minimumFeasible; i--) {
     if (offers[i].id === pinned?.id || offers[i].offerKind === 'supply' || offerFeasibility(content, state, offers[i]).feasible) continue;
-    const replacement = instantiateOffer(content, state, content.expeditions.fallbackTemplate, rng, state.dayNumber, i);
+    const replacement = instantiateOffer(content, state, content.expeditions.fallbackTemplate, rng, cycle, i);
     offers[i] = replacement;
     if (offerFeasibility(content, state, replacement).feasible) feasible++;
   }
-  state.expeditions.board = { day: state.dayNumber, seed, offers };
+  // Operations Programs improve the next cycle's routes from their world:
+  // one banked boost adds a visible material bundle to every route from that
+  // world on this board.
+  const boostQty = content.balance.programs?.operations?.bonusQty ?? 4;
+  for (const world of content.worlds) {
+    const ops = state.programs?.[world.id]?.operations;
+    if (!ops?.boostCycles) continue;
+    const boosted = offers.filter(offer => offer.world === world.id);
+    if (!boosted.length) continue;
+    ops.boostCycles -= 1;
+    for (const offer of boosted) {
+      offer.baseRewards.push({
+        kind: 'material', id: rollRewardMaterial(content, { kind: 'material', id: RANDOM_MATERIAL, grade: 'basic' }, rng),
+        qty: boostQty, operations: true
+      });
+    }
+  }
+  state.expeditions.board = { cycle, seed: cycle, offers };
+  state.expeditions.allowances = {
+    freeRerolls: settings.freeRerolls ?? 1, freeRerollsUsed: 0,
+    freePins: settings.freePins ?? 1, freePinsUsed: 0
+  };
   return state.expeditions.board;
 }
 
-export function launchExpedition(content, state, offerId, ids) {
-  const offer = state.expeditions.board.offers.find(o => o.id === offerId);
+// Launch the whole cycle in one commitment: up to `slotCount` routes, all
+// parties assigned together, no character on two routes. Unchosen routes are
+// released (a pinned one is carried to the next cycle's board).
+export function launchCycle(content, state, selections) {
+  const settings = content.expeditions.settings;
+  const board = state.expeditions.board;
   const reasons = [];
-  if (!offer) reasons.push('That offer is no longer available.');
-  if (state.expeditions.active.length >= content.expeditions.settings.slotCount) reasons.push('All Expedition slots are occupied.');
-  const busy = expeditionCharacterIds(state);
-  for (const id of ids) {
-    if (!state.characters[id]?.owned) reasons.push('Every Expedition member must be owned.');
-    if (busy.has(id)) reasons.push(`${content.characterById[id]?.displayName ?? id} is already on an Expedition.`);
-  }
-  const preview = offer ? previewExpedition(content, state, offer, ids) : null;
-  if (preview && !preview.valid) reasons.push('The selected party does not satisfy every mandatory requirement.');
-  const promisedSupplies = (offer?.fixedRewards ?? []).filter(entry => entry.kind === 'resource' && entry.id === FIELD_SUPPLY_ID)
-    .reduce((sum, entry) => sum + entry.qty, 0);
-  if (promisedSupplies > fieldSupplyLimits(content, state).unreservedCapacity) {
-    reasons.push('Held and promised Field Supplies already fill the available storage. Cancel a launch-day Supply Expedition or use a Supply first.');
-  }
+  if (!board) reasons.push('No route board is waiting.');
+  if (state.expeditions.active) reasons.push('This cycle has already launched.');
+  if (!Array.isArray(selections) || selections.length < 1) reasons.push('Choose at least one route.');
+  if ((selections?.length ?? 0) > settings.slotCount) reasons.push(`At most ${settings.slotCount} routes can launch per cycle.`);
   if (reasons.length) return { ok: false, reasons };
-  const modifiers = offer.world ? hqExpeditionModifiers(content, state, offer.world) : { renownBp: 0, worldAssetBp: 0, rareChanceBp: 0 };
-  const crisisRenown = offer.world ? activeCrisisBoon(state, 'world_expedition_renown_bp', offer.world) : null;
-  if (crisisRenown) modifiers.renownBp += crisisRenown.bonusBp ?? 0;
-  const rewards = scaledRewards(offer.baseRewards, preview.multiplierBp, modifiers);
-  const rareChance = Math.min(10000, (offer.rareReward?.chanceBp ?? 0) + (modifiers.rareChanceBp ?? 0));
-  if (preview.tier === 'exceptional' && offer.rareReward && offer.rareRoll < rareChance) {
-    rewards.push({ ...offer.rareReward, qty: offer.rareReward.qty ?? 1 });
+
+  const seen = new Set();
+  const assigned = new Set();
+  const routes = [];
+  let promisedSupplies = 0;
+  for (const selection of selections) {
+    const offer = board.offers.find(o => o.id === selection.offerId);
+    if (!offer) { reasons.push('A selected route is no longer available.'); continue; }
+    if (seen.has(offer.id)) { reasons.push(`${offer.name} was selected twice.`); continue; }
+    seen.add(offer.id);
+    const ids = selection.party ?? [];
+    for (const id of ids) {
+      if (!state.characters[id]?.owned) reasons.push('Every route member must be owned.');
+      if (assigned.has(id)) reasons.push(`${content.characterById[id]?.displayName ?? id} is assigned to two routes.`);
+      assigned.add(id);
+    }
+    const preview = previewExpedition(content, state, offer, ids);
+    if (!preview.valid) reasons.push(`${offer.name}: the selected party does not satisfy every mandatory requirement.`);
+    // Resolve character-lead shard choices to the player's chosen hero.
+    const baseRewards = structuredClone(offer.baseRewards);
+    for (const entry of baseRewards) {
+      if (entry.kind !== 'shards' || !entry.choice) continue;
+      const chosenId = selection.shardChoiceCharacterId;
+      const def = chosenId ? content.characterById[chosenId] : null;
+      if (!def) reasons.push(`${offer.name}: choose a revealed hero for the lead.`);
+      else if (entry.choice.world && def.world !== entry.choice.world) reasons.push(`${offer.name}: the lead must be a hero of ${content.worldById[entry.choice.world]?.displayName ?? 'the route’s world'}.`);
+      else if (!isRevealed(state, chosenId)) reasons.push(`${offer.name}: only a revealed hero can be the lead.`);
+      else { entry.characterId = chosenId; delete entry.choice; }
+    }
+    promisedSupplies += (offer.fixedRewards ?? [])
+      .filter(entry => entry.kind === 'resource' && entry.id === FIELD_SUPPLY_ID)
+      .reduce((sum, entry) => sum + entry.qty, 0);
+    if (reasons.length) continue;
+    const rewards = scaledRewards(baseRewards, preview.multiplierBp);
+    const rareChance = offer.rareReward?.chanceBp ?? 0;
+    if (preview.tier === 'exceptional' && offer.rareReward && offer.rareRoll < rareChance) {
+      rewards.push({ ...offer.rareReward, qty: offer.rareReward.qty ?? 1 });
+    }
+    routes.push({
+      id: `route_${offer.id}`, offerId: offer.id, templateId: offer.templateId,
+      name: offer.name, description: offer.description, world: offer.world,
+      party: [...ids], snapshot: preview.party,
+      tier: preview.tier, optionalMet: preview.optional.met, rewards,
+      fixedRewards: structuredClone(offer.fixedRewards ?? []), offerKind: offer.offerKind ?? 'standard',
+      rareReward: offer.rareReward, rareRevealed: offer.rareRevealed
+    });
   }
-  const active = {
-    id: `exp_${offer.id}`, offerId: offer.id, templateId: offer.templateId,
-    name: offer.name, description: offer.description, world: offer.world,
-    launchDay: state.dayNumber, returnDay: state.dayNumber + offer.duration,
-    duration: offer.duration, party: [...ids], snapshot: preview.party,
-    tier: preview.tier, optionalMet: preview.optional.met, rewards,
-    fixedRewards: structuredClone(offer.fixedRewards ?? []), offerKind: offer.offerKind ?? 'standard',
-    rareReward: offer.rareReward, rareRevealed: offer.rareRevealed,
-    sourceOffer: structuredClone(offer)
+  if (promisedSupplies > fieldSupplyLimits(content, state).unreservedCapacity) {
+    reasons.push('Held and promised Field Supplies already fill the available storage. Use a Supply first.');
+  }
+  if (reasons.length) return { ok: false, reasons: [...new Set(reasons)] };
+
+  const pinnedCarry = board.offers.find(offer => offer.pinned && !seen.has(offer.id)) ?? null;
+  state.expeditions.active = {
+    cycle: board.cycle, launchDay: state.dayNumber,
+    returnDay: state.dayNumber + (settings.cycleLengthDays ?? 4),
+    routes, pinnedCarry, sourceBoard: structuredClone(board)
   };
-  state.expeditions.active.push(active);
-  state.expeditions.board.offers = state.expeditions.board.offers.filter(o => o.id !== offerId);
-  return { ok: true, active };
+  state.expeditions.board = null;
+  return { ok: true, active: state.expeditions.active };
 }
 
-export function cancelExpedition(state, expeditionId) {
-  const index = state.expeditions.active.findIndex(e => e.id === expeditionId);
-  if (index < 0) return { ok: false, reasons: ['Unknown Expedition.'] };
-  if (state.expeditions.active[index].launchDay !== state.dayNumber) {
-    return { ok: false, reasons: ['An Expedition cannot be cancelled after its launch day has advanced.'] };
+export function cancelCycle(state) {
+  const active = state.expeditions.active;
+  if (!active) return { ok: false, reasons: ['No launched cycle to cancel.'] };
+  if (active.launchDay !== state.dayNumber) {
+    return { ok: false, reasons: ['A cycle cannot be cancelled after its launch day has advanced.'] };
   }
-  const [active] = state.expeditions.active.splice(index, 1);
-  if (active.sourceOffer && state.expeditions.board?.day === state.dayNumber) {
-    state.expeditions.board.offers.push(active.sourceOffer);
+  state.expeditions.board = active.sourceBoard;
+  state.expeditions.active = null;
+  return { ok: true };
+}
+
+// Resolve a due cycle: grant every route's rewards together, feed each world's
+// Operations Program, file one cycle report, and put up the next board.
+export function resolveDueCycle(content, state, rng) {
+  const active = state.expeditions.active;
+  if (!active || active.returnDay > state.dayNumber) return null;
+  const routeReports = [];
+  for (const route of active.routes) {
+    const rewards = grantRewardEntries(content, state, [...(route.fixedRewards ?? []), ...(route.rewards ?? [])]);
+    if (route.world) addOperationsCompletion(content, state, route.world, 1);
+    const pool = content.expeditions.reports[route.tier] ?? ['The party returned with the promised rewards.'];
+    routeReports.push({ ...route, report: pool[(route.offerId.length + active.returnDay) % pool.length], rewards });
   }
-  return { ok: true, active };
+  const report = {
+    cycle: active.cycle, launchDay: active.launchDay, returnDay: active.returnDay,
+    routes: routeReports, acknowledged: false
+  };
+  state.expeditions.reports.unshift(report);
+  state.expeditions.reports = state.expeditions.reports.slice(0, 20);
+  const pinned = active.pinnedCarry;
+  state.expeditions.active = null;
+  state.expeditions.cycle += 1;
+  if (rng && content.expeditions?.templates?.length) {
+    generateCycleBoard(content, state, rng, { pinned });
+  }
+  return report;
 }
 
 export function rerollOffer(content, state, offerId, rng) {
-  const index = state.expeditions.board.offers.findIndex(o => o.id === offerId);
-  const offer = state.expeditions.board.offers[index];
+  const board = state.expeditions.board;
+  if (!board) return { ok: false, reasons: ['No route board is waiting.'] };
+  const index = board.offers.findIndex(o => o.id === offerId);
+  const offer = board.offers[index];
   if (!offer || offer.pinned || offer.offerKind === 'supply') return { ok: false, reasons: [offer?.offerKind === 'supply'
-    ? 'The guaranteed Field Supply route cannot be rerolled.' : 'Only an unpinned available offer can be rerolled.'] };
-  const free = state.expeditions.daily.freeRerollsUsed < state.expeditions.daily.freeRerolls;
+    ? 'The guaranteed Field Supply route cannot be rerolled.' : 'Only an unpinned available route can be rerolled.'] };
+  const allowances = state.expeditions.allowances;
+  const free = allowances.freeRerollsUsed < allowances.freeRerolls;
   if (!free && !addResource(state, INTELLIGENCE_ID, -content.expeditions.settings.intelligenceCosts.reroll)) {
     return { ok: false, reasons: ['Not enough Intelligence.'] };
   }
   const pool = content.expeditions.templates.filter(template => template.enabled !== false
     && template.id !== content.expeditions.settings.guaranteedSupplyTemplateId);
-  if (!pool.length) return { ok: false, reasons: ['No other enabled Expedition template can replace this offer.'] };
-  const replacement = instantiateOffer(content, state, pick(rng, pool), rng, state.dayNumber, index);
-  state.expeditions.board.offers[index] = replacement;
-  if (free) state.expeditions.daily.freeRerollsUsed++;
+  if (!pool.length) return { ok: false, reasons: ['No other enabled route template can replace this offer.'] };
+  const replacement = instantiateOffer(content, state, pick(rng, pool), rng, board.cycle, index);
+  board.offers[index] = replacement;
+  if (free) allowances.freeRerollsUsed++;
   return { ok: true, offer: replacement, free };
 }
 
 export function togglePinOffer(content, state, offerId) {
-  const offer = state.expeditions.board.offers.find(o => o.id === offerId);
-  if (!offer) return { ok: false, reasons: ['Unknown offer.'] };
+  const board = state.expeditions.board;
+  if (!board) return { ok: false, reasons: ['No route board is waiting.'] };
+  const offer = board.offers.find(o => o.id === offerId);
+  if (!offer) return { ok: false, reasons: ['Unknown route.'] };
   if (offer.pinned) { offer.pinned = false; return { ok: true, pinned: false }; }
-  if (state.expeditions.board.offers.some(o => o.pinned)) return { ok: false, reasons: ['Only one offer may be pinned.'] };
-  const free = state.expeditions.daily.freePinsUsed < state.expeditions.daily.freePins;
+  if (board.offers.some(o => o.pinned)) return { ok: false, reasons: ['Only one route may be pinned.'] };
+  const allowances = state.expeditions.allowances;
+  const free = allowances.freePinsUsed < allowances.freePins;
   if (!free && !addResource(state, INTELLIGENCE_ID, -content.expeditions.settings.intelligenceCosts.pin)) {
     return { ok: false, reasons: ['Not enough Intelligence.'] };
   }
   offer.pinned = true;
-  if (free) state.expeditions.daily.freePinsUsed++;
+  if (free) allowances.freePinsUsed++;
   return { ok: true, pinned: true, free };
 }
 
 export function revealRareReward(content, state, offerId) {
-  const offer = state.expeditions.board.offers.find(o => o.id === offerId);
-  if (!offer || !offer.rareReward) return { ok: false, reasons: ['This offer has no rare reward to reveal.'] };
+  const offer = state.expeditions.board?.offers.find(o => o.id === offerId);
+  if (!offer || !offer.rareReward) return { ok: false, reasons: ['This route has no rare reward to reveal.'] };
   if (offer.rareRevealed) return { ok: true };
   if (!addResource(state, INTELLIGENCE_ID, -content.expeditions.settings.intelligenceCosts.reveal)) {
     return { ok: false, reasons: ['Not enough Intelligence.'] };
   }
   offer.rareRevealed = true;
   return { ok: true };
-}
-
-export function resolveDueExpeditions(content, state) {
-  const returned = [], remaining = [];
-  for (const active of state.expeditions.active) {
-    if (active.returnDay > state.dayNumber) { remaining.push(active); continue; }
-    const rewards = grantRewardEntries(content, state, [...(active.fixedRewards ?? []), ...(active.rewards ?? [])], active.world);
-    const pool = content.expeditions.reports[active.tier] ?? ['The party returned with the promised rewards.'];
-    const report = { ...active, report: pool[(active.offerId.length + active.returnDay) % pool.length], rewards, acknowledged: false };
-    state.expeditions.reports.unshift(report);
-    returned.push(report);
-  }
-  state.expeditions.active = remaining;
-  state.expeditions.reports = state.expeditions.reports.slice(0, 30);
-  return returned;
 }

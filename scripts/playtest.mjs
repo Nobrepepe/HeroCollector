@@ -1,9 +1,12 @@
-// Full-content playthrough bot for HeroCollector.
-// Loads the author's default_content.json (not the sample pack) and plays a
-// greedy-but-sensible player: campaign frontier -> squad shards -> gear
-// materials, while running Expeditions, Headquarters, Crises and Field Supply.
+// Full-content playthrough bot for HeroCollector — the balance harness for
+// the goal-driven overhaul. Loads the author's default_content.json and plays
+// a greedy-but-sensible player: campaign frontier → gear materials, while
+// Development Focus converts the same Energy into shards, Programs deliver,
+// Mastery milestones pay, Field Supplies push targets, and one Expedition
+// cycle runs every four days.
 //
-// Usage: node playthrough.mjs [maxDays] [seed] [--quiet]
+// Usage: node scripts/playtest.mjs [maxDays] [seed] [--quiet] [--no-supply]
+//        [--no-expeditions] [--no-crises]
 
 import { readFileSync } from 'node:fs';
 import { buildContent, equipmentRecipe } from '../src/core/content.js';
@@ -17,20 +20,21 @@ import {
   craftComponent, upcraft, craftEquipment, completeGearTier,
   promoteStar, unlockCharacter, checkCompleteTier, checkPromoteStar,
   checkUnlockCharacter, maxCraftableComponents,
-  nodeUnlocked, matQty, compQty, maxSweepCount, shardAttemptsLeft, archiveStatus,
-  ensureExpeditionBoard
+  nodeUnlocked, matQty, compQty, maxSweepCount
 } from '../src/core/state.js';
 import {
-  previewExpedition, launchExpedition, expeditionCharacterIds
+  previewExpedition, launchCycle, offerFeasibility, expeditionCharacterIds
 } from '../src/core/expeditions.js';
+import { FOCUS_SLOTS, assignFocus, isRevealed } from '../src/core/focus.js';
+import { relicStatus } from '../src/core/relics.js';
 import {
-  startConstruction, facilityLevel, hqRank, assignHqStaff, staffingCapacity, setProduction
-} from '../src/core/hq.js';
+  worldMasteryBreakdown, masteryRank, resolveMasteryChoice, pendingMasteryChoices
+} from '../src/core/mastery.js';
+import { setProcurementFamily, setDevelopmentHero, installRelic } from '../src/core/programs.js';
+import { previewSupplyTutoring, useSupplyTutoring } from '../src/core/energy.js';
 import {
   previewCrisis, setCrisisAssignment, resolveCrisis, claimCrisisCache, crisisCacheChoiceStatus
 } from '../src/core/crises.js';
-import { previewFieldSupplyUse, useFieldSupply } from '../src/core/energy.js';
-import { canAffordEntries } from '../src/core/resources.js';
 
 // ---------------------------------------------------------------- content
 const dbRaw = JSON.parse(readFileSync(new URL('../default_content.json', import.meta.url), 'utf8'));
@@ -44,7 +48,6 @@ const seed = Number(process.argv[3] ?? 20260806);
 const QUIET = process.argv.includes('--quiet');
 const NO_SUPPLY = process.argv.includes('--no-supply');
 const NO_EXPEDITIONS = process.argv.includes('--no-expeditions');
-const NO_HQ = process.argv.includes('--no-hq');
 const NO_CRISES = process.argv.includes('--no-crises');
 
 const DAY = 86400000;
@@ -70,37 +73,52 @@ function mark(key, text) {
   if (!QUIET) console.log(`day ${String(s.dayNumber).padStart(4)}: ${text}`);
 }
 const stats = {
-  energyGranted: 0, energySpentNodes: 0, energyRefundedMomentum: 0, energyFromSupply: 0,
-  energyWastedAtCap: 0,
-  runsByType: { ordinary: 0, advanced: 0, shard: 0, world: 0 },
-  shardsFromNodes: 0, shardsFromExpeditions: 0, shardsFromFirstClear: 0,
-  expeditionsLaunched: 0, expeditionsByTier: { completed: 0, successful: 0, exceptional: 0 },
-  crisesSpawned: 0, crisisOutcomes: {}, hqBuilds: 0,
-  suppliesUsed: 0, suppliesWasted: 0,
+  energyGranted: 0, energySpentNodes: 0, energyRefundedMomentum: 0, energyWastedAtCap: 0,
+  runsByType: { ordinary: 0, advanced: 0, world: 0 },
+  shardsFromFocus: 0, shardsFromEncounters: 0, shardsFromExpeditions: 0,
+  shardsFromPrograms: 0, shardsFromMastery: 0, shardsFromTutoring: 0,
+  fullEnergyDays: 0, focusShardsOnFullDays: 0,
+  cyclesLaunched: 0, cyclesCompleted: 0, routesLaunched: 0, routesByTier: { completed: 0, successful: 0, exceptional: 0 },
+  shipmentsDelivered: 0, developmentGrants: 0, operationsBoosts: 0,
+  relicInstalledDays: {}, suppliesUsed: 0,
+  crisesSpawned: 0, crisisOutcomes: {},
   daysNoEnergyLeftUnspent: 0, energyUnspentTotal: 0,
-  expTierByPhase: {}, energySplit: { shards: 0, materials: 0 }
+  daysBothAdvanced: 0, daysPlayed: 0
 };
-const daily = []; // per-day snapshot
+const daily = []; // per-25-day snapshot
 
 // ---------------------------------------------------------------- helpers
 const owned = () => content.characters.filter(d => s.characters[d.id].owned).map(d => d.id);
 const cs = id => s.characters[id];
 const isMaxed = id => cs(id).owned && cs(id).stars === 7 && cs(id).gearTier >= content.maxGearTier;
 
-// The six characters we drive to the endgame. Starters cost the least shards
-// (their unlock threshold is already paid), so they anchor the squad; the
-// sixth is the cheapest additional Minor with a live shard source.
+function shardRemaining(id) {
+  const c = cs(id);
+  const def = content.characterById[id];
+  const starCosts = content.balance.starShards;
+  let rest = 0;
+  if (!c.owned) {
+    const tier = content.balance.acquisitionTiers[def.tier];
+    rest = tier.cumulativeShards;
+    for (let star = tier.unlockStar; star < 7; star++) rest += starCosts[star];
+  } else {
+    for (let star = c.stars; star < 7; star++) rest += starCosts[star];
+  }
+  return Math.max(0, rest - c.shards);
+}
+
+// The six characters we drive to the endgame: the starters plus the cheapest
+// additional Minor from a world with starters, so world nodes stay reachable.
 const SQUAD = (() => {
   const starters = content.characters.filter(d => d.starting).map(d => d.id);
   const extra = content.characters
     .filter(d => !d.starting && d.tier === 'minor')
-    // Prefer a world that already has starters, so world nodes stay reachable.
     .sort((a, b) => {
       const wa = starters.filter(id => content.characterById[id].world === a.world).length;
       const wb = starters.filter(id => content.characterById[id].world === b.world).length;
       if (wa !== wb) return wb - wa;
-      const na = content.shardNodesByCharacter[a.id]?.[0]?.number ?? 99;
-      const nb = content.shardNodesByCharacter[b.id]?.[0]?.number ?? 99;
+      const na = content.encounterNodesByCharacter[a.id]?.[0]?.number ?? 99;
+      const nb = content.encounterNodesByCharacter[b.id]?.[0]?.number ?? 99;
       return na - nb;
     })[0];
   return [...starters, extra.id];
@@ -121,7 +139,6 @@ function partyCandidates(node) {
     const wp = byPower.filter(id => content.characterById[id].world === w.id);
     if (wp.length >= 5) out.push(wp.slice(0, 5));
   }
-  // Squad-first party (the characters we actually invest in).
   const squadOwned = SQUAD.filter(id => cs(id).owned);
   if (squadOwned.length >= 5) out.push(squadOwned.slice(0, 5));
   return out;
@@ -136,24 +153,96 @@ function bestParty(node) {
   return best;
 }
 
+let shardsToday = 0, materialsToday = 0;
+
 function runNode(nodeId, count) {
   const node = content.nodeById[nodeId];
   const party = bestParty(node);
   if (!party) return false;
   const check = checkClear(content, s, nodeId, party, count);
   if (!check.ok) return false;
-  const before = s.energy;
   const res = clearNode(content, s, nodeId, party, count, rng, now);
   if (!res.ok) { bug('clear_mismatch', `checkClear passed but clearNode failed on ${nodeId}: ${res.reasons.join('; ')}`); return false; }
-  const spent = before - s.energy;
   stats.energySpentNodes += res.rewards.energySpent;
   stats.energyRefundedMomentum += res.rewards.energyRefunded ?? 0;
   stats.runsByType[node.type] += count;
-  for (const [cid, q] of Object.entries(res.rewards.shards)) {
-    if (node.shardCharacter === cid) stats.shardsFromNodes += q; else stats.shardsFromFirstClear += q;
-  }
+  for (const grant of res.rewards.focusShards) { stats.shardsFromFocus += grant.shards; shardsToday += grant.shards; }
+  for (const q of Object.values(res.rewards.shards)) { stats.shardsFromEncounters += q; shardsToday += q; }
+  materialsToday += Object.values(res.rewards.materials).reduce((a, b) => a + b, 0);
+  for (const event of res.rewards.masteryEvents) recordMasteryEvent(event);
   if (s.energy < 0) bug('negative_energy', `Energy went negative (${s.energy}) after ${nodeId}`);
   return true;
+}
+
+function recordMasteryEvent(event) {
+  mark(`mastery_${event.worldId}_${event.rankId}`,
+    `${content.worldById[event.worldId]?.displayName ?? event.worldId} reached ${event.rankName} Mastery`);
+}
+
+// ---------------------------------------------------------------- allocation
+// Focus, Programs, milestone choices, and Supplies: pointed at the squad
+// first, then at whoever gates a world campaign, then everyone else.
+function shardTargets() {
+  const targets = [];
+  // Opening a world campaign (five owned of that world) unlocks materials,
+  // the relic, and most of the Mastery track — the cheap gate unlocks come
+  // before the long squad journey.
+  for (const w of content.worlds) {
+    const cnt = content.characters.filter(d => d.world === w.id && cs(d.id).owned).length;
+    if (cnt >= content.balance.partySize) continue;
+    const gates = content.characters
+      .filter(d => d.world === w.id && !cs(d.id).owned && isRevealed(s, d.id))
+      .sort((a, b) => shardRemaining(a.id) - shardRemaining(b.id))
+      .slice(0, content.balance.partySize - cnt);
+    for (const d of gates) targets.push(d.id);
+  }
+  for (const id of SQUAD) if (isRevealed(s, id) && shardRemaining(id) > 0) targets.push(id);
+  for (const d of content.characters) {
+    if (isRevealed(s, d.id) && shardRemaining(d.id) > 0) targets.push(d.id);
+  }
+  return [...new Set(targets)];
+}
+
+function manageAllocation() {
+  const targets = shardTargets();
+  FOCUS_SLOTS.forEach((slot, index) => {
+    const target = targets[index];
+    if (target && s.focus.slots[slot].characterId !== target) assignFocus(content, s, slot, target);
+  });
+  const shortages = Object.entries(squadGearDemand()).sort((a, b) => b[1] - a[1]);
+  const family = shortages.length
+    ? content.materialById[shortages[0][0]].family
+    : content.materialMeta.familyOrder[s.dayNumber % content.materialMeta.familyOrder.length];
+  for (const w of content.worlds) {
+    setProcurementFamily(content, s, w.id, family);
+    const worldTarget = targets.find(id => content.characterById[id].world === w.id);
+    if (worldTarget) setDevelopmentHero(content, s, w.id, worldTarget);
+    const relic = relicStatus(content, s, w.id);
+    if (relic?.complete && !s.programs[w.id]?.relicSlot) {
+      installRelic(content, s, w.id, 'procurement');
+      stats.relicInstalledDays[w.id] = s.dayNumber;
+      mark(`relic_installed_${w.id}`, `${w.displayName} relic installed into Procurement`);
+    }
+  }
+  for (const choice of pendingMasteryChoices(content, s)) {
+    if (choice.kind === 'materialCache') {
+      const r = resolveMasteryChoice(content, s, choice.worldId, choice.rankId, { family });
+      if (!r.ok) bug('mastery_cache', `cache choice failed: ${r.reasons.join('; ')}`);
+    } else {
+      const hero = targets.find(id => content.characterById[id].world === choice.worldId);
+      if (!hero) continue;
+      const r = resolveMasteryChoice(content, s, choice.worldId, choice.rankId, { characterId: hero });
+      if (r.ok) { stats.shardsFromMastery += choice.qty; shardsToday += choice.qty; }
+    }
+  }
+  if (!NO_SUPPLY) {
+    for (const id of targets) {
+      const pv = previewSupplyTutoring(content, s, id);
+      if (!pv.ok) continue;
+      const r = useSupplyTutoring(content, s, id);
+      if (r.ok) { stats.suppliesUsed++; stats.shardsFromTutoring += r.qty; shardsToday += r.qty; }
+    }
+  }
 }
 
 // ---------------------------------------------------------------- improve
@@ -181,10 +270,8 @@ function improve() {
         if (c.gearTier >= content.maxGearTier) mark(`gear_${id}`, `${def.displayName} gear complete (T${c.gearTier})`);
         acted = true;
       }
-      // Only spend materials on gear for the squad until they are done; then
-      // let everyone else use the surplus.
-      const squadDone = SQUAD.every(x => isMaxed(x));
-      if (!squadDone && !SQUAD_SET.has(id)) continue;
+      const squadDoneNow = SQUAD.every(x => isMaxed(x));
+      if (!squadDoneNow && !SQUAD_SET.has(id)) continue;
       const tier = activeTier(content.balance, c, content.maxGearTier);
       if (!tier) continue;
       for (const slot of content.characterMeta.slotOrder) {
@@ -244,8 +331,6 @@ function upcraftToward(materialId) {
   }
 }
 
-// Best farm node for a material: exact grade first, otherwise the highest
-// lower grade of the same family (upcraft feeds it).
 function farmNodesFor(materialId, pool) {
   const mat = content.materialById[materialId];
   const exact = pool.filter(n => n.material === materialId);
@@ -266,16 +351,14 @@ function energyPerUnit(node) {
 }
 
 // ---------------------------------------------------------------- expeditions
-function pickExpeditionParty(offer) {
-  const busy = expeditionCharacterIds(s);
+function pickCycleParty(offer, busy) {
   const pool = owned().filter(id => !busy.has(id))
     .sort((a, b) => characterPowerForState(content, s, b) - characterPowerForState(content, s, a));
   if (pool.length < offer.partySize) return null;
-  // Try the strongest legal combination with a bounded search.
   let best = null, bestScore = -1, tried = 0;
   const chosen = [];
   const walk = start => {
-    if (tried > 4000) return;
+    if (tried > 3000) return;
     if (chosen.length === offer.partySize) {
       tried++;
       const pv = previewExpedition(content, s, offer, chosen);
@@ -288,7 +371,7 @@ function pickExpeditionParty(offer) {
       chosen.push(pool[i]);
       walk(i + 1);
       chosen.pop();
-      if (tried > 4000) return;
+      if (tried > 3000) return;
     }
   };
   walk(0);
@@ -297,43 +380,67 @@ function pickExpeditionParty(offer) {
 
 function runExpeditions() {
   if (NO_EXPEDITIONS) return;
-  ensureExpeditionBoard(content, s);
-  const board = s.expeditions.board;
-  if (!board) return;
-  const slots = content.expeditions.settings.slotCount;
-  // Prefer offers that promise Field Supply, then shards for the squad.
+  if (s.expeditions.active || !s.expeditions.board) return;
+  const targets = shardTargets();
   const score = offer => {
     let v = 0;
     for (const e of [...(offer.fixedRewards ?? []), ...(offer.baseRewards ?? [])]) {
       if (e.kind === 'resource' && e.id === 'field_supply') v += 1000 * e.qty;
-      if (e.kind === 'shards' && SQUAD_SET.has(e.characterId)) v += 200 * e.qty;
-      if (e.kind === 'shards') v += 20 * e.qty;
+      if (e.kind === 'shards') v += 100 * e.qty;
       if (e.kind === 'resource') v += 5 * e.qty;
       if (e.kind === 'material') v += 3 * e.qty * Math.pow(2, rank(e.id));
     }
-    return v / Math.max(1, offer.duration);
+    return v;
   };
-  const ordered = [...board.offers].sort((a, b) => score(b) - score(a));
+  const ordered = [...s.expeditions.board.offers].sort((a, b) => score(b) - score(a));
+  const busy = new Set(expeditionCharacterIds(s));
+  const selections = [];
   for (const offer of ordered) {
-    if (s.expeditions.active.length >= slots) break;
-    const party = pickExpeditionParty(offer);
+    if (selections.length >= content.expeditions.settings.slotCount) break;
+    const party = pickCycleParty(offer, busy);
     if (!party) continue;
-    const pv = previewExpedition(content, s, offer, party);
-    const res = launchExpedition(content, s, offer.id, party);
-    if (res.ok) {
-      stats.expeditionsLaunched++;
-      stats.expeditionsByTier[pv.tier]++;
-      const bucket = Math.floor(s.dayNumber / 200) * 200;
-      (stats.expTierByPhase[bucket] ??= { completed: 0, successful: 0, exceptional: 0 })[pv.tier]++;
-    } else if (!res.reasons.some(r => /Field Supplies already fill/.test(r))) {
-      bug('exp_launch', `launchExpedition rejected a previewed-valid party for "${offer.name}": ${res.reasons.join('; ')}`);
+    const selection = { offerId: offer.id, party };
+    const lead = offer.baseRewards.find(e => e.kind === 'shards' && e.choice);
+    if (lead) {
+      const chosen = targets.find(id => !lead.choice.world || content.characterById[id].world === lead.choice.world)
+        ?? content.characters.find(d => (!lead.choice.world || d.world === lead.choice.world) && isRevealed(s, d.id))?.id;
+      if (!chosen) continue;
+      selection.shardChoiceCharacterId = chosen;
     }
+    selections.push(selection);
+    for (const id of party) busy.add(id);
   }
+  if (!selections.length) return;
+  const res = launchCycle(content, s, selections);
+  if (!res.ok) {
+    if (!res.reasons.some(r => /Field Supplies already fill/.test(r))) {
+      bug('cycle_launch', `launchCycle rejected previewed-valid selections: ${res.reasons.join('; ')}`);
+    }
+    return;
+  }
+  stats.cyclesLaunched++;
+  stats.routesLaunched += res.active.routes.length;
+  for (const route of res.active.routes) stats.routesByTier[route.tier]++;
 }
 
-function collectExpeditionShardStats(summary) {
-  for (const rep of summary?.expeditions ?? []) {
-    for (const r of rep.rewards ?? []) if (r.kind === 'shards') stats.shardsFromExpeditions += r.qty;
+function collectDailySummary(summary) {
+  for (const report of summary?.cycleReports ?? []) {
+    stats.cyclesCompleted++;
+    for (const route of report.routes) {
+      for (const r of route.rewards ?? []) {
+        if (r.kind === 'shards') { stats.shardsFromExpeditions += r.qty; shardsToday += r.qty; }
+      }
+    }
+  }
+  for (const event of summary?.shipments ?? []) {
+    if (event.program === 'procurement') stats.shipmentsDelivered++;
+    if (event.program === 'development') {
+      stats.developmentGrants++;
+      const qty = event.granted?.[0]?.qty ?? 0;
+      stats.shardsFromPrograms += qty;
+      shardsToday += qty;
+    }
+    if (event.program === 'operations') stats.operationsBoosts++;
   }
 }
 
@@ -345,8 +452,6 @@ function runCrisis() {
   stats.crisesSpawned++;
   const pool = owned().sort((a, b) => characterPowerForState(content, s, b) - characterPowerForState(content, s, a));
   const used = new Set();
-  // Greedy: fill each front with the highest-power characters that carry its
-  // favored tags, strongest front first.
   for (const front of active.fronts) {
     const favored = new Set(front.favoredTagIds);
     const ranked = pool.filter(id => !used.has(id)).sort((a, b) => {
@@ -364,7 +469,7 @@ function runCrisis() {
       if (!r.ok) bug('crisis_assign', `setCrisisAssignment failed: ${r.reasons.join('; ')}`);
     }
   }
-  const pv = previewCrisis(content, s);
+  void previewCrisis(content, s);
   const res = resolveCrisis(content, s);
   if (!res.ok) {
     if (owned().length >= active.fronts.length * active.teamSize) {
@@ -386,50 +491,7 @@ function tagsOf(id) {
   return (tagCache[id] = new Set([d.world, d.archetype, d.faction, ...(d.extraTags ?? [])].filter(Boolean)));
 }
 
-// ---------------------------------------------------------------- HQ
-function runHq() {
-  if (NO_HQ) return;
-  for (const w of content.worlds) {
-    if (!w.hq?.enabled) continue;
-    // Staff every facility we can, favouring the archetypes that pay off.
-    const cap = staffingCapacity(content, s, w.id);
-    if (cap > 0) {
-      const locals = content.characters.filter(d => d.world === w.id && cs(d.id).owned).map(d => d.id);
-      for (const f of w.hq.facilities) {
-        if (!facilityLevel(s, w.id, f.id)) continue;
-        if (f.category === 'production') setProduction(content, s, w.id, f.id, f.productionOptions?.[0]?.id);
-        for (const id of locals) assignHqStaff(content, s, w.id, f.id, id);
-      }
-    }
-  }
-  if (s.headquarters.construction) return;
-  // Cheapest affordable upgrade, production and training first.
-  const order = { production: 0, training: 1, operations: 2, community: 3 };
-  const options = [];
-  for (const w of content.worlds) {
-    if (!w.hq?.enabled) continue;
-    for (const f of w.hq.facilities) {
-      const lvl = facilityLevel(s, w.id, f.id);
-      const next = f.levels[lvl];
-      if (!next) continue;
-      if (!canAffordEntries(content, s, next.cost, w.id).ok) continue;
-      options.push({ w, f, lvl, key: (order[f.category] ?? 9) * 100 + lvl });
-    }
-  }
-  options.sort((a, b) => a.key - b.key);
-  if (!options.length) return;
-  const o = options[0];
-  const r = startConstruction(content, s, o.w.id, o.f.id);
-  if (r.ok) {
-    stats.hqBuilds++;
-    mark(`hq_${o.w.id}_${o.f.id}_${o.lvl + 1}`, `HQ: ${o.w.displayName} ${o.f.displayName} -> L${o.lvl + 1}`);
-  }
-}
-
 // ---------------------------------------------------------------- energy day
-// Energy spent today, split by purpose, so shards and gear both keep moving.
-let spentShards = 0, spentMaterials = 0;
-
 function pushFrontiers() {
   let acted = false;
   for (const campaign of ['main', ...content.worlds.map(w => w.campaignId)]) {
@@ -444,37 +506,8 @@ function pushFrontiers() {
   return acted;
 }
 
-function shardBatch() {
-  const squadLeft = SQUAD.some(id => !isMaxed(id));
-  // Priority order: squad members short of 7 stars, then the characters that
-  // still gate a world campaign, then everyone else.
-  const targets = [];
-  for (const id of SQUAD) if (cs(id).owned && cs(id).stars < 7) targets.push(id);
-  for (const id of SQUAD) if (!cs(id).owned) targets.push(id);
-  for (const w of content.worlds) {
-    const cnt = content.characters.filter(d => d.world === w.id && cs(d.id).owned).length;
-    if (cnt >= content.balance.partySize) continue;
-    for (const d of content.characters.filter(d => d.world === w.id && !cs(d.id).owned)) targets.push(d.id);
-  }
-  if (!squadLeft) {
-    for (const d of content.characters) if (cs(d.id).stars < 7) targets.push(d.id);
-  }
-  for (const id of [...new Set(targets)]) {
-    for (const node of content.shardNodesByCharacter[id] ?? []) {
-      if (!nodeUnlocked(content, s, node).unlocked) continue;
-      const left = shardAttemptsLeft(content, s, node);
-      if (left <= 0) continue;
-      const count = nodeState(s, node.id).cleared ? Math.min(left, maxSweepCount(content, s, node.id)) : 1;
-      if (count < 1) continue;
-      const before = s.energy;
-      if (runNode(node.id, count)) { spentShards += before - s.energy; improve(); return true; }
-    }
-  }
-  return false;
-}
-
 function materialBatch() {
-  const pool = unlockedNodes().filter(n => !n.shardCharacter && nodeState(s, n.id).cleared);
+  const pool = unlockedNodes().filter(n => nodeState(s, n.id).cleared);
   if (!pool.length) return false;
   const shortages = Object.entries(squadGearDemand()).sort((a, b) => rank(b[0]) - rank(a[0]) || b[1] - a[1]);
   for (const [matId] of shortages) {
@@ -483,20 +516,18 @@ function materialBatch() {
     const node = sources[0];
     const count = Math.min(8, maxSweepCount(content, s, node.id));
     if (count < 1) continue;
-    const before = s.energy;
     if (runNode(node.id, count)) {
       if (node.material !== matId) upcraftToward(matId);
-      spentMaterials += before - s.energy;
       improve();
       return true;
     }
   }
-  // Nothing specific outstanding: bank the highest grade available.
+  // Nothing specific outstanding: bank the highest grade available. The
+  // Energy still feeds Focus and Procurement either way.
   const best = [...pool].sort((a, b) => rank(b.material) - rank(a.material) || energyPerUnit(a) - energyPerUnit(b))[0];
   const count = Math.min(8, maxSweepCount(content, s, best.id));
   if (count < 1) return false;
-  const before = s.energy;
-  if (runNode(best.id, count)) { spentMaterials += before - s.energy; improve(); return true; }
+  if (runNode(best.id, count)) { improve(); return true; }
   return false;
 }
 
@@ -504,43 +535,20 @@ function spendEnergy() {
   let guard = 0;
   while (s.energy > 0 && guard++ < 600) {
     if (pushFrontiers()) continue;
-    // Gear is what lifts Power past the next threshold, so material farming
-    // keeps a majority share until every squad member's gear is finished.
-    const gearOutstanding = SQUAD.some(id => cs(id).owned && cs(id).gearTier < content.maxGearTier);
-    const shardShare = gearOutstanding ? 0.45 : 0.95;
-    const total = spentShards + spentMaterials;
-    const preferShards = total === 0 ? true : spentShards / total < shardShare;
-    const first = preferShards ? shardBatch : materialBatch;
-    const second = preferShards ? materialBatch : shardBatch;
-    if (first()) continue;
-    if (second()) continue;
+    if (materialBatch()) continue;
     break;
   }
   if (guard >= 600) bug('spend_loop', 'spendEnergy() hit its iteration guard');
-}
-
-function useSupplies() {
-  if (NO_SUPPLY) return;
-  let guard = 0;
-  while (guard++ < 5) {
-    const pv = previewFieldSupplyUse(content, s);
-    if (!pv.ok) return;
-    const r = useFieldSupply(content, s);
-    if (!r.ok) { bug('supply_mismatch', `previewFieldSupplyUse ok but useFieldSupply failed: ${r.reasons.join('; ')}`); return; }
-    stats.energyFromSupply += r.restored;
-    stats.suppliesUsed++;
-    stats.suppliesWasted += r.wasted;
-    spendEnergy();
-  }
 }
 
 // ---------------------------------------------------------------- goals
 const squadDone = () => SQUAD.every(isMaxed);
 const allDone = () => content.characters.every(d => isMaxed(d.id));
 const campaignDone = () => content.nodes.every(n => nodeState(s, n.id).cleared);
-const archivesDone = () => content.worlds.every(w => archiveStatus(content, s, w.id).complete);
+const relicsDone = () => content.worlds.every(w => relicStatus(content, s, w.id)?.complete);
 
-let squadDay = null, allDay = null, campaignDay = null, archiveDay = null;
+let squadDay = null, allDay = null, campaignDay = null, relicDay = null;
+const masteryRankDays = {};
 
 // ---------------------------------------------------------------- main loop
 if (!QUIET) {
@@ -549,8 +557,8 @@ if (!QUIET) {
 }
 
 improve();
+manageAllocation();
 runExpeditions();
-runHq();
 
 while (s.dayNumber < maxDays) {
   now += DAY;
@@ -559,21 +567,32 @@ while (s.dayNumber < maxDays) {
   stats.energyGranted += content.balance.energy.dailyGrant;
   const capped = before + content.balance.energy.dailyGrant - content.balance.energy.storageCap;
   if (capped > 0) stats.energyWastedAtCap += capped;
-  collectExpeditionShardStats(summary);
-  spentShards = 0; spentMaterials = 0;
+  shardsToday = 0; materialsToday = 0;
+  collectDailySummary(summary);
+  const fullDay = before === 0 || s.energy >= content.balance.energy.dailyGrant;
 
   improve();
+  manageAllocation();
   runCrisis();
-  runHq();
   runExpeditions();
   spendEnergy();
-  useSupplies();
   improve();
 
-  stats.energySplit.shards += spentShards;
-  stats.energySplit.materials += spentMaterials;
+  stats.daysPlayed++;
   stats.energyUnspentTotal += s.energy;
   if (s.energy > 0) stats.daysNoEnergyLeftUnspent++;
+  if (shardsToday > 0 && materialsToday > 0) stats.daysBothAdvanced++;
+  if (fullDay && stats.energySpentNodes >= 120) { stats.fullEnergyDays++; stats.focusShardsOnFullDays += shardsToday; }
+
+  for (const w of content.worlds) {
+    const rankNow = masteryRank(content, s, w.id);
+    const key = `${w.id}:${rankNow.id}`;
+    if (rankNow.at > 0 && !masteryRankDays[key]) masteryRankDays[key] = s.dayNumber;
+  }
+  // Invariant: no removed currency may ever reappear.
+  for (const id of Object.keys(s.inventory.resources ?? {})) {
+    if (!content.resourceById[id]) bug('removed_currency', `unknown resource "${id}" appeared in the inventory`);
+  }
 
   if (s.dayNumber % 25 === 0 || s.dayNumber < 15) {
     daily.push({
@@ -583,37 +602,48 @@ while (s.dayNumber < maxDays) {
       squadStars: SQUAD.reduce((n, id) => n + cs(id).stars, 0),
       squadGear: SQUAD.reduce((n, id) => n + cs(id).gearTier, 0),
       mainCleared: (content.nodesByCampaign.main ?? []).filter(n => nodeState(s, n.id).cleared).length,
+      mastery: Object.fromEntries(content.worlds.map(w => [w.id, worldMasteryBreakdown(content, s, w.id).score])),
       power: (() => { const p = bestParty(null); return p ? evaluateParty(content, s, p).effectivePower : 0; })(),
-      energyLeft: s.energy
+      energyLeft: s.energy,
+      shardsToday
     });
   }
 
   if (!squadDay && squadDone()) { squadDay = s.dayNumber; mark('SQUAD', `*** ENDGAME SQUAD COMPLETE: 6 maxed characters ***`); }
   if (!campaignDay && campaignDone()) { campaignDay = s.dayNumber; mark('CAMPAIGN', '*** every campaign node cleared ***'); }
-  if (!archiveDay && archivesDone()) { archiveDay = s.dayNumber; mark('ARCHIVE', '*** every Archive complete ***'); }
-  if (!allDay && allDone()) { allDay = s.dayNumber; mark('ALL', '*** all 40 characters maxed ***'); break; }
+  if (!relicDay && relicsDone()) { relicDay = s.dayNumber; mark('RELICS', '*** every world relic reassembled ***'); }
+  if (!allDay && allDone()) { allDay = s.dayNumber; mark('ALL', '*** all characters maxed ***'); break; }
 }
 
 // ---------------------------------------------------------------- report
+const totalShards = stats.shardsFromFocus + stats.shardsFromEncounters + stats.shardsFromExpeditions
+  + stats.shardsFromPrograms + stats.shardsFromMastery + stats.shardsFromTutoring;
 const result = {
   seed, maxDays,
   squad: SQUAD.map(id => content.characterById[id].displayName),
-  squadDay, allDay, campaignDay, archiveDay,
+  squadDay, allDay, campaignDay, relicDay,
   daysRun: s.dayNumber,
   maxGearTier: content.maxGearTier,
-  gearTierTableLength: content.balance.gearTierPower.length,
   partySize: content.balance.partySize,
+  // The headline playtest target: ~12 deterministic shards per 120 Energy.
+  focusShardsPer120Energy: stats.energySpentNodes ? +(stats.shardsFromFocus / stats.energySpentNodes * 120).toFixed(2) : 0,
+  shardsPerDay: stats.daysPlayed ? +(totalShards / stats.daysPlayed).toFixed(2) : 0,
+  bothAdvancedShare: stats.daysPlayed ? +(stats.daysBothAdvanced / stats.daysPlayed).toFixed(3) : 0,
+  cyclesPerFourDays: stats.daysPlayed ? +((stats.cyclesCompleted * 4) / stats.daysPlayed).toFixed(2) : 0,
+  masteryRankDays,
   stats, bugs, milestones, daily,
   final: content.characters.map(d => ({
     id: d.id, name: d.displayName, world: d.world, tier: d.tier,
-    owned: cs(d.id).owned, stars: cs(d.id).stars, gear: cs(d.id).gearTier, shards: cs(d.id).shards
+    owned: cs(d.id).owned, stars: cs(d.id).stars, gear: cs(d.id).gearTier, shards: cs(d.id).shards,
+    revealed: !!cs(d.id).revealed
   })),
   campaignProgress: Object.fromEntries(Object.entries(content.nodesByCampaign).map(([k, v]) =>
     [k, `${v.filter(n => nodeState(s, n.id).cleared).length}/${v.length}`])),
-  archives: content.worlds.map(w => {
-    const a = archiveStatus(content, s, w.id);
-    return { world: w.displayName, relics: `${a.relicsDone}/${a.relicsTotal}`, complete: a.complete };
+  relics: content.worlds.map(w => {
+    const r = relicStatus(content, s, w.id);
+    return { world: w.displayName, pieces: `${r?.ownedCount ?? 0}/${r?.total ?? 4}`, complete: !!r?.complete, installed: s.programs[w.id]?.relicSlot ?? null };
   }),
+  mastery: content.worlds.map(w => ({ world: w.displayName, ...worldMasteryBreakdown(content, s, w.id) })),
   inventoryTail: Object.fromEntries(Object.entries(s.inventory.materials).filter(([, q]) => q > 0)),
   resources: s.inventory.resources,
   health: merged.health

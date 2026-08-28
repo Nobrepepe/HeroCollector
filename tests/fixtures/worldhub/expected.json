@@ -1,0 +1,24 @@
+{
+  "appType": "hero-collector.content-pack",
+  "contractId": "4a79247f-85ea-47d0-86b6-415f99066622",
+  "contractVersion": 1,
+  "libraryId": "10c0297a-5c26-4cce-8474-4f4eaf6dc5f8",
+  "productionId": "737a8364-2db7-4840-bc85-5ada30ea9090",
+  "publicationV1": "5eb7d75c-bbcd-49c1-8903-51189e0f9b82",
+  "publicationV2": "c66ca204-a948-4852-8a81-3374b74bcfc3",
+  "worldId": "7e35d5e4-5697-4176-a7c0-3a4a824f4462",
+  "characterIds": [
+    "025a9990-99b7-4e4e-83b1-835d540cfc88",
+    "f44c0693-d027-4588-81d0-56c371b68410",
+    "2469dacf-3f61-4b30-ab2e-0e883cd970f5",
+    "094f7671-a1d1-4a22-b9c6-cad537d03559",
+    "d3a87684-4348-48b5-b04d-d06447a9bdb2"
+  ],
+  "renamedCharacterId": "025a9990-99b7-4e4e-83b1-835d540cfc88",
+  "retiredCharacterIds": [
+    "f44c0693-d027-4588-81d0-56c371b68410",
+    "2469dacf-3f61-4b30-ab2e-0e883cd970f5",
+    "094f7671-a1d1-4a22-b9c6-cad537d03559",
+    "d3a87684-4348-48b5-b04d-d06447a9bdb2"
+  ]
+}

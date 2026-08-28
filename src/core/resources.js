@@ -1,6 +1,5 @@
-export const RENOWN_ID = 'renown';
 export const INTELLIGENCE_ID = 'intelligence';
-export const ASSOCIATED_WORLD_ASSET = '@associated_world_asset';
+export const FIELD_SUPPLY_ID = 'field_supply';
 // A material reward that names a grade instead of a family: the family is drawn
 // when the reward is rolled, so a cache is not always the same material.
 export const RANDOM_MATERIAL = '@random_material';
@@ -23,13 +22,7 @@ export function addResource(state, id, qty) {
   return true;
 }
 
-export function resolveRewardId(content, worldId, entry) {
-  if (entry.kind !== 'resource') return entry.id;
-  if (entry.id !== ASSOCIATED_WORLD_ASSET) return entry.id;
-  return content.worldById[worldId]?.worldAsset?.id ?? null;
-}
-
-export function grantRewardEntries(content, state, entries, worldId = null) {
+export function grantRewardEntries(content, state, entries) {
   const granted = [];
   for (const entry of entries ?? []) {
     const qty = Math.max(0, Math.floor(entry.qty ?? 0));
@@ -38,9 +31,8 @@ export function grantRewardEntries(content, state, entries, worldId = null) {
       state.inventory.materials[entry.id] = (state.inventory.materials[entry.id] ?? 0) + qty;
       granted.push({ ...entry, qty });
     } else if (entry.kind === 'resource') {
-      const id = resolveRewardId(content, worldId, entry);
-      if (!id || !addResource(state, id, qty)) continue;
-      granted.push({ ...entry, id, qty });
+      if (!entry.id || !addResource(state, entry.id, qty)) continue;
+      granted.push({ ...entry, qty });
     } else if (entry.kind === 'shards' && state.characters[entry.characterId]) {
       state.characters[entry.characterId].shards += qty;
       granted.push({ ...entry, qty });
@@ -49,36 +41,31 @@ export function grantRewardEntries(content, state, entries, worldId = null) {
   return granted;
 }
 
-export function canAffordEntries(content, state, entries, worldId = null) {
+export function canAffordEntries(content, state, entries) {
   const reasons = [];
   for (const entry of entries ?? []) {
-    const id = resolveRewardId(content, worldId, entry);
     const have = entry.kind === 'material'
-      ? state.inventory.materials[id] ?? 0
-      : resourceQty(state, id);
-    if (!id || have < entry.qty) reasons.push(`Need ${entry.qty} ${content.resourceById[id]?.displayName ?? content.materialById[id]?.displayName ?? id} (have ${have}).`);
+      ? state.inventory.materials[entry.id] ?? 0
+      : resourceQty(state, entry.id);
+    if (!entry.id || have < entry.qty) reasons.push(`Need ${entry.qty} ${content.resourceById[entry.id]?.displayName ?? content.materialById[entry.id]?.displayName ?? entry.id} (have ${have}).`);
   }
   return { ok: reasons.length === 0, reasons };
 }
 
-export function spendEntries(content, state, entries, worldId = null) {
-  const check = canAffordEntries(content, state, entries, worldId);
+export function spendEntries(content, state, entries) {
+  const check = canAffordEntries(content, state, entries);
   if (!check.ok) return check;
   for (const entry of entries ?? []) {
-    const id = resolveRewardId(content, worldId, entry);
     if (entry.kind === 'material') {
-      state.inventory.materials[id] -= entry.qty;
-      if (!state.inventory.materials[id]) delete state.inventory.materials[id];
-    } else addResource(state, id, -entry.qty);
+      state.inventory.materials[entry.id] -= entry.qty;
+      if (!state.inventory.materials[entry.id]) delete state.inventory.materials[entry.id];
+    } else addResource(state, entry.id, -entry.qty);
   }
   return { ok: true };
 }
 
-export function scaledRewards(entries, multiplierBp, modifiers = {}) {
-  return (entries ?? []).map(entry => {
-    let bp = multiplierBp;
-    if (entry.kind === 'resource' && entry.id === RENOWN_ID) bp += modifiers.renownBp ?? 0;
-    if (entry.kind === 'resource' && entry.id === ASSOCIATED_WORLD_ASSET) bp += modifiers.worldAssetBp ?? 0;
-    return { ...entry, qty: Math.max(1, Math.floor(entry.qty * bp / 10000)) };
-  });
+export function scaledRewards(entries, multiplierBp) {
+  return (entries ?? []).map(entry => ({
+    ...entry, qty: Math.max(1, Math.floor(entry.qty * multiplierBp / 10000))
+  }));
 }
