@@ -65,9 +65,14 @@ export function loadPackage(root) {
   if (contract.appType !== manifest.applicationType) {
     throw new PackageError('The embedded contract does not match the package application type.');
   }
-  if (!SUPPORTED_CONTRACT_VERSIONS.has(manifest.contract.version) ||
-      !SUPPORTED_CONTRACT_VERSIONS.has(contract.contractVersion)) {
+  // `contract.contractVersion` is the contract FORMAT version and is what
+  // this app supports; `manifest.contract.version` is the contract's revision
+  // counter in the authoring library and grows with every edit.
+  if (!SUPPORTED_CONTRACT_VERSIONS.has(contract.contractVersion)) {
     throw new PackageError('This package uses a contract version this app does not support.');
+  }
+  if (!Number.isInteger(manifest.contract.version) || manifest.contract.version < 1) {
+    throw new PackageError('The package manifest carries an invalid contract revision.');
   }
 
   const checksums = readJson(root, 'checksums.json');
