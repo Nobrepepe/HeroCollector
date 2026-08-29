@@ -6,8 +6,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { extractZipSafely, ZipError } from '../src/core/worldhub/zip-reader.js';
-import { loadPackage, semanticValidation, PackageError } from '../src/core/worldhub/package-reader.js';
+import { extractZipSafely, ZipError } from '../vendor/worldhub-kit/js/zip-reader.mjs';
+import { loadPackage, PackageError } from '../vendor/worldhub-kit/js/package-reader.mjs';
+import { APP_TYPE, READER_OPTIONS, semanticValidation } from '../src/core/worldhub/semantics.js';
 import { adaptPackageToCustomDb } from '../src/core/worldhub/adapter.js';
 import { upgradeCustomDB, mergeContent, gameReadiness } from '../src/core/custom.js';
 import { buildContent } from '../src/core/content.js';
@@ -28,7 +29,7 @@ function loadSystemRaw() {
 
 function extractFixture(name) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hc-worldhub-'));
-  extractZipSafely(fs.readFileSync(path.join(FIXTURES, name)), dir);
+  extractZipSafely(path.join(FIXTURES, name), dir);
   return dir;
 }
 
@@ -42,10 +43,11 @@ function mediaUrl(pkg) {
 
 function buildFromFixture(name) {
   const dir = extractFixture(name);
-  const pkg = loadPackage(dir);
+  const pkg = loadPackage(dir, APP_TYPE, READER_OPTIONS);
   semanticValidation(pkg);
-  const db = upgradeCustomDB(adaptPackageToCustomDb(pkg, mediaUrl(pkg)));
-  const merged = mergeContent(loadSystemRaw(), db);
+  const systemRaw = loadSystemRaw();
+  const db = upgradeCustomDB(adaptPackageToCustomDb(pkg, mediaUrl(pkg), systemRaw.balance.worldHub ?? {}));
+  const merged = mergeContent(systemRaw, db);
   const content = buildContent(merged.raw);
   content.images = merged.images;
   return { pkg, db, merged, content, dir };
@@ -148,10 +150,10 @@ test('adversarial packages are rejected before any adaptation', () => {
     ['unlisted-file.zip', PackageError, /unlisted/i],
     ['missing-asset.zip', PackageError, /missing/i],
     ['wrong-apptype.zip', PackageError, /not for this app/i],
-    ['unsupported-protocol.zip', PackageError, /newer World Hub protocol/i],
+    ['unsupported-protocol.zip', PackageError, /protocol this app does not understand/i],
   ]) {
     const dir = extractFixture(fixture);
-    assert.throws(() => { const pkg = loadPackage(dir); semanticValidation(pkg); },
+    assert.throws(() => { const pkg = loadPackage(dir, APP_TYPE, READER_OPTIONS); semanticValidation(pkg); },
       (error) => error instanceof ErrorType && pattern.test(error.message),
       fixture);
   }
@@ -167,6 +169,53 @@ test('wrong-app packages from sibling consumers are refused', () => {
   const sibling = path.join(__dirname, '..', '..', 'TaskStamps', 'tests', 'fixtures', 'worldhub', 'valid-v1.zip');
   if (!fs.existsSync(sibling)) return; // sibling checkout not present
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hc-worldhub-'));
-  extractZipSafely(fs.readFileSync(sibling), dir);
-  assert.throws(() => loadPackage(dir), /not for this app/);
+  extractZipSafely(sibling, dir);
+  assert.throws(() => loadPackage(dir, APP_TYPE, READER_OPTIONS), /not for this app/);
+});
+
+test('engine defaults come from balance.json, not from literals in the adapter', () => {
+  const dir = extractFixture('valid-v1.zip');
+  const pkg = loadPackage(dir, APP_TYPE, READER_OPTIONS);
+
+  /* An author who leaves the engine numbers alone — the ordinary case, and the
+     one where these values used to be invisible defaults inside the adapter. */
+  for (const crisis of pkg.content.values.hc_crises ?? []) {
+    delete crisis.crisis_weight;
+    delete crisis.crisis_min_cleared;
+    for (const front of crisis.crisis_fronts ?? []) {
+      delete front.front_power_local;
+      delete front.front_power_major;
+      delete front.front_power_world;
+    }
+  }
+  for (const template of pkg.content.values.hc_expedition_templates ?? []) {
+    delete template.exptpl_power_ratio_bp;
+    delete template.exptpl_weight;
+  }
+  for (const faction of pkg.content.values.hc_factions ?? []) {
+    delete faction.faction_bonus_2_bp;
+    delete faction.faction_bonus_3_bp;
+  }
+
+  const designerTuning = {
+    factionBonusBp: { two: 111, three: 222 },
+    expedition: { weight: 33, requirementCount: 0, powerRatioBp: 4444 },
+    crisis: { weight: 55, minimumClearedNodes: 6, frontPower: { local: 7, major: 8, world: 9 } },
+  };
+  const db = adaptPackageToCustomDb(pkg, mediaUrl(pkg), designerTuning);
+
+  const crisis = db.crises.definitions[0];
+  assert.equal(crisis.weight, 55, 'the crisis weight a designer set is what the game gets');
+  assert.equal(crisis.minimumClearedNodes, 6);
+  assert.deepEqual(crisis.fronts[0].recommendedPowerByGrade, { local: 7, major: 8, world: 9 });
+
+  const template = db.expeditions.templates[0];
+  assert.equal(template.powerRatioBp, 4444);
+  assert.equal(template.weight, 33);
+  assert.deepEqual(db.factions[0].thresholds.map((t) => t.bonusBp), [111, 222]);
+
+  /* and the file the game actually ships carries that block */
+  const balance = loadSystemRaw().balance;
+  assert.ok(balance.worldHub, 'content/balance.json declares the World Hub defaults');
+  assert.ok(Number.isInteger(balance.worldHub.crisis.frontPower.local));
 });

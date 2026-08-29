@@ -7,8 +7,9 @@ import { createHash } from 'node:crypto';
 import { join, dirname, basename, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdtempSync } from 'node:fs';
-import { extractZipSafely } from '../src/core/worldhub/zip-reader.js';
-import { loadPackage, semanticValidation, readCurrentPointer } from '../src/core/worldhub/package-reader.js';
+import { extractZipSafely } from '../vendor/worldhub-kit/js/zip-reader.mjs';
+import { loadPackage, readCurrentPointer } from '../vendor/worldhub-kit/js/package-reader.mjs';
+import { APP_TYPE, READER_OPTIONS, semanticValidation } from '../src/core/worldhub/semantics.js';
 import { adaptPackageToCustomDb } from '../src/core/worldhub/adapter.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -54,7 +55,7 @@ function hubLoadActivePackage() {
   if (!pointer) return null;
   const dir = join(hubPublications(), pointer.publicationId);
   if (!existsSync(dir)) return null;
-  const pkg = loadPackage(dir);
+  const pkg = loadPackage(dir, APP_TYPE, READER_OPTIONS);
   hubLoadedPackages.set(pointer.publicationId, pkg);
   return pkg;
 }
@@ -75,7 +76,7 @@ function hubStatus() {
 }
 
 function hubStage(dir, sourceType, sourcePath) {
-  const pkg = loadPackage(dir);
+  const pkg = loadPackage(dir, APP_TYPE, READER_OPTIONS);
   semanticValidation(pkg);
   const stagingId = createHash('sha256').update(dir + Date.now()).digest('hex').slice(0, 16);
   hubStaging.set(stagingId, { dir, sourceType, sourcePath, pkg });
@@ -154,7 +155,7 @@ app.whenReady().then(() => {
     if (canceled || !filePaths[0]) return null;
     const staging = hubStagingDir();
     try {
-      extractZipSafely(readFileSync(filePaths[0]), staging);
+      extractZipSafely(filePaths[0], staging);
       return hubStage(staging, 'zip', filePaths[0]);
     } catch (error) {
       rmSync(staging, { recursive: true, force: true });
@@ -247,7 +248,7 @@ app.whenReady().then(() => {
     const source = join(hubPublications(), previous);
     if (!existsSync(source)) return { error: 'The previous publication’s files are no longer available.' };
     try {
-      loadPackage(source);
+      loadPackage(source, APP_TYPE, READER_OPTIONS);
       const next = {
         publicationId: previous,
         previousPublicationId: pointer.publicationId,
@@ -271,7 +272,7 @@ app.whenReady().then(() => {
       const pkg = hubLoadActivePackage();
       if (!pkg) return null;
       return {
-        db: adaptPackageToCustomDb(pkg, hubMediaUrl(pkg.manifest.publicationId)),
+        db: adaptPackageToCustomDb(pkg, hubMediaUrl(pkg.manifest.publicationId), systemBalance().worldHub ?? {}),
         status: hubStatus(),
       };
     } catch (error) {
@@ -307,6 +308,10 @@ app.whenReady().then(() => {
       return { error: String(error.message ?? error) };
     }
   });
+
+  /* Engine configuration the World Hub adapter needs for anything the author
+     left blank. Read from the same content/ directory as everything else. */
+  const systemBalance = () => JSON.parse(readFileSync(join(root, 'content', 'balance.json'), 'utf8'));
 
   ipcMain.handle('content:load', () => {
     const out = {};

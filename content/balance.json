@@ -163,5 +163,29 @@
         "shardChoice": 25
       }
     }
+  },
+  "worldHub": {
+    "$comment": "Defaults for World Hub package fields the contract no longer carries, plus those an author leaves blank. These lived as literals inside the package adapter, where the person authoring in World Hub could neither see nor change them. The values match what the live Shin Eden production actually authored, so removing those fields changed no behaviour.",
+    "factionBonusBp": {
+      "two": 200,
+      "three": 400
+    },
+    "expedition": {
+      "weight": 10,
+      "requirementCount": 1,
+      "powerRatioBp": 10000
+    },
+    "crisis": {
+      "weight": 10,
+      "minimumClearedNodes": 3,
+      "frontPower": {
+        "local": 100,
+        "major": 300,
+        "world": 900
+      }
+    },
+    "reward": {
+      "rare": false
+    }
   }
 }
