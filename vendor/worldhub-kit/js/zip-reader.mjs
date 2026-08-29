@@ -1,17 +1,26 @@
-// Minimal ZIP extraction for World Hub packages (stored + deflate),
-// with hostile-entry rejection. Node-only (main process and tests);
-// package checksums are verified after extraction, so this reader only
-// needs to be correct, not clever.
+// Minimal ZIP extraction for World Hub packages (stored + deflate), with
+// hostile-entry rejection. Node built-ins only, so vendoring the kit never
+// obliges an application to take a dependency. Package checksums are
+// verified after extraction, so this reader only needs to be correct.
 import { inflateRawSync } from 'node:zlib';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
+import { PackageError } from './package-reader.mjs';
 
-export class ZipError extends Error {}
+/**
+ * An archive that cannot be safely extracted is a package that cannot be
+ * read, so this is a PackageError. A consumer that catches PackageError to
+ * mean "this package is bad" would otherwise let a hostile archive escape
+ * its error handling entirely — and the Python reader already raises a
+ * single type here, so this keeps the two the same.
+ */
+export class ZipError extends PackageError {}
 
 const EOCD_SIG = 0x06054b50;
 const CENTRAL_SIG = 0x02014b50;
+const LOCAL_SIG = 0x04034b50;
 
-/** Parse the central directory: [{ name, compressed, method, offset, size }] */
+/** Parse the central directory: [{ name, method, compressedSize, … }] */
 export function listZipEntries(buffer) {
   let eocd = -1;
   const scanFrom = Math.max(0, buffer.length - 65557);
@@ -43,7 +52,7 @@ export function listZipEntries(buffer) {
 
 function readEntry(buffer, entry) {
   const local = entry.localOffset;
-  if (buffer.readUInt32LE(local) !== 0x04034b50) {
+  if (buffer.readUInt32LE(local) !== LOCAL_SIG) {
     throw new ZipError('A local file header is damaged.');
   }
   const nameLength = buffer.readUInt16LE(local + 26);
@@ -55,8 +64,19 @@ function readEntry(buffer, entry) {
   throw new ZipError('The archive uses an unsupported compression method.');
 }
 
-/** Extract safely into destination; refuses hostile names outright. */
-export function extractZipSafely(buffer, destination) {
+/**
+ * Extract a package ZIP safely; refuses hostile names outright.
+ *
+ * Takes a path, matching the Python reader's signature — the two are meant to
+ * be the same reader in two languages, and a difference in how they are called
+ * is the seam where they start drifting apart.
+ */
+export function extractZipSafely(zipPath, destination) {
+  extractZipBuffer(readFileSync(zipPath), destination);
+}
+
+/** The same, for callers that already hold the bytes. */
+export function extractZipBuffer(buffer, destination) {
   const entries = listZipEntries(buffer);
   const seen = new Set();
   const resolvedDestination = resolve(destination);

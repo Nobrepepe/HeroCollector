@@ -22,11 +22,35 @@ function entriesFrom(list, prefix, { range = false } = {}) {
 }
 
 /**
- * @param pkg      a validated package from package-reader
- * @param mediaUrl (assetId, preferredRecipes) -> displayable URL or null
+ * @param pkg              a validated package from the World Hub kit's reader
+ * @param mediaUrl         (assetId, preferredRecipes) -> displayable URL or null
+ * @param worldHubDefaults content/balance.json's `worldHub` block: engine
+ *                         configuration for whatever the author left blank
+ *
+ * Recipe names come from the contract embedded in the package, never from
+ * this file: World Hub renames them, and it has done so once already.
  */
-export function adaptPackageToCustomDb(pkg, mediaUrl) {
-  const { content, entitiesById } = pkg;
+export function adaptPackageToCustomDb(pkg, mediaUrl, worldHubDefaults = {}) {
+  /* Engine configuration for anything the author left blank. These used to be
+     literals right here, which meant the person authoring in World Hub could
+     neither see them nor change them; they live in content/balance.json now,
+     where a designer tunes them. */
+  const tuning = {
+    factionBonusBp: { two: 200, three: 400, ...(worldHubDefaults.factionBonusBp ?? {}) },
+    expedition: { weight: 10, requirementCount: 0, powerRatioBp: 10000, ...(worldHubDefaults.expedition ?? {}) },
+    reward: { rare: false, ...(worldHubDefaults.reward ?? {}) },
+    crisis: {
+      weight: 10,
+      minimumClearedNodes: 0,
+      ...(worldHubDefaults.crisis ?? {}),
+      frontPower: { local: 100, major: 300, world: 900, ...(worldHubDefaults.crisis?.frontPower ?? {}) },
+    },
+  };
+  const { content } = pkg;
+  /* The kit hands back a Map keyed by id, not a plain object. Reading it the
+     wrong way resolves every record to `{}` and the defaults below turn that
+     into a package that adapts "successfully" into nothing at all. */
+  const entitiesById = pkg.entitiesById();
   const values = content.values ?? {};
   const selections = content.selections ?? {};
   const entityValues = content.entityValues ?? {};
@@ -42,7 +66,7 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
 
   /* ---- characters ---- */
   const characters = (selections.hc_characters ?? []).map((hubId) => {
-    const entity = entitiesById[hubId] ?? {};
+    const entity = entitiesById.get(hubId) ?? {};
     const profile = characterProfiles[hubId] ?? {};
     const own = entityValues[hubId] ?? {};
     const equipment = {};
@@ -50,7 +74,7 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
       const authored = (own.hc_equipment ?? []).find((line) => line.equip_slot === slot);
       equipment[slot] = {
         name: authored?.equip_name || `${entity.name ?? 'Hero'}’s ${slot}`,
-        image: authored?.equip_art ? mediaUrl(authored.equip_art, ['square']) : null,
+        image: authored?.equip_art ? mediaUrl(authored.equip_art, pkg.recipesFor('equip_art')) : null,
       };
     }
     return {
@@ -66,13 +90,13 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
       extraTags: own.hc_extra_tags ?? [],
       description: entity.summary ?? '',
       lore: profile.biography ?? '',
-      portrait: mediaUrl(setAsset('hc_portrait', hubId), ['square', 'thumbnail_square']),
-      fullBody: mediaUrl(setAsset('hc_full_body', hubId), ['full_body_9x16']),
+      portrait: mediaUrl(setAsset('hc_portrait', hubId), pkg.recipesFor('hc_portrait')),
+      fullBody: mediaUrl(setAsset('hc_full_body', hubId), pkg.recipesFor('hc_full_body')),
       equipment,
       skins: (own.hc_skins ?? []).map((skin) => ({
         id: skin.skin_id,
         name: skin.skin_name,
-        portrait: skin.skin_art ? mediaUrl(skin.skin_art, ['full_body_9x16', 'square']) : null,
+        portrait: skin.skin_art ? mediaUrl(skin.skin_art, pkg.recipesFor('skin_art')) : null,
         fullBody: null,
       })),
     };
@@ -80,10 +104,10 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
 
   /* ---- worlds ---- */
   const worlds = (selections.hc_worlds ?? []).map((hubId) => {
-    const entity = entitiesById[hubId] ?? {};
+    const entity = entitiesById.get(hubId) ?? {};
     const profile = worldProfiles[hubId] ?? {};
     const own = entityValues[hubId] ?? {};
-    const chapterArt = setAssets('hc_chapter_art', hubId).map((assetId) => mediaUrl(assetId, ['tile_16x9']));
+    const chapterArt = setAssets('hc_chapter_art', hubId).map((assetId) => mediaUrl(assetId, pkg.recipesFor('hc_chapter_art')));
     while (chapterArt.length < 3) chapterArt.push(null);
 
     return {
@@ -97,7 +121,7 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
         accent: own.hc_palette_accent || DEFAULT_PALETTE.accent,
         dark: own.hc_palette_dark || DEFAULT_PALETTE.dark,
       },
-      image: mediaUrl(setAsset('hc_world_cover', hubId), ['tile_16x9']),
+      image: mediaUrl(setAsset('hc_world_cover', hubId), pkg.recipesFor('hc_world_cover')),
       campaignChapterImages: chapterArt.slice(0, 3),
       campaignChapterTitles: own.hc_chapter_titles
         ?? [1, 2, 3].map((n) => `${entity.name} · Chapter ${n}`),
@@ -117,7 +141,7 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
         pieces: (own.hc_relic_pieces ?? []).map((piece) => ({
           name: piece.piece_name,
           lore: piece.piece_lore || '',
-          image: piece.piece_art ? mediaUrl(piece.piece_art, ['square']) : null,
+          image: piece.piece_art ? mediaUrl(piece.piece_art, pkg.recipesFor('piece_art')) : null,
         })),
       },
       masterySkins: (own.hc_mastery_skins ?? []).map((entry) => ({
@@ -148,8 +172,8 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
     displayName: faction.faction_name,
     explanation: faction.faction_explanation || `${faction.faction_name} members work well together.`,
     thresholds: [
-      { count: 2, bonusBp: faction.faction_bonus_2_bp ?? 200 },
-      { count: 3, bonusBp: faction.faction_bonus_3_bp ?? 400 },
+      { count: 2, bonusBp: faction.faction_bonus_2_bp ?? tuning.factionBonusBp.two },
+      { count: 3, bonusBp: faction.faction_bonus_3_bp ?? tuning.factionBonusBp.three },
     ],
   }));
 
@@ -166,7 +190,7 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
       resultMultipliersBp: { completed: 10000, successful: 12500, exceptional: 15000 },
     },
     images: {
-      global: productionSets.length ? mediaUrl(productionSets[0].assetId, ['tile_16x9']) : null,
+      global: productionSets.length ? mediaUrl(productionSets[0].assetId, pkg.recipesFor('hc_expedition_art')) : null,
       worlds: {},
     },
     requirements: (values.hc_expedition_requirements ?? []).map((req) => ({
@@ -179,7 +203,7 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
     })),
     rewardPackages: (values.hc_expedition_rewards ?? []).map((reward) => ({
       id: reward.expreward_id, displayName: reward.expreward_name,
-      rare: reward.expreward_rare === true,
+      rare: reward.expreward_rare ?? tuning.reward.rare,
       entries: entriesFrom(reward.expreward_entries, 'rentry', { range: true }),
       // A lead range makes routes with this package character leads: the
       // player chooses a revealed hero of the route's world at launch.
@@ -190,13 +214,13 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
     templates: (values.hc_expedition_templates ?? []).map((template) => ({
       id: template.exptpl_id, enabled: true,
       world: template.exptpl_world || undefined,
-      weight: template.exptpl_weight ?? 10,
+      weight: template.exptpl_weight ?? tuning.expedition.weight,
       partySize: template.exptpl_party_size,
       requirementIds: template.exptpl_requirement_ids ?? [],
-      requirementCount: template.exptpl_requirement_count ?? 0,
+      requirementCount: template.exptpl_requirement_count ?? tuning.expedition.requirementCount,
       optionalIds: template.exptpl_optional_ids ?? [],
       rewardPackageId: template.exptpl_reward_package,
-      powerRatioBp: template.exptpl_power_ratio_bp ?? 10000,
+      powerRatioBp: template.exptpl_power_ratio_bp ?? tuning.expedition.powerRatioBp,
       titles: template.exptpl_titles ?? [],
       descriptions: template.exptpl_descriptions ?? [],
       fixedRewards: template.exptpl_supply === true
@@ -226,18 +250,18 @@ export function adaptPackageToCustomDb(pkg, mediaUrl) {
       worldId: crisis.crisis_world,
       name: crisis.crisis_name,
       openingDescription: crisis.crisis_opening || '',
-      artwork: crisis.crisis_art ? mediaUrl(crisis.crisis_art, ['tile_16x9']) : null,
-      weight: crisis.crisis_weight ?? 10,
-      minimumClearedNodes: crisis.crisis_min_cleared ?? 0,
+      artwork: crisis.crisis_art ? mediaUrl(crisis.crisis_art, pkg.recipesFor('crisis_art')) : null,
+      weight: crisis.crisis_weight ?? tuning.crisis.weight,
+      minimumClearedNodes: crisis.crisis_min_cleared ?? tuning.crisis.minimumClearedNodes,
       fronts: (crisis.crisis_fronts ?? []).map((front) => ({
         id: front.front_id,
         name: front.front_name,
         description: front.front_description || '',
         favoredTagIds: front.front_favored_tags ?? [],
         recommendedPowerByGrade: {
-          local: front.front_power_local ?? 100,
-          major: front.front_power_major ?? 300,
-          world: front.front_power_world ?? 900,
+          local: front.front_power_local ?? tuning.crisis.frontPower.local,
+          major: front.front_power_major ?? tuning.crisis.frontPower.major,
+          world: front.front_power_world ?? tuning.crisis.frontPower.world,
         },
         struggleText: front.front_struggle_text || `${front.front_name} held, barely.`,
         successText: front.front_success_text || `${front.front_name} steadied.`,
