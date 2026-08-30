@@ -180,7 +180,7 @@ export function openCrisisCharacterPicker(store, { currentId = null, excludedIds
         .filter(def => store.state.characters[def.id].owned);
       for (const def of candidates) {
         const unavailable = excludedIds.has(def.id) && def.id !== currentId;
-        const tags = new Set([def.world, def.archetype, def.faction, ...(def.extraTags ?? [])].filter(Boolean));
+        const tags = new Set([def.world, def.archetype, def.faction].filter(Boolean));
         const matches = favoredTagIds.filter(id => tags.has(id));
         grid.appendChild(h('button.picker-card', {
           disabled: unavailable,

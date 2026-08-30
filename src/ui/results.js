@@ -112,7 +112,7 @@ function shardColumn(store, characterId, qty) {
   const cs = store.state.characters[characterId];
   const before = store.ui.transactionBefore?.shards?.[characterId] ?? Math.max(0, cs.shards - qty);
   const need = cs.owned && cs.stars < 7 ? store.content.balance.starShards[cs.stars]
-    : store.content.balance.acquisitionTiers[def.tier].cumulativeShards;
+    : store.content.balance.rosterProgression.recruitShards;
   return h('div.reward-column.hero',
     h('div.shard-icon', '🧩'),
     h('div.display-s', `+${qty}`),

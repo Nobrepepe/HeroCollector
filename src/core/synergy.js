@@ -24,7 +24,7 @@ export function evaluateTag(content, tag, partyDefs) {
       break;
     }
     case 'tag_count':
-      count = partyDefs.filter(d => d.faction === tag.id || (d.extraTags || []).includes(tag.id)).length;
+      count = partyDefs.filter(d => d.faction === tag.id).length;
       break;
     default:
       count = 0;
@@ -106,7 +106,7 @@ export function objectiveSatisfied(content, objective, members) {
   const defs = members.map(id => content.characterById[id]).filter(Boolean);
   switch (objective.rule) {
     case 'tag_count':
-      return defs.filter(d => d.faction === objective.tagId || (d.extraTags || []).includes(objective.tagId)).length >= objective.count;
+      return defs.filter(d => d.faction === objective.tagId).length >= objective.count;
     case 'same_world_count': {
       const byWorld = {};
       for (const d of defs) byWorld[d.world] = (byWorld[d.world] || 0) + 1;

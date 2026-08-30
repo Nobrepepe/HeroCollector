@@ -2,8 +2,8 @@
 // finite rewards — never passive percentage modifiers.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadContent, maxOut } from './helpers.mjs';
-import { newPlayerState, clearNode } from '../src/core/state.js';
+import { loadContent, maxOut, newGame } from './helpers.mjs';
+import { clearNode } from '../src/core/state.js';
 import { makeRng } from '../src/core/rng.js';
 import {
   worldMasteryBreakdown, masteryRank, masteryRankAtLeast,
@@ -35,7 +35,7 @@ function maxWorld(state, worldId) {
 }
 
 test('the four parts weigh 350/350/200/100 and land exactly on 1000 when complete', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   const start = worldMasteryBreakdown(content, state, WORLD);
   assert.ok(start.score > 0 && start.score < 100); // the starters alone
   maxWorld(state, WORLD);
@@ -49,7 +49,7 @@ test('the four parts weigh 350/350/200/100 and land exactly on 1000 when complet
 });
 
 test('the score is derived, never stored — reverting state reverts the score', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   const before = worldMasteryBreakdown(content, state, WORLD).score;
   state.characters.char_mei.owned = true;
   const owned = worldMasteryBreakdown(content, state, WORLD).score;
@@ -59,7 +59,7 @@ test('the score is derived, never stored — reverting state reverts the score',
 });
 
 test('rank gates compare against the rank thresholds', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   assert.equal(masteryRankAtLeast(content, state, WORLD, 'unfamiliar'), true);
   assert.equal(masteryRankAtLeast(content, state, WORLD, 'known'), false);
   clearWorldCampaign(state, WORLD);
@@ -68,7 +68,7 @@ test('rank gates compare against the rank thresholds', () => {
 });
 
 test('crossing a rank grants its milestone exactly once, choices queue for the player', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   clearWorldCampaign(state, WORLD); // 350: crosses Known (200)
   const events = applyMasteryMilestones(content, state, WORLD, T0);
   assert.equal(events.length, 1);
@@ -83,7 +83,7 @@ test('crossing a rank grants its milestone exactly once, choices queue for the p
 });
 
 test('a material cache pays the chosen family at the world opened grade', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   clearWorldCampaign(state, WORLD);
   applyMasteryMilestones(content, state, WORLD, T0);
   // the cleared World Campaign includes advanced-grade nodes
@@ -97,7 +97,7 @@ test('a material cache pays the chosen family at the world opened grade', () => 
 });
 
 test('a shard choice takes only a revealed hero of that world', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   maxWorld(state, WORLD);
   // un-max one hero so a target exists, then claim Established (shard choice)
   state.characters.char_mei.stars = 3;
@@ -111,7 +111,7 @@ test('a shard choice takes only a revealed hero of that world', () => {
 });
 
 test('clearing world nodes applies milestones inside the same transaction', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   const roster = content.characters.filter(d => d.world === WORLD).map(d => d.id);
   maxOut(content, state, roster.slice(0, 5));
   state.energy = 10000;

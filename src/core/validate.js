@@ -6,7 +6,6 @@ import { equipmentRecipe } from './content.js';
 import { fieldSupplyLimits, FIELD_SUPPLY_ID } from './energy.js';
 import { RANDOM_MATERIAL, randomMaterialPool } from './resources.js';
 import { CRISIS_BOON_TYPES } from './crises.js';
-import { RELIC_PIECE_NODES, MASTERY_SKIN_RANKS } from './custom.js';
 
 export function validateContent(content) {
   const errors = [];
@@ -63,17 +62,21 @@ export function validateContent(content) {
     for (const id of template.optionalIds ?? []) if (!content.expeditions.optionalById[id]) err(`${template.id}: unknown optional objective ${id}`);
     if (template.partySize < 1 || template.partySize > 4) err(`${template.id}: invalid party size`);
     if (!template.titles?.length || !template.descriptions?.length) err(`${template.id}: missing procedural prose`);
+    if (!template.optionalIds?.length) err(`${template.id}: a route with no possible bonus cannot reach an exceptional return`);
+    if (template.requirementCount > (template.requirementIds?.length ?? 0)) err(`${template.id}: asks for more requirements than it defines`);
     for (const reward of template.fixedRewards ?? []) {
       if (reward.kind !== 'resource' || reward.id !== FIELD_SUPPLY_ID || reward.qty !== 1) err(`${template.id}: invalid fixed reward`);
-      if (template.id !== content.expeditions.settings.guaranteedSupplyTemplateId) err(`${template.id}: only the configured guaranteed template may promise a Field Supply`);
+      if (!template.supply) err(`${template.id}: only the Field Supply route may promise a Field Supply`);
     }
   }
-  const guaranteedId = content.expeditions.settings.guaranteedSupplyTemplateId;
-  if (guaranteedId) {
-    const guaranteed = content.expeditions.templateById[guaranteedId];
-    if (!guaranteed || guaranteed.enabled === false) err('Guaranteed Field Supply template is missing or disabled');
-    if (guaranteed && (guaranteed.fixedRewards?.length !== 1 || guaranteed.fixedRewards[0]?.id !== FIELD_SUPPLY_ID || guaranteed.fixedRewards[0]?.qty !== 1)) {
-      err(`${guaranteedId}: guaranteed Supply template needs exactly one fixed Field Supply`);
+  // The guaranteed Supply route is an engine rule, so exactly one template
+  // may carry it — a second would crowd the board, none would starve it.
+  const supplyTemplates = (content.expeditions.templates ?? []).filter(template => template.supply);
+  if (supplyTemplates.length > 1) err(`Only one Expedition route may be the guaranteed Field Supply (found ${supplyTemplates.length})`);
+  for (const template of supplyTemplates) {
+    if (template.enabled === false) err(`${template.id}: the guaranteed Field Supply route is disabled`);
+    if (template.fixedRewards?.length !== 1 || template.fixedRewards[0]?.id !== FIELD_SUPPLY_ID || template.fixedRewards[0]?.qty !== 1) {
+      err(`${template.id}: the guaranteed Supply route needs exactly one fixed Field Supply`);
     }
   }
 
@@ -86,13 +89,21 @@ export function validateContent(content) {
     gradeIds.add(grade.id);
     if (!Number.isInteger(grade.minOwned) || grade.minOwned < 1
       || !Number.isInteger(grade.frontCount) || grade.frontCount < 2 || !Number.isInteger(grade.teamSize) || grade.teamSize < 1) err(`${grade.id}: invalid Crisis grade settings`);
+    // A grade must be reachable with a roster it will actually accept, or its
+    // benchmark would be computed from heroes the player cannot have.
+    if (grade.frontCount * grade.teamSize > grade.minOwned) {
+      err(`${grade.id}: needs ${grade.frontCount * grade.teamSize} heroes but unlocks at ${grade.minOwned} owned`);
+    }
     if (masteryRankIds.size && !masteryRankIds.has(grade.minMasteryRank)) err(`${grade.id}: unknown Mastery rank gate ${grade.minMasteryRank}`);
   }
+  // A Crisis is generated per world, so the grades decide how many Fronts a
+  // spawn draws; the definition must be able to supply the largest of them.
+  const widestGrade = Math.max(0, ...(content.crises?.settings?.grades ?? []).map(grade => grade.frontCount ?? 0));
   for (const definition of content.crises?.definitions ?? []) {
     if (crisisIds.has(definition.id)) err(`Duplicate Crisis ID: ${definition.id}`);
     crisisIds.add(definition.id);
     if (!content.worldById[definition.worldId]) err(`${definition.id}: unknown Crisis world ${definition.worldId}`);
-    if ((definition.fronts?.length ?? 0) < 3) err(`${definition.id}: a Crisis needs at least three Fronts`);
+    if ((definition.fronts?.length ?? 0) < widestGrade) err(`${definition.id}: needs at least ${widestGrade} Fronts for its widest grade`);
     const frontIds = new Set();
     for (const front of definition.fronts ?? []) {
       if (frontIds.has(front.id)) err(`${definition.id}: duplicate Front ${front.id}`);
@@ -100,15 +111,19 @@ export function validateContent(content) {
       if (!front.name || !front.description) err(`${front.id}: missing Front prose`);
       if (!front.favoredTagIds?.length || front.favoredTagIds.length > 2) err(`${front.id}: needs one or two favored tags`);
       for (const id of front.favoredTagIds ?? []) if (!favoredIds.has(id)) err(`${front.id}: unknown favored tag ${id}`);
-      for (const grade of content.crises.settings.grades ?? []) {
-        if (!Number.isInteger(front.recommendedPowerByGrade?.[grade.id]) || front.recommendedPowerByGrade[grade.id] < 1) err(`${front.id}: invalid ${grade.id} recommendation`);
-      }
+      // Recommended Power is computed when the Crisis spawns, from the roster
+      // the player could field, so a Front carries no authored number to check.
     }
     if (![3, 4].includes(definition.cacheChoices?.length)) err(`${definition.id}: needs three or four Emergency Cache choices`);
+    if (!definition.fronts?.every(front => front.struggleText && front.successText && front.excelText)) err(`${definition.id}: a Front is missing its outcome prose`);
     if (!CRISIS_BOON_TYPES.has(definition.boon?.type)) err(`${definition.id}: unknown boon type ${definition.boon?.type}`);
     for (const choice of definition.cacheChoices ?? []) for (const reward of choice.rewards ?? []) {
       if (reward.kind === 'resource' && !content.resourceById[reward.id]) err(`${choice.id}: unknown Cache resource ${reward.id}`);
-      if (reward.kind === 'material' && !content.materialById[reward.id]) err(`${choice.id}: unknown Cache material ${reward.id}`);
+      // A material Cache names a family; the grade is resolved at spawn from
+      // whatever this world has opened, so the family is what must be real.
+      if (reward.kind === 'material' && !content.materialMeta.familyOrder.includes(reward.family)) {
+        err(`${choice.id}: unknown Cache material family ${reward.family}`);
+      }
       if (!Number.isInteger(reward.qty) || reward.qty < 1) err(`${choice.id}: invalid Cache quantity`);
     }
     const boon = definition.boon;
@@ -121,14 +136,16 @@ export function validateContent(content) {
     if (!content.worldById[c.world]) err(`${c.id}: unknown world ${c.world}`);
     if (!content.archetypes[c.archetype]) err(`${c.id}: unknown archetype ${c.archetype}`);
     if (c.faction && !content.tagById[c.faction]) err(`${c.id}: unknown faction ${c.faction}`);
-    for (const t of c.extraTags ?? []) if (!content.tagById[t]) err(`${c.id}: unknown extra tag ${t}`);
     for (const slot of content.characterMeta.slotOrder) {
       if (!c.equipmentLines[slot]) err(`${c.id}: missing equipment line for slot ${slot}`);
     }
-    // every non-starting character needs an encounter that reveals them
-    if (!c.starting && (content.encounterNodesByCharacter[c.id] ?? []).length === 0) {
-      err(`${c.id}: no encounter node reveals this character`);
-    }
+    // The starting five are drawn per save from the whole roster, so no hero
+    // can rely on being one: every hero needs exactly one encounter that
+    // reveals them. Two would stake the reveal shards twice for one hero and
+    // never for another, which is a compiler fault rather than an authoring one.
+    const reveals = (content.encounterNodesByCharacter[c.id] ?? []).length;
+    if (reveals === 0) err(`${c.id}: no encounter node reveals this character`);
+    else if (reveals > 1) err(`${c.id}: revealed by ${reveals} nodes; each hero enters the game once`);
   }
 
   // --- materials / components
@@ -170,6 +187,28 @@ export function validateContent(content) {
         }
       }
     }
+  }
+
+  // --- campaigns are generated, so their shape is an invariant, not a
+  // preference: a world campaign is exactly `nodes` long and the Main
+  // Campaign is a whole number of chapters.
+  const campaignConfig = content.balance.campaigns;
+  for (const world of content.worlds) {
+    const length = (content.nodesByCampaign[world.campaignId] ?? []).length;
+    if (length !== campaignConfig.world.nodes) {
+      err(`${world.id}: compiled ${length} campaign nodes, expected ${campaignConfig.world.nodes}`);
+    }
+  }
+  const mainLength = (content.nodesByCampaign.main ?? []).length;
+  if (mainLength % campaignConfig.main.chapterSize !== 0) {
+    err(`Main Campaign compiled ${mainLength} nodes, which is not a whole number of ${campaignConfig.main.chapterSize}-node chapters`);
+  }
+  // It also has to be long enough to introduce every world's opening party,
+  // because a World Campaign is locked until five of its heroes are owned and
+  // nothing else can unlock it.
+  const openingNeeded = content.worlds.length * content.balance.partySize;
+  if (content.worlds.length && mainLength < openingNeeded) {
+    err(`Main Campaign has ${mainLength} nodes but ${content.worlds.length} worlds need ${openingNeeded} opening reveals`);
   }
 
   // --- campaigns: continuous previous chains, nondecreasing thresholds
@@ -225,8 +264,9 @@ export function validateContent(content) {
     }
   }
 
-  // --- relics: exactly four pieces per world, each awarded by the first
-  // clear of its authored World Campaign node.
+  // --- relics: one piece per configured position, each awarded by the first
+  // clear of the World Campaign node the compiler put it on.
+  const RELIC_PIECE_NODES = content.balance.campaigns.world.relicPieceNodes;
   for (const w of content.worlds) {
     if (!content.relicByWorld[w.id]) err(`${w.id}: world has no relic`);
   }
@@ -259,9 +299,10 @@ export function validateContent(content) {
     if (!skinChar) err(`${skin.id}: skin references unknown character`);
     else if (skinChar.world !== skin.world) err(`${skin.id}: skin character is from another world`);
   }
+  const cosmeticRanks = content.balance.mastery.cosmeticRanks ?? [];
   for (const w of content.worlds) {
     for (const entry of w.masterySkins ?? []) {
-      if (!MASTERY_SKIN_RANKS.includes(entry.rank)) err(`${w.id}: unknown Mastery skin rank ${entry.rank}`);
+      if (!cosmeticRanks.includes(entry.rank)) err(`${w.id}: unknown Mastery cosmetic rank ${entry.rank}`);
       const skin = content.skinById[entry.skinId];
       if (!skin) err(`${w.id}: Mastery skin references unknown skin ${entry.skinId}`);
       else if (skin.characterId !== entry.characterId || skin.world !== w.id) err(`${w.id}: Mastery skin ${entry.skinId} does not belong to that character and world`);
@@ -287,10 +328,21 @@ export function validateContent(content) {
 // content does.
 export function validateSave(content, state) {
   const errors = [];
-  if (state.schemaVersion !== 6) errors.push(`Unsupported save schema ${state.schemaVersion}`);
+  if (state.schemaVersion !== 7) errors.push(`Unsupported save schema ${state.schemaVersion}`);
   if (!state.characters || !state.inventory || !state.nodes || !Array.isArray(state.parties)
     || !state.focus?.slots || typeof state.programs !== 'object' || !state.relics?.pieces || typeof state.mastery !== 'object') {
     return { ok: false, errors: ['Save is missing required gameplay state.'] };
+  }
+  // The drawn starting five. `syncSaveWithContent` prunes entries whose
+  // content left the game and tops the list back up, so by the time a save is
+  // validated every name here is live — and owned, because the draw granted
+  // them. (Their ownership itself survives dormancy in `state.characters`.)
+  if (!Array.isArray(state.starters)) errors.push('Save is missing its starting roster.');
+  else {
+    if (new Set(state.starters).size !== state.starters.length) errors.push('The starting roster names the same character twice.');
+    for (const id of state.starters) {
+      if (!state.characters[id]?.owned) errors.push(`Starting character ${id} is not owned`);
+    }
   }
   for (const id of Object.keys(state.characters)) {
     const selectedSkinId = state.characters[id].selectedSkinId;

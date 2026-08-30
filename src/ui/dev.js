@@ -10,7 +10,8 @@ import { applyDailyReset, newPlayerState } from '../core/state.js';
 import { openModal, toast, render } from '../app.js';
 import { addResource } from '../core/resources.js';
 import { generateCycleBoard } from '../core/expeditions.js';
-import { upgradeCustomDB } from '../core/custom.js';
+import { normalizeManifest } from '../core/manifest.js';
+import { describeReveals } from '../core/compile/roster.js';
 import { importJson } from '../platform.js';
 
 export function renderDev(store, root) {
@@ -23,12 +24,12 @@ export function renderDev(store, root) {
   cp.appendChild(h('h2', 'Content pack'));
   cp.appendChild(h('p.small.muted', store.hubMode
     ? 'A World Hub publication is active; importing a pack here is disabled until it is rolled back.'
-    : 'Import a content-pack JSON (any legacy version; it is upgraded on import). It replaces the bundled default until removed.'));
+    : 'Import a Creative Manifest JSON: worlds, characters, names and art. Every number stays the game’s. It replaces the bundled default until removed.'));
   if (!store.hubMode) cp.appendChild(h('button.btn', {
     onclick: async () => {
       const raw = await importJson();
       if (!raw) { toast('Import canceled or unreadable.', 'error'); return; }
-      store.customDB = upgradeCustomDB(raw);
+      store.manifest = normalizeManifest(raw, store.baseRaw.characters.slotOrder);
       const applied = await store.applyCustom({ rerender: true });
       toast(applied.ok ? 'Content pack applied.' : 'The pack could not be applied — previous content is still active.', applied.ok ? 'info' : 'error');
     }
@@ -186,6 +187,19 @@ export function renderDev(store, root) {
         });
       }
     }, 'Validate content & save'),
+    h('button.btn.tiny', {
+      onclick: () => openModal((modal, close) => {
+        // Where the compiler put every hero. Reveal positions come from world
+        // order and roster order, so this is the one place that makes the
+        // consequence of reordering a production visible before playing it.
+        const lines = describeReveals(content, store.revealPlan ?? []);
+        modal.appendChild(h('h2', 'Where each hero enters'));
+        modal.appendChild(h('p.small.muted',
+          `${lines.length} of ${content.characters.length} heroes have a reveal. The Main Campaign introduces each world's opening five; the rest are spread along their own world's campaign.`));
+        modal.appendChild(h('ul.reasons', lines.map(line => h('li', line))));
+        modal.appendChild(h('button.btn', { onclick: close }, 'Close'));
+      })
+    }, 'Show hero reveal plan'),
     h('button.btn.tiny.danger', {
       onclick: () => openModal((modal, close) => {
         modal.appendChild(h('h2', 'Reset to clean save?'));

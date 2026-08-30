@@ -9,8 +9,9 @@ import { fileURLToPath } from 'node:url';
 import { extractZipSafely, ZipError } from '../vendor/worldhub-kit/js/zip-reader.mjs';
 import { loadPackage, PackageError } from '../vendor/worldhub-kit/js/package-reader.mjs';
 import { APP_TYPE, READER_OPTIONS, semanticValidation } from '../src/core/worldhub/semantics.js';
-import { adaptPackageToCustomDb } from '../src/core/worldhub/adapter.js';
-import { upgradeCustomDB, mergeContent, gameReadiness } from '../src/core/custom.js';
+import { adaptPackageToManifest } from '../src/core/worldhub/adapter.js';
+import { compileManifest } from '../src/core/compile/index.js';
+import { normalizeManifest, gameReadiness } from '../src/core/manifest.js';
 import { buildContent } from '../src/core/content.js';
 import { validateContent, validateSave } from '../src/core/validate.js';
 import { newPlayerState, syncSaveWithContent } from '../src/core/state.js';
@@ -21,7 +22,7 @@ const EXPECTED = JSON.parse(fs.readFileSync(path.join(FIXTURES, 'expected.json')
 
 function loadSystemRaw() {
   const out = {};
-  for (const file of ['balance', 'worlds', 'archetypes', 'materials', 'components', 'characters', 'tags', 'recipes', 'nodes', 'archives']) {
+  for (const file of ['balance', 'archetypes', 'materials', 'components', 'characters', 'tags', 'recipes', 'expeditions', 'crises']) {
     out[file] = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'content', `${file}.json`), 'utf8'));
   }
   return out;
@@ -46,11 +47,13 @@ function buildFromFixture(name) {
   const pkg = loadPackage(dir, APP_TYPE, READER_OPTIONS);
   semanticValidation(pkg);
   const systemRaw = loadSystemRaw();
-  const db = upgradeCustomDB(adaptPackageToCustomDb(pkg, mediaUrl(pkg), systemRaw.balance.worldHub ?? {}));
-  const merged = mergeContent(systemRaw, db);
+  const manifest = normalizeManifest(
+    adaptPackageToManifest(pkg, mediaUrl(pkg)),
+    systemRaw.characters.slotOrder);
+  const merged = compileManifest(systemRaw, manifest);
   const content = buildContent(merged.raw);
   content.images = merged.images;
-  return { pkg, db, merged, content, dir };
+  return { pkg, manifest, merged, content, dir };
 }
 
 test('the page CSP admits packaged media, or no hub art can ever render', () => {
@@ -173,49 +176,126 @@ test('wrong-app packages from sibling consumers are refused', () => {
   assert.throws(() => loadPackage(dir, APP_TYPE, READER_OPTIONS), /not for this app/);
 });
 
-test('engine defaults come from balance.json, not from literals in the adapter', () => {
+test('the adapter carries no engine configuration at all', () => {
   const dir = extractFixture('valid-v1.zip');
   const pkg = loadPackage(dir, APP_TYPE, READER_OPTIONS);
 
-  /* An author who leaves the engine numbers alone — the ordinary case, and the
-     one where these values used to be invisible defaults inside the adapter. */
-  for (const crisis of pkg.content.values.hc_crises ?? []) {
-    delete crisis.crisis_weight;
-    delete crisis.crisis_min_cleared;
-    for (const front of crisis.crisis_fronts ?? []) {
-      delete front.front_power_local;
-      delete front.front_power_major;
-      delete front.front_power_world;
-    }
-  }
-  for (const template of pkg.content.values.hc_expedition_templates ?? []) {
-    delete template.exptpl_power_ratio_bp;
-    delete template.exptpl_weight;
-  }
-  for (const faction of pkg.content.values.hc_factions ?? []) {
-    delete faction.faction_bonus_2_bp;
-    delete faction.faction_bonus_3_bp;
-  }
-
-  const designerTuning = {
-    factionBonusBp: { two: 111, three: 222 },
-    expedition: { weight: 33, requirementCount: 0, powerRatioBp: 4444 },
-    crisis: { weight: 55, minimumClearedNodes: 6, frontPower: { local: 7, major: 8, world: 9 } },
-  };
-  const db = adaptPackageToCustomDb(pkg, mediaUrl(pkg), designerTuning);
-
-  const crisis = db.crises.definitions[0];
-  assert.equal(crisis.weight, 55, 'the crisis weight a designer set is what the game gets');
-  assert.equal(crisis.minimumClearedNodes, 6);
-  assert.deepEqual(crisis.fronts[0].recommendedPowerByGrade, { local: 7, major: 8, world: 9 });
-
-  const template = db.expeditions.templates[0];
-  assert.equal(template.powerRatioBp, 4444);
-  assert.equal(template.weight, 33);
-  assert.deepEqual(db.factions[0].thresholds.map((t) => t.bonusBp), [111, 222]);
-
-  /* and the file the game actually ships carries that block */
+  /* Every number the adapter once defaulted — faction synergy, Expedition
+     weights and Power ratios, Crisis weights and Front Power — now lives in
+     content/, so the adapter takes no configuration argument and
+     balance.worldHub is gone. */
+  assert.equal(adaptPackageToManifest.length, 2, 'the adapter takes only a package and a media resolver');
   const balance = loadSystemRaw().balance;
-  assert.ok(balance.worldHub, 'content/balance.json declares the World Hub defaults');
-  assert.ok(Number.isInteger(balance.worldHub.crisis.frontPower.local));
+  assert.equal(balance.worldHub, undefined, 'no World Hub defaults block remains');
+  assert.ok(balance.campaigns?.world?.thresholdStart, 'campaign curves are game-owned');
+  assert.ok(balance.factions?.thresholds?.length, 'faction synergy is game-owned');
+
+  const manifest = adaptPackageToManifest(pkg, mediaUrl(pkg));
+  assert.equal(manifest.crises, undefined, 'no Crisis library reaches the manifest');
+  assert.equal(manifest.expeditions, undefined, 'no Expedition library reaches the manifest');
+  assert.ok(manifest.expeditionArt, 'board artwork still does');
+});
+
+test('the contract asks for creative facts only — every field is accounted for', () => {
+  // The guard this replaces rewrote the contract's mechanical fields to
+  // nonsense and proved the adapter ignored them. Those fields are gone, so
+  // the invariant moves up: the contract may not grow one back. Adding a
+  // field here means deciding, deliberately, that a publication owns it.
+  const contract = JSON.parse(fs.readFileSync(
+    path.join(__dirname, '..', 'worldhub', 'application-contract.json'), 'utf8'));
+
+  const ids = [];
+  const walk = (field) => {
+    ids.push(field.id);
+    for (const child of field.fields ?? []) walk(child);
+    if (field.item) walk(field.item);
+  };
+  for (const field of contract.productionFields ?? []) walk(field);
+  for (const selection of contract.entitySelections ?? []) {
+    for (const field of selection.fields ?? []) walk(field);
+  }
+
+  const allowed = new Set([
+    // Main Campaign: a title and ten names.
+    'hc_main_chapters', 'chapter_title', 'chapter_art', 'chapter_nodes', 'mnode_name',
+    // Worlds: look, campaign names, relic fiction, cosmetic order.
+    'hc_world_icon', 'hc_palette_primary', 'hc_palette_accent', 'hc_palette_dark',
+    'hc_chapter_titles', 'hc_chapter_title', 'hc_campaign_nodes', 'node_name',
+    'hc_relic_name', 'hc_relic_lore', 'hc_relic_pieces', 'piece_name', 'piece_lore', 'piece_art',
+    'hc_mastery_cosmetics', 'mc_character', 'mc_name', 'mc_art',
+    // Characters: who they are, and the art that shows them.
+    'hc_archetype', 'hc_faction', 'hc_equipment', 'equip_slot', 'equip_name', 'equip_art',
+    // Factions: identity only.
+    'hc_faction_explanation',
+  ]);
+  assert.deepEqual(ids.filter((id) => !allowed.has(id)), [],
+    'the contract grew a field the game should own');
+  assert.equal(ids.length, allowed.size, 'a field disappeared without the allowlist being updated');
+
+  // And nothing in it names a mechanical concept, whatever it is called.
+  const forbidden = /threshold|_family|_grade|_tier|_weight|power|reward|encounter|starting|display_order|expedition_(?!art)|crisis|shard/i;
+  for (const id of ids) assert.ok(!forbidden.test(id), `${id} names something mechanical`);
+});
+
+test('a package from the older contract shape is refused, not quietly emptied', () => {
+  const dir = extractFixture('valid-v1.zip');
+  const pkg = loadPackage(dir, APP_TYPE, READER_OPTIONS);
+  assert.doesNotThrow(() => semanticValidation(pkg));
+
+  /* Node names used to be records carrying a threshold, a family and a grade.
+     Such a package passes every structural check and would install and run
+     with every authored name replaced by "Node 1" — content that looks correct
+     and is not. It must be refused, and the message must say what to do. */
+  const stale = structuredClone(pkg);
+  stale.content.values.hc_main_chapters[0].chapter_nodes =
+    stale.content.values.hc_main_chapters[0].chapter_nodes.map((name, i) => ({
+      mnode_name: name, mnode_threshold: 50 + i * 40, mnode_family: 'metal', mnode_grade: 'basic',
+    }));
+  assert.throws(() => semanticValidation(stale),
+    (error) => error instanceof PackageError && /republish/i.test(error.message));
+
+  const staleWorld = structuredClone(pkg);
+  const worldId = staleWorld.content.selections.hc_worlds[0];
+  staleWorld.content.entityValues[worldId].hc_campaign_nodes =
+    staleWorld.content.entityValues[worldId].hc_campaign_nodes.map((name) => ({ node_name: name }));
+  assert.throws(() => semanticValidation(staleWorld),
+    (error) => error instanceof PackageError && /republish/i.test(error.message));
+});
+
+test('every Main Campaign chapter has a backdrop of its own', () => {
+  const { manifest, content } = buildFromFixture('valid-v1.zip');
+  // Authored art reaches the chapter it was authored on.
+  assert.ok(manifest.mainChapters[0].image?.startsWith('hcpkg://'), 'chapter art adapts');
+  assert.equal(content.images.chapter['main:1'], manifest.mainChapters[0].image);
+
+  /* Left blank, a chapter borrows the backdrop of the world it introduces
+     rather than falling through to "the first world that has a cover" — which
+     showed one world's cover behind every chapter of the opening track. */
+  const blank = structuredClone(manifest);
+  for (const chapter of blank.mainChapters) chapter.image = null;
+  const compiled = compileManifest(loadSystemRaw(), blank);
+  const world = compiled.raw.worlds[0];
+  const borrowed = compiled.images.chapter['main:1'];
+  assert.ok(borrowed, 'a chapter with no art still has a backdrop');
+  assert.ok(borrowed === manifest.worlds[0].chapterImages.find(Boolean) || borrowed === manifest.worlds[0].image,
+    'the backdrop borrowed is the introduced world’s, not an arbitrary one');
+  void world;
+});
+
+test('world and roster order carry through the manifest into compiled progression', () => {
+  const { pkg, manifest, content } = buildFromFixture('valid-v1.zip');
+  assert.deepEqual(manifest.worlds.map((w) => w.id), pkg.content.selections.hc_worlds,
+    'world selection order is progression order');
+  assert.deepEqual(
+    manifest.characters.filter((c) => c.worldId === manifest.worlds[0].id).map((c) => c.id),
+    pkg.content.selections.hc_characters.filter((id) => manifest.characters.some((c) => c.id === id && c.worldId === manifest.worlds[0].id)),
+    'character selection order is roster order');
+
+  /* Every hero is revealed exactly once, because any of them might not be
+     among the five a save draws. */
+  const revealed = content.nodes.flatMap((node) => node.encounterCharacter ?? []);
+  assert.equal(new Set(revealed).size, revealed.length, 'no hero is revealed twice');
+  for (const def of content.characters) {
+    assert.ok(revealed.includes(def.id), `${def.displayName} has a reveal node`);
+  }
 });

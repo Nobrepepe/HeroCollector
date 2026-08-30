@@ -6,7 +6,8 @@ import { validateContent, validateSave } from './core/validate.js';
 import { newPlayerState, applyDailyReset, syncSaveWithContent, ensureExpeditionBoard, SCHEMA_VERSION } from './core/state.js';
 import { characterPower } from './core/power.js';
 import { makeRng, entropySeed } from './core/rng.js';
-import { upgradeCustomDB, mergeContent, gameReadiness } from './core/custom.js';
+import { compileManifest } from './core/compile/index.js';
+import { normalizeManifest, gameReadiness } from './core/manifest.js';
 import { loadRawContent, loadSave, writeSave, loadDefaultPack, loadActiveCustomContent, writeActiveCustomContent, importSave, exportJson } from './platform.js';
 import { h, clear, fmt } from './ui/dom.js';
 import {
@@ -40,8 +41,9 @@ const store = {
   state: null,
   rng: null,
   baseRaw: null,
-  customDB: null,
+  manifest: null,
   contentHealth: [],
+  revealPlan: [],
   gameReady: { ready: false, checks: [] },
   ui: {
     modalStack: [],
@@ -110,7 +112,7 @@ const store = {
   // Re-merge base + custom content and swap it in live. Never applies an
   // invalid content set: on validation failure the previous content stays.
   async applyCustom({ rerender = false } = {}) {
-    const merged = mergeContent(this.baseRaw, this.customDB);
+    const merged = compileManifest(this.baseRaw, this.manifest);
     const content = buildContent(merged.raw);
     const check = validateContent(content);
     if (!check.ok) {
@@ -124,8 +126,9 @@ const store = {
     content.images = merged.images;
     this.content = content;
     this.contentHealth = merged.health;
+    this.revealPlan = merged.revealPlan;
     this.gameReady = gameReadiness(content);
-    await writeActiveCustomContent(this.customDB);
+    await writeActiveCustomContent(this.manifest);
     if (this.state) {
       syncSaveWithContent(content, this.state);
       await this.save();
@@ -496,19 +499,20 @@ async function boot() {
     setTimeout(() => toast(`The installed World Hub publication could not be loaded: ${store.hubLoadError}`, 'error'), 300);
   }
   const packDb = hubDb ?? await loadActiveCustomContent() ?? await loadDefaultPack();
-  store.customDB = upgradeCustomDB(packDb);
+  store.manifest = normalizeManifest(packDb, store.baseRaw.characters.slotOrder);
 
   // Merge base + pack content; if the merge is somehow invalid, fall back to
   // the bundled default pack, then bare system content, so the game starts.
-  const merged = mergeContent(store.baseRaw, store.customDB);
+  const merged = compileManifest(store.baseRaw, store.manifest);
   let content = buildContent(merged.raw);
   let check = validateContent(content);
   if (check.ok) {
     content.images = merged.images;
     store.contentHealth = merged.health;
+    store.revealPlan = merged.revealPlan;
   } else {
-    const fallbackDB = upgradeCustomDB(await loadDefaultPack());
-    const fallbackMerged = mergeContent(store.baseRaw, fallbackDB);
+    const fallbackManifest = normalizeManifest(await loadDefaultPack(), store.baseRaw.characters.slotOrder);
+    const fallbackMerged = compileManifest(store.baseRaw, fallbackManifest);
     const fallbackContent = buildContent(fallbackMerged.raw);
     const fallbackCheck = validateContent(fallbackContent);
     content = fallbackCheck.ok ? fallbackContent : buildContent(store.baseRaw);

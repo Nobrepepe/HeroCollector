@@ -25,6 +25,7 @@ export function buildContent(raw) {
         cycleLengthDays: 4, cycleScaleBp: 40000,
         intelligenceCosts: { reroll: 1, pin: 1, reveal: 1 },
         resultMultipliersBp: { completed: 10000, successful: 12500, exceptional: 15000 } },
+      images: { global: null, worlds: {} },
       requirements: [], optionalObjectives: [], rewardPackages: [], templates: [], reports: {}, fallbackTemplate: null
     },
     crises: raw.crises ?? { settings: { spawnChanceBp: 2500, grades: [] }, definitions: [] },

@@ -10,7 +10,8 @@
 
 import { readFileSync } from 'node:fs';
 import { buildContent, equipmentRecipe } from '../src/core/content.js';
-import { mergeContent, upgradeCustomDB } from '../src/core/custom.js';
+import { compileManifest } from '../src/core/compile/index.js';
+import { normalizeManifest } from '../src/core/manifest.js';
 import { loadSystemRaw } from '../tests/helpers.mjs';
 import { makeRng } from '../src/core/rng.js';
 import { evaluateParty } from '../src/core/synergy.js';
@@ -38,7 +39,8 @@ import {
 
 // ---------------------------------------------------------------- content
 const dbRaw = JSON.parse(readFileSync(new URL('../default_content.json', import.meta.url), 'utf8'));
-const merged = mergeContent(loadSystemRaw(), upgradeCustomDB(dbRaw));
+const systemRaw = loadSystemRaw();
+const merged = compileManifest(systemRaw, normalizeManifest(dbRaw, systemRaw.characters.slotOrder));
 export const health = merged.health;
 const content = buildContent(merged.raw);
 content.images = merged.images;
@@ -98,21 +100,24 @@ function shardRemaining(id) {
   const starCosts = content.balance.starShards;
   let rest = 0;
   if (!c.owned) {
-    const tier = content.balance.acquisitionTiers[def.tier];
-    rest = tier.cumulativeShards;
-    for (let star = tier.unlockStar; star < 7; star++) rest += starCosts[star];
+    const { recruitShards, recruitStar } = content.balance.rosterProgression;
+    rest = recruitShards;
+    for (let star = recruitStar; star < 7; star++) rest += starCosts[star];
   } else {
     for (let star = c.stars; star < 7; star++) rest += starCosts[star];
   }
   return Math.max(0, rest - c.shards);
 }
 
-// The six characters we drive to the endgame: the starters plus the cheapest
-// additional Minor from a world with starters, so world nodes stay reachable.
+// The six characters we drive to the endgame: the save's drawn starters plus
+// one more from a world those starters already sit in, so world nodes stay
+// reachable. Every hero costs the same now, so the tie-break is purely how
+// early the campaign reveals them.
 const SQUAD = (() => {
-  const starters = content.characters.filter(d => d.starting).map(d => d.id);
+  const starters = [...s.starters];
+  const startSet = new Set(starters);
   const extra = content.characters
-    .filter(d => !d.starting && d.tier === 'minor')
+    .filter(d => !startSet.has(d.id))
     .sort((a, b) => {
       const wa = starters.filter(id => content.characterById[id].world === a.world).length;
       const wb = starters.filter(id => content.characterById[id].world === b.world).length;
@@ -255,7 +260,7 @@ function improve() {
       if (!c.owned) {
         if (checkUnlockCharacter(content, s, id).ok) {
           unlockCharacter(content, s, id);
-          mark(`unlock_${id}`, `unlocked ${def.displayName} (${def.tier})`);
+          mark(`unlock_${id}`, `unlocked ${def.displayName}`);
           acted = true;
         }
         continue;
@@ -450,22 +455,30 @@ function runCrisis() {
   const active = s.crises?.active;
   if (!active || active.status !== 'planning') return;
   stats.crisesSpawned++;
-  const pool = owned().sort((a, b) => characterPowerForState(content, s, b) - characterPowerForState(content, s, a));
+  const pool = owned();
   const used = new Set();
+  const bonusBp = content.crises.settings.power?.favoredTagBonusBp ?? 2000;
   for (const front of active.fronts) {
     const favored = new Set(front.favoredTagIds);
-    const ranked = pool.filter(id => !used.has(id)).sort((a, b) => {
-      const ta = tagsOf(a), tb = tagsOf(b);
-      const ma = [...favored].filter(t => ta.has(t)).length;
-      const mb = [...favored].filter(t => tb.has(t)).length;
-      if (ma !== mb) return mb - ma;
-      return characterPowerForState(content, s, b) - characterPowerForState(content, s, a);
-    });
+    // A Front's bonus is per *team*: distinct favoured tags the team covers,
+    // capped at two. So the value of a hero is their Power plus whatever new
+    // tag they bring — never the tag alone. Ranking tags above Power trades a
+    // maxed hero for an uninvested one to gain twenty percent, which loses.
+    const covered = new Set();
     for (let i = 0; i < active.teamSize; i++) {
-      const pick = ranked[i];
-      if (!pick) break;
-      used.add(pick);
-      const r = setCrisisAssignment(content, s, front.id, i, pick);
+      let best = null, bestScore = -1;
+      for (const id of pool) {
+        if (used.has(id)) continue;
+        const tags = tagsOf(id);
+        const fresh = [...favored].filter(t => tags.has(t) && !covered.has(t));
+        const gain = Math.min(2 - covered.size, fresh.length);
+        const score = characterPowerForState(content, s, id) * (10000 + Math.max(0, gain) * bonusBp) / 10000;
+        if (score > bestScore) { bestScore = score; best = { id, fresh }; }
+      }
+      if (!best) break;
+      used.add(best.id);
+      for (const tag of best.fresh) if (covered.size < 2) covered.add(tag);
+      const r = setCrisisAssignment(content, s, front.id, i, best.id);
       if (!r.ok) bug('crisis_assign', `setCrisisAssignment failed: ${r.reasons.join('; ')}`);
     }
   }
@@ -488,7 +501,7 @@ const tagCache = {};
 function tagsOf(id) {
   if (tagCache[id]) return tagCache[id];
   const d = content.characterById[id];
-  return (tagCache[id] = new Set([d.world, d.archetype, d.faction, ...(d.extraTags ?? [])].filter(Boolean)));
+  return (tagCache[id] = new Set([d.world, d.archetype, d.faction].filter(Boolean)));
 }
 
 // ---------------------------------------------------------------- energy day
@@ -633,7 +646,7 @@ const result = {
   masteryRankDays,
   stats, bugs, milestones, daily,
   final: content.characters.map(d => ({
-    id: d.id, name: d.displayName, world: d.world, tier: d.tier,
+    id: d.id, name: d.displayName, world: d.world, starter: s.starters.includes(d.id),
     owned: cs(d.id).owned, stars: cs(d.id).stars, gear: cs(d.id).gearTier, shards: cs(d.id).shards,
     revealed: !!cs(d.id).revealed
   })),

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadContent, maxOut } from './helpers.mjs';
-import { newPlayerState, clearNode, checkClear, applyDailyReset } from '../src/core/state.js';
+import { loadContent, maxOut, newGame } from './helpers.mjs';
+import { clearNode, checkClear, applyDailyReset } from '../src/core/state.js';
 import {
   fieldSupplyLimits,
   previewSupplyRequisition, useSupplyRequisition,
@@ -15,7 +15,7 @@ const T0 = Date.parse('2026-07-25T12:00:00');
 const DAY = 86400000;
 
 test('Field Supplies use a flat storage cap and no daily use limit', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   const limits = fieldSupplyLimits(content, state);
   assert.equal(limits.storageCap, content.balance.fieldSupply.storageCap);
   assert.equal(limits.held, 0);
@@ -23,7 +23,7 @@ test('Field Supplies use a flat storage cap and no daily use limit', () => {
 });
 
 test('Requisition pays the guaranteed yield of the best cleared source, atomically', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   const party = state.parties[0].members;
   state.inventory.resources.field_supply = 1;
   const material = content.nodeById.main_1.material;
@@ -45,11 +45,11 @@ test('Requisition pays the guaranteed yield of the best cleared source, atomical
 });
 
 test('Tutoring grants targeted shards to revealed, unmaxed heroes only', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   state.inventory.resources.field_supply = 2;
   // an unrevealed hero cannot be tutored
   assert.equal(previewSupplyTutoring(content, state, 'char_elian').ok, false);
-  const starter = content.characters.find(d => d.starting).id;
+  const starter = state.starters[0];
   const used = useSupplyTutoring(content, state, starter);
   assert.equal(used.ok, true);
   assert.equal(state.characters[starter].shards, content.balance.fieldSupply.shardGrant);
@@ -63,7 +63,7 @@ test('Tutoring grants targeted shards to revealed, unmaxed heroes only', () => {
 });
 
 test('Surge arms once and is spent only when it carries an attempt', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   const party = state.parties[0].members.filter(Boolean);
   state.inventory.resources.field_supply = 2;
   assert.equal(useSupplySurge(content, state).ok, true);
@@ -93,7 +93,7 @@ test('Surge arms once and is spent only when it carries an attempt', () => {
 });
 
 test('Frontier Momentum returns only actual first-clear Energy up to its daily cap', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   const party = state.parties[0].members;
   maxOut(content, state, party);
   state.energySystems.daily.momentumRefunded = 28;

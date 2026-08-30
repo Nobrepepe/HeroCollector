@@ -4,19 +4,18 @@ import {
   rankTodayHook, todayHookText, sceneImage,
   partyHeadline, bestPartySwap
 } from '../src/ui/presentation.js';
-import { loadContent, maxOut } from './helpers.mjs';
-import { newPlayerState } from '../src/core/state.js';
+import { loadContent, maxOut, newGame } from './helpers.mjs';
 import { evaluateParty } from '../src/core/synergy.js';
 
 test('Today chooses the smallest remaining shard gap with stable content-order ties', () => {
   const content = {
     characters: [
-      { id: 'a', displayName: 'Ashley', tier: 'minor' },
-      { id: 'b', displayName: 'Bridget', tier: 'minor' }
+      { id: 'a', displayName: 'Ashley' },
+      { id: 'b', displayName: 'Bridget' }
     ],
     balance: {
       starShards: [10, 25, 50, 75, 110, 150, 200],
-      acquisitionTiers: { minor: { cumulativeShards: 10 } }
+      rosterProgression: { recruitShards: 10 }
     }
   };
   const state = {
@@ -31,13 +30,30 @@ test('Today chooses the smallest remaining shard gap with stable content-order t
   assert.match(todayHookText(hook).headline, /Ashley/);
 });
 
+test('an unrecruited hero is ranked by the one recruitment cost everyone shares', () => {
+  const content = {
+    characters: [{ id: 'a', displayName: 'Ashley' }, { id: 'b', displayName: 'Bridget' }],
+    balance: { starShards: [10, 25], rosterProgression: { recruitShards: 40 } }
+  };
+  const state = {
+    characters: {
+      a: { owned: false, stars: 0, shards: 33 },   // 7 short
+      b: { owned: false, stars: 0, shards: 12 }    // 28 short
+    }
+  };
+  const hook = rankTodayHook(content, state, [], []);
+  assert.equal(hook.def.id, 'a', 'the smallest remaining gap wins');
+  assert.equal(hook.need, 40, 'every hero costs the same to recruit');
+  assert.equal(hook.gap, 7);
+});
+
 test('Today falls through to gear, campaign, then quiet', () => {
   const content = {
-    characters: [{ id: 'a', displayName: 'Ashley', tier: 'minor' }],
+    characters: [{ id: 'a', displayName: 'Ashley' }],
     characterById: { a: { id: 'a', displayName: 'Ashley' } },
     balance: {
       starShards: [10, 25, 50, 75, 110, 150, 200],
-      acquisitionTiers: { minor: { cumulativeShards: 10 } }
+      rosterProgression: { recruitShards: 10 }
     }
   };
   const maxed = { characters: { a: { owned: true, stars: 7, shards: 0 } } };
@@ -48,9 +64,9 @@ test('Today falls through to gear, campaign, then quiet', () => {
 
 test('an unresolved Crisis outranks every ordinary Today hook', () => {
   const content = {
-    characters: [{ id: 'a', displayName: 'Ashley', tier: 'minor' }],
+    characters: [{ id: 'a', displayName: 'Ashley' }],
     characterById: { a: { id: 'a', displayName: 'Ashley' } }, crisisById: { c: { id: 'c' } },
-    balance: { starShards: [10], acquisitionTiers: { minor: { cumulativeShards: 10 } } }
+    balance: { starShards: [10], rosterProgression: { recruitShards: 10 } }
   };
   const state = { characters: { a: { owned: true, stars: 1, shards: 0 } },
     crises: { active: { definitionId: 'c', status: 'planning', name: 'A Crisis' } } };
@@ -81,7 +97,7 @@ test('party presentation covers empty, incomplete, and complete headlines', () =
 
 test('best party swap fills empty slots and chooses a legal positive improvement', () => {
   const content = loadContent();
-  const state = newPlayerState(content, Date.parse('2026-07-24T12:00:00Z'));
+  const state = newGame(content, Date.parse('2026-07-24T12:00:00Z'));
   const slots = [...state.parties[0].members];
   slots[4] = null;
   assert.deepEqual(bestPartySwap(content, state, slots), { kind: 'empty', slotIndex: 4 });

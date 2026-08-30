@@ -20,3 +20,12 @@ export function makeRng(seed) {
 export function entropySeed() {
   return (Date.now() ^ (Math.random() * 0xFFFFFFFF)) >>> 0;
 }
+
+// A stable 32-bit seed from a string (FNV-1a). Used wherever a deterministic
+// draw has to be reproducible from something the save already records — the
+// creation timestamp, the logical day — rather than from stored RNG state.
+export function hashSeed(text) {
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
+  return hash >>> 0;
+}

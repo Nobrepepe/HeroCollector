@@ -1,16 +1,16 @@
 // Appendix B transaction invariants + core rule correctness (GDD 14.2).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadContent, maxOut, give } from './helpers.mjs';
+import { loadContent, maxOut, give, newGame } from './helpers.mjs';
 import { validateContent, validateSave } from '../src/core/validate.js';
 import { characterPowerBreakdown, characterPower, maxCharacterPower } from '../src/core/power.js';
 import { evaluateParty, partyLegality } from '../src/core/synergy.js';
 import { makeRng } from '../src/core/rng.js';
 import {
-  newPlayerState, applyDailyReset, resetDayKey, clearNode, checkClear,
+  applyDailyReset, resetDayKey, clearNode, checkClear,
   craftComponent, upcraft, craftEquipment, completeGearTier, promoteStar,
   unlockCharacter, checkCraftEquipment, nodeState, worldCampaignUnlocked,
-  checkCompleteTier, selectSkin, maxSweepCount
+  checkCompleteTier, selectSkin, maxSweepCount, newPlayerState
 } from '../src/core/state.js';
 import { unlockedSkins } from '../src/core/mastery.js';
 import { isRevealed } from '../src/core/focus.js';
@@ -27,16 +27,15 @@ test('content passes full validation', () => {
 });
 
 test('new save: starting state matches GDD 2.2', () => {
-  const s = newPlayerState(content, T0);
+  const s = newGame(content, T0);
   const owned = content.characters.filter(d => s.characters[d.id].owned);
-  assert.equal(owned.length, 5);
-  const byWorld = {};
-  for (const d of owned) byWorld[d.world] = (byWorld[d.world] ?? 0) + 1;
-  assert.deepEqual(Object.values(byWorld).sort(), [2, 3]);
+  assert.equal(owned.length, content.balance.rosterProgression.starterCount);
+  assert.deepEqual([...s.starters].sort(), owned.map(d => d.id).sort(),
+    'the save records exactly the five it granted');
   for (const d of owned) {
-    assert.equal(s.characters[d.id].stars, 1);
+    assert.equal(s.characters[d.id].stars, content.balance.rosterProgression.recruitStar);
     assert.equal(s.characters[d.id].gearTier, 0);
-    assert.equal(d.tier, 'minor');
+    assert.ok(s.characters[d.id].revealed);
   }
   assert.equal(s.energy, 120);
   assert.deepEqual(s.inventory.materials, {});
@@ -45,7 +44,7 @@ test('new save: starting state matches GDD 2.2', () => {
 
 test('power: launch maximum respects the authored Gear Tier 6 cap', () => {
   assert.equal(content.maxGearTier, 6);
-  const s = newPlayerState(content, T0);
+  const s = newGame(content, T0);
   const cs = s.characters.char_suzume;
   cs.stars = 7; cs.gearTier = 6;
   const b = characterPowerBreakdown(content, cs);
@@ -57,7 +56,7 @@ test('power: launch maximum respects the authored Gear Tier 6 cap', () => {
 });
 
 test('gear: each equipped piece grants 10% of tier power; completion lands exactly on the table', () => {
-  const s = newPlayerState(content, T0);
+  const s = newGame(content, T0);
   const cs = s.characters.char_suzume;
   cs.gearTier = 2; // active tier 3 => 150 power, 15 per piece
   const p0 = characterPower(content, cs);
@@ -74,7 +73,7 @@ test('gear: each equipped piece grants 10% of tier power; completion lands exact
 });
 
 test('synergy: mixed 3-2 party gets cohesion + diversity; cap applies at 25%', () => {
-  const s = newPlayerState(content, T0);
+  const s = newGame(content, T0);
   const party = ['char_suzume', 'char_hoshi', 'char_ayame', 'char_ashley', 'char_bridget'];
   const ev = evaluateParty(content, s, party);
   const groups = Object.fromEntries(ev.active.map(a => [a.tag.stackingGroup, a.bonusBp]));
@@ -95,14 +94,14 @@ test('synergy: mixed 3-2 party gets cohesion + diversity; cap applies at 25%', (
 });
 
 test('synergy: inactive bonuses explain what is missing', () => {
-  const s = newPlayerState(content, T0);
+  const s = newGame(content, T0);
   const ev = evaluateParty(content, s, ['char_suzume', 'char_hoshi', 'char_ayame', 'char_ashley', 'char_bridget']);
   const missing = ev.inactive.map(i => i.missing).join(' | ');
   assert.match(missing, /Rebel/);
 });
 
 test('clear: insufficient power cannot start and spends no energy', () => {
-  const s = newPlayerState(content, T0);
+  const s = newGame(content, T0);
   const party = ['char_suzume', 'char_hoshi', 'char_ayame', 'char_ashley', 'char_bridget'];
   // main_1 threshold 5500 is passable at start; main_10 is not reachable (locked) —
   // force the check on threshold by testing a later node's power reason via checkClear on main_1 with weakened party
@@ -116,7 +115,7 @@ test('clear: insufficient power cannot start and spends no energy', () => {
 });
 
 test('clear: success consumes energy, awards first-clear once, unlocks sweep', () => {
-  const s = newPlayerState(content, T0);
+  const s = newGame(content, T0);
   const party = ['char_suzume', 'char_hoshi', 'char_ayame', 'char_ashley', 'char_bridget'];
   const rng = makeRng(42);
   // sweep before first clear is rejected
@@ -138,31 +137,33 @@ test('clear: success consumes energy, awards first-clear once, unlocks sweep', (
 });
 
 test('Encounters: the first clear reveals the hero, stakes two shards, exactly once', () => {
-  const s = newPlayerState(content, T0);
+  const s = newGame(content, T0);
   const party = ['char_suzume', 'char_hoshi', 'char_ayame', 'char_ashley', 'char_bridget'];
   const rng = makeRng(7);
   s.energy = 1000;
-  // main_6 carries the first non-starting encounter (char_elian).
-  const node = content.nodeById.main_6;
-  assert.equal(node.encounterCharacter, 'char_elian');
-  assert.ok(!isRevealed(s, 'char_elian'));
-  for (let i = 1; i <= 5; i++) assert.ok(clearNode(content, s, `main_${i}`, party, 1, rng, T0).ok);
-  const r = clearNode(content, s, 'main_6', party, 1, rng, T0);
+  // The Main Campaign introduces every world's opening party in order; the
+  // first node naming someone the save did not start with is the one to test.
+  const node = content.nodesByCampaign.main
+    .find(n => n.encounterCharacter && !s.characters[n.encounterCharacter].owned);
+  const hero = node.encounterCharacter;
+  assert.ok(!isRevealed(s, hero));
+  for (let i = 1; i < node.number; i++) assert.ok(clearNode(content, s, `main_${i}`, party, 1, rng, T0).ok);
+  const r = clearNode(content, s, node.id, party, 1, rng, T0);
   assert.ok(r.ok);
-  assert.deepEqual(r.rewards.revealed, ['char_elian']);
-  assert.equal(s.characters.char_elian.shards, 2);
-  assert.ok(isRevealed(s, 'char_elian'));
+  assert.deepEqual(r.rewards.revealed, [hero]);
+  assert.equal(s.characters[hero].shards, content.balance.rosterProgression.revealShardStake);
+  assert.ok(isRevealed(s, hero));
   // repeat clears grant no further encounter shards and reveal nothing new
-  const r2 = clearNode(content, s, 'main_6', party, 1, rng, T0);
+  const r2 = clearNode(content, s, node.id, party, 1, rng, T0);
   assert.ok(r2.ok);
   assert.deepEqual(r2.rewards.revealed, []);
-  assert.equal(s.characters.char_elian.shards, 2);
+  assert.equal(s.characters[hero].shards, content.balance.rosterProgression.revealShardStake);
   // sweeps are Energy-bound only: no per-day attempt limit exists anywhere
-  assert.equal(maxSweepCount(content, s, 'main_6'), Math.floor(s.energy / 6));
+  assert.equal(maxSweepCount(content, s, node.id), Math.floor(s.energy / content.balance.nodeDefaults[node.type].energy));
 });
 
 test('daily reset: adds 120 up to 240 cap, idempotent, backward clock grants nothing', () => {
-  const s = newPlayerState(content, T0);
+  const s = newGame(content, T0);
   s.energy = 50;
   assert.equal(applyDailyReset(content, s, T0), null);        // same day: no-op
   const sum1 = applyDailyReset(content, s, T0 + DAY);
@@ -185,7 +186,7 @@ test('daily reset: rolls at the configured local reset hour', () => {
 });
 
 test('crafting: atomic, requires all inputs, no negative quantities', () => {
-  const s = newPlayerState(content, T0);
+  const s = newGame(content, T0);
   const comp = content.componentById.comp_weave_basic;
   const bad = craftComponent(content, s, 'comp_weave_basic', 1);
   assert.ok(!bad.ok);
@@ -203,7 +204,7 @@ test('crafting: atomic, requires all inputs, no negative quantities', () => {
 });
 
 test('upcraft: 5:1 upward only, masterwork cannot convert', () => {
-  const s = newPlayerState(content, T0);
+  const s = newGame(content, T0);
   give(s, 'mat_metal_basic', 12);
   const r = upcraft(content, s, 'mat_metal_basic', 2);
   assert.ok(r.ok);
@@ -214,7 +215,7 @@ test('upcraft: 5:1 upward only, masterwork cannot convert', () => {
 });
 
 test('equipment: equipping a completed slot is impossible; tier completion needs all six', () => {
-  const s = newPlayerState(content, T0);
+  const s = newGame(content, T0);
   const cs = s.characters.char_suzume;
   // stock enough components for Fern's tier-1 attire (caretaker: weave primary)
   const check = checkCraftEquipment(content, s, 'char_suzume', 'attire');
@@ -242,7 +243,7 @@ test('equipment: equipping a completed slot is impossible; tier completion needs
 });
 
 test('stars: promotion needs owned, below 7, exact shard cost consumed', () => {
-  const s = newPlayerState(content, T0);
+  const s = newGame(content, T0);
   const cs = s.characters.char_suzume; // 1 star
   assert.ok(!promoteStar(content, s, 'char_suzume').ok);
   cs.shards = 25;
@@ -256,26 +257,41 @@ test('stars: promotion needs owned, below 7, exact shard cost consumed', () => {
   assert.ok(!promoteStar(content, s, 'char_genjiro').ok); // not owned
 });
 
-test('unlock: consumes cumulative threshold, creates correct star state', () => {
-  const s = newPlayerState(content, T0);
-  const thorn = s.characters.char_genjiro; // medium: 110 shards -> 4★
-  thorn.shards = 109;
+test('recruiting: one cost and one joining Star for every hero', () => {
+  const s = newGame(content, T0);
+  const { recruitShards, recruitStar } = content.balance.rosterProgression;
+  const thorn = s.characters.char_genjiro;
+  thorn.shards = recruitShards - 1;
   assert.ok(!unlockCharacter(content, s, 'char_genjiro').ok);
-  thorn.shards = 115;
+  thorn.shards = recruitShards + 5;
   const r = unlockCharacter(content, s, 'char_genjiro');
   assert.ok(r.ok);
   assert.ok(thorn.owned);
-  assert.equal(thorn.stars, 4);
-  assert.equal(thorn.shards, 5);
-  // majors unlock at 7★
+  assert.equal(thorn.stars, recruitStar);
+  assert.equal(thorn.shards, 5, 'exactly the threshold is consumed');
+  // Heroes differ in fiction, not in price: the same cost recruits anyone.
   const sable = s.characters.char_irina;
-  sable.shards = 450;
+  sable.shards = recruitShards;
   unlockCharacter(content, s, 'char_irina');
-  assert.equal(sable.stars, 7);
+  assert.equal(sable.stars, recruitStar);
+  assert.equal(sable.shards, 0);
+});
+
+test('the starting five are drawn per save, reproducibly and with spread', () => {
+  const a = newPlayerState(content, T0);
+  const b = newPlayerState(content, T0);
+  assert.deepEqual(a.starters, b.starters, 'the same save reproduces its own five');
+  assert.notDeepEqual(a.starters, newPlayerState(content, T0 + 86400000).starters,
+    'a different save draws differently');
+  assert.equal(new Set(a.starters).size, 5);
+  assert.equal(new Set(a.starters.map(id => content.characterById[id].archetype)).size, 5,
+    'five distinct archetypes while the roster allows it');
+  for (const id of a.starters) assert.ok(a.characters[id].owned && a.characters[id].revealed);
+  assert.ok(validateSave(content, a).ok);
 });
 
 test('world campaign: locked until five world characters owned; world nodes require matching party', () => {
-  const s = newPlayerState(content, T0);
+  const s = newGame(content, T0);
   assert.ok(!worldCampaignUnlocked(content, s, 'world_hidden_village').unlocked); // only 3 owned
   maxOut(content, s, ['char_mei', 'char_tsubaki']);
   assert.ok(worldCampaignUnlocked(content, s, 'world_hidden_village').unlocked);
@@ -289,7 +305,7 @@ test('world campaign: locked until five world characters owned; world nodes requ
 });
 
 test('relic pieces: first-clearing nodes 4, 9, 15, 21 reassembles the world relic', () => {
-  const s = newPlayerState(content, T0);
+  const s = newGame(content, T0);
   const party = ['char_suzume', 'char_hoshi', 'char_ayame', 'char_mei', 'char_tsubaki'];
   maxOut(content, s, party);
   s.energy = 10000;
@@ -313,7 +329,7 @@ test('relic pieces: first-clearing nodes 4, 9, 15, 21 reassembles the world reli
 });
 
 test('objective: one-time reward on a qualifying paid clear, never blocks progression', () => {
-  const s = newPlayerState(content, T0);
+  const s = newGame(content, T0);
   const party = ['char_suzume', 'char_hoshi', 'char_ayame', 'char_ashley', 'char_bridget'];
   maxOut(content, s, party);
   const rng = makeRng(5);
@@ -326,7 +342,7 @@ test('objective: one-time reward on a qualifying paid clear, never blocks progre
 });
 
 test('launch progression blocks crafting beyond the farmable material ceiling', () => {
-  const s = newPlayerState(content, T0);
+  const s = newGame(content, T0);
   const cs = s.characters.char_suzume;
   cs.gearTier = content.maxGearTier;
   for (const slot of content.characterMeta.slotOrder) cs.slots[slot] = true;
@@ -341,7 +357,7 @@ test('launch progression blocks crafting beyond the farmable material ceiling', 
 });
 
 test('Mastery ranks unlock independently selectable skins', () => {
-  const s = newPlayerState(content, T0);
+  const s = newGame(content, T0);
   const world = content.worldById.world_hidden_village;
   const knownSkin = world.masterySkins.find(entry => entry.rank === 'known');
   assert.deepEqual(unlockedSkins(content, s, knownSkin.characterId), []);

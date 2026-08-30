@@ -10,14 +10,14 @@ import { mkdtempSync } from 'node:fs';
 import { extractZipSafely } from '../vendor/worldhub-kit/js/zip-reader.mjs';
 import { loadPackage, readCurrentPointer } from '../vendor/worldhub-kit/js/package-reader.mjs';
 import { APP_TYPE, READER_OPTIONS, semanticValidation } from '../src/core/worldhub/semantics.js';
-import { adaptPackageToCustomDb } from '../src/core/worldhub/adapter.js';
+import { adaptPackageToManifest } from '../src/core/worldhub/adapter.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const savePath = () => join(app.getPath('userData'), 'save.json');
 const backupPath = () => join(app.getPath('userData'), 'save.backup.json');
 const activeCustomPath = () => join(app.getPath('userData'), 'active-custom-content.json');
 
-const CONTENT_FILES = ['balance', 'worlds', 'archetypes', 'materials', 'components', 'characters', 'tags', 'recipes', 'nodes', 'archives'];
+const CONTENT_FILES = ['balance', 'archetypes', 'materials', 'components', 'characters', 'tags', 'recipes', 'expeditions', 'crises'];
 
 // ---- World Hub consumer: app-owned installed-content cache ---------------
 const hubRoot = () => join(app.getPath('userData'), 'worldhub-content');
@@ -272,7 +272,7 @@ app.whenReady().then(() => {
       const pkg = hubLoadActivePackage();
       if (!pkg) return null;
       return {
-        db: adaptPackageToCustomDb(pkg, hubMediaUrl(pkg.manifest.publicationId), systemBalance().worldHub ?? {}),
+        db: adaptPackageToManifest(pkg, hubMediaUrl(pkg.manifest.publicationId)),
         status: hubStatus(),
       };
     } catch (error) {

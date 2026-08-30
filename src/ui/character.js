@@ -27,10 +27,10 @@ export function renderCharacter(store, root, characterId) {
   const arch = content.archetypes[def.archetype];
 
   root.appendChild(h('button.link.character-back', { onclick: () => store.go('#/roster') }, '← Collection'));
-  const page = h('div.character-page', { style: { '--character-color': def.color } });
+  const page = h('div.character-page');
   const art = h('div.character-art.bleed-tall' + (fullBody ? '' : '.art-fallback'));
   if (fullBody) art.appendChild(h('img', { src: fullBody, alt: `${def.displayName} full art` }));
-  else art.appendChild(h('span.character-glyph', def.glyph));
+  else art.appendChild(h('span.character-glyph', def.displayName[0].toUpperCase()));
   page.appendChild(art);
 
   const body = h('div.character-body',
@@ -92,16 +92,16 @@ function ownedProgress(store, def, cs, power) {
 }
 
 function unownedProgress(store, def, cs) {
-  const tier = store.content.balance.acquisitionTiers[def.tier];
+  const { recruitShards, recruitStar } = store.content.balance.rosterProgression;
   const check = checkUnlockCharacter(store.content, store.state, def.id);
   const revealed = isRevealed(store.state, def.id);
   return h('section.character-power',
     h('div.eyebrow', revealed ? 'Revealed · not yet recruited' : 'Not yet met'),
-    h('div.power-line', h('div.display-l', fmt(cs.shards)), h('div.caption', `of ${fmt(tier.cumulativeShards)} shards`)),
-    h('div.progressbar', h('div', { style: { width: `${Math.min(100, cs.shards / tier.cumulativeShards * 100)}%` } })),
+    h('div.power-line', h('div.display-l', fmt(cs.shards)), h('div.caption', `of ${fmt(recruitShards)} shards`)),
+    h('div.progressbar', h('div', { style: { width: `${Math.min(100, cs.shards / recruitShards * 100)}%` } })),
     h('p', revealed
-      ? `${def.tier} acquisition · joins at ${tier.unlockStar}★. Shards can already be pointed at them.`
-      : `${def.tier} acquisition · joins at ${tier.unlockStar}★. First-clear their encounter to reveal them.`),
+      ? `Joins at ${recruitStar}★, like everyone. Shards can already be pointed at them.`
+      : `Joins at ${recruitStar}★, like everyone. First-clear their encounter to reveal them.`),
     h('div.character-actions',
       h('button.btn.primary', { disabled: !check.ok, onclick: () => store.tx(() => unlockCharacter(store.content, store.state, def.id)) }, 'Meet them →'),
       h('button.link', { onclick: () => openFindSources(store, { type: 'shards', id: def.id }) }, 'Find shards'),

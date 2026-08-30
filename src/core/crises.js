@@ -1,8 +1,8 @@
 import { characterPowerForState } from './power.js';
-import { masteryRankAtLeast } from './mastery.js';
+import { masteryRankAtLeast, worldMaterialGrade } from './mastery.js';
 import { grantRewardEntries } from './resources.js';
 import { fieldSupplyLimits, FIELD_SUPPLY_ID } from './energy.js';
-import { makeRng } from './rng.js';
+import { hashSeed, makeRng } from './rng.js';
 
 export const CRISIS_BOON_TYPES = new Set([
   'free_world_node_runs', 'bonus_world_material_runs', 'instant_intelligence'
@@ -18,10 +18,44 @@ const shuffle = (rng, list) => {
 };
 
 export function crisisDayRng(state, day = state.dayNumber) {
-  let hash = 2166136261;
-  const text = `crisis:${state.createdAt}:${day}`;
-  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
-  return makeRng(hash >>> 0);
+  return makeRng(hashSeed(`crisis:${state.createdAt}:${day}`));
+}
+
+/**
+ * What each Front of a Crisis should ask for, computed when the Crisis spawns.
+ *
+ * A Crisis needs `frontCount × teamSize` distinct heroes — nobody answers two
+ * Fronts — so the benchmark is exactly that: the player's strongest heroes,
+ * dealt into balanced teams, and each Front asks a little more than one such
+ * team brings. Above 100% raw Power alone falls short and a matched favoured
+ * tag is what carries the Front, which is the puzzle the Fronts exist to pose.
+ *
+ * An authored number could not do this. It was written once against an early
+ * roster, and by the endgame a maxed team beat the hardest Front three to five
+ * times over: 745 Crises mastered against a single one endured.
+ */
+export function crisisFrontPowers(content, state, grade) {
+  const config = content.crises.settings.power ?? {};
+  const powers = content.characters
+    .filter(def => state.characters[def.id]?.owned)
+    .map(def => characterPowerForState(content, state, def.id))
+    .sort((a, b) => b - a);
+
+  const teams = Array.from({ length: grade.frontCount }, () => 0);
+  // Serpentine dealing: the strongest hero to the first team, the next to the
+  // second, then back down the line — the standard way to split a ranked list
+  // into groups of near-equal strength.
+  for (let pick = 0; pick < grade.frontCount * grade.teamSize; pick++) {
+    const round = Math.floor(pick / grade.frontCount);
+    const slot = round % 2 === 0 ? pick % grade.frontCount : grade.frontCount - 1 - (pick % grade.frontCount);
+    // A roster shorter than the benchmark cannot happen at these grade gates,
+    // but a missing hero must not silently make a Front free.
+    teams[slot] += powers[pick] ?? powers[powers.length - 1] ?? 0;
+  }
+  const ratio = grade.powerRatioBp ?? 10000;
+  return teams.map(power => Math.max(
+    config.minimumRecommended ?? 1,
+    Math.round(power * ratio / 10000)));
 }
 
 export function crisisGrade(content, state, worldId) {
@@ -71,9 +105,10 @@ export function generateCrisisForDay(content, state, rng = crisisDayRng(state)) 
   const weighted = unseen.flatMap(definition => Array(Math.max(1, definition.weight ?? 1)).fill(definition));
   const definition = weighted[Math.floor(rng.next() * weighted.length)];
   const grade = crisisGrade(content, state, definition.worldId);
-  const fronts = shuffle(rng, definition.fronts).slice(0, grade.frontCount).map(front => ({
+  const recommended = crisisFrontPowers(content, state, grade);
+  const fronts = shuffle(rng, definition.fronts).slice(0, grade.frontCount).map((front, index) => ({
     id: front.id, name: front.name, description: front.description,
-    favoredTagIds: [...front.favoredTagIds], recommendedPower: front.recommendedPowerByGrade[grade.id],
+    favoredTagIds: [...front.favoredTagIds], recommendedPower: recommended[index],
     successText: front.successText, excelText: front.excelText, struggleText: front.struggleText
   }));
   const active = {
@@ -84,7 +119,7 @@ export function generateCrisisForDay(content, state, rng = crisisDayRng(state)) 
     assignments: Object.fromEntries(fronts.map(front => [front.id, Array(grade.teamSize).fill(null)])),
     status: 'planning', result: null, cacheClaimed: false,
     consolationReward: structuredClone(definition.consolationReward ?? []),
-    cacheChoices: structuredClone(definition.cacheChoices ?? []),
+    cacheChoices: resolveCacheGrades(content, state, definition),
     boon: structuredClone(definition.boon ?? null)
   };
   state.crises.active = active;
@@ -93,18 +128,34 @@ export function generateCrisisForDay(content, state, rng = crisisDayRng(state)) 
   return active;
 }
 
+/** A cache names a material family; the grade is whatever this world has
+ *  actually opened, so the reward keeps pace with the campaign. */
+function resolveCacheGrades(content, state, definition) {
+  const grade = worldMaterialGrade(content, state, definition.worldId);
+  return (definition.cacheChoices ?? []).map(choice => ({
+    ...structuredClone(choice),
+    rewards: (choice.rewards ?? []).map(reward => {
+      if (reward.kind !== 'material' || !reward.family) return { ...reward };
+      const { family, ...rest } = reward;
+      const materialId = `mat_${family}_${grade}`;
+      return content.materialById[materialId] ? { ...rest, id: materialId } : { ...rest, id: `mat_${family}_basic` };
+    })
+  }));
+}
+
 export function characterCrisisTags(content, characterId) {
   const definition = content.characterById[characterId];
-  return new Set([definition?.world, definition?.archetype, definition?.faction, ...(definition?.extraTags ?? [])].filter(Boolean));
+  return new Set([definition?.world, definition?.archetype, definition?.faction].filter(Boolean));
 }
 
 export function previewCrisisFront(content, state, front, assignments) {
   const ids = (assignments ?? []).filter(Boolean);
   const basePower = ids.reduce((sum, id) => sum + characterPowerForState(content, state, id), 0);
   const represented = front.favoredTagIds.filter(tagId => ids.some(id => characterCrisisTags(content, id).has(tagId)));
+  const config = content.crises.settings.power ?? {};
   const matchedFavoredTagCount = Math.min(2, new Set(represented).size);
-  const effectivePower = Math.floor(basePower * (10000 + matchedFavoredTagCount * 2000) / 10000);
-  const excelAt = Math.ceil(front.recommendedPower * 12000 / 10000);
+  const effectivePower = Math.floor(basePower * (10000 + matchedFavoredTagCount * (config.favoredTagBonusBp ?? 2000)) / 10000);
+  const excelAt = Math.ceil(front.recommendedPower * (config.excelBp ?? 12000) / 10000);
   const projection = effectivePower < front.recommendedPower ? 'struggle' : effectivePower < excelAt ? 'succeed' : 'excel';
   return { basePower, matchedTagIds: represented, matchedFavoredTagCount, effectivePower,
     recommendedPower: front.recommendedPower, projection, completed: projection !== 'struggle' };

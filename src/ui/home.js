@@ -264,7 +264,7 @@ function trackingThread(store) {
     if (pin.type === 'character') {
       const cs = state.characters[pin.characterId];
       total = pin.objective === 'unlock'
-        ? content.balance.acquisitionTiers[def.tier].cumulativeShards
+        ? content.balance.rosterProgression.recruitShards
         : content.balance.starShards[pin.targetStars - 1];
       current = cs.shards;
       label = `${def.displayName} · ${pin.objective === 'unlock' ? 'unlock' : `${pin.targetStars}★`}`;

@@ -115,16 +115,16 @@ function characterCard(store, def, isReady, index) {
   const owned = cs.owned;
   const need = owned
     ? cs.stars < 7 ? store.content.balance.starShards[cs.stars] : 1
-    : store.content.balance.acquisitionTiers[def.tier].cumulativeShards;
+    : store.content.balance.rosterProgression.recruitShards;
   const image = store.content.images.fullBody[def.id];
   const card = h('button.gallery-card' + (owned ? '' : '.unmet') + (isReady ? '.ready' : ''), {
     onclick: () => store.go(`#/character/${def.id}`),
     'aria-label': `${def.displayName}, ${cs.stars} stars, ${fmt(characterPower(store.content, cs))} Power${isReady ? ', upgrade ready' : ''}`,
-    style: { '--character-color': def.color, '--gallery-offset': index % 2 ? '26px' : '0px' }
+    style: { '--gallery-offset': index % 2 ? '26px' : '0px' }
   });
   const art = h('div.gallery-art.bleed-tall' + (image ? '' : '.art-fallback'));
   if (image) art.appendChild(h('img', { src: image, alt: '', draggable: 'false' }));
-  else art.appendChild(h('span.gallery-glyph', def.glyph));
+  else art.appendChild(h('span.gallery-glyph', def.displayName[0].toUpperCase()));
   const arch = store.content.archetypes[def.archetype];
   card.append(art, h('div.gallery-scrim'), h('div.gallery-meta',
     h('div.eyebrow', arch.name),
@@ -144,10 +144,9 @@ function compactCharacter(store, def, readyItems, pulses) {
   const isReady = readyItems.length > 0;
   const need = owned
     ? (cs.stars < 7 ? store.content.balance.starShards[cs.stars] : null)
-    : store.content.balance.acquisitionTiers[def.tier].cumulativeShards;
+    : store.content.balance.rosterProgression.recruitShards;
   const card = h('button.compact-character' + (owned ? '.owned' : '.unmet') + (isReady ? '.ready' : '') + (pulses ? '.pulses' : ''), {
     onclick: () => store.go(`#/character/${def.id}`),
-    style: { '--character-color': def.color },
     'aria-label': owned
       ? `${def.displayName}, ${cs.stars} stars, ${fmt(characterPower(store.content, cs))} Power${isReady ? ', upgrade ready' : ''}`
       : `${def.displayName}, not yet met, ${fmt(cs.shards)} of ${fmt(need)} shards`
@@ -177,7 +176,7 @@ function compactReadyLabel(items, owned) {
 // One unclaimed encounter stake would carry them over the line.
 function oneShardRunAway(content, state, def) {
   const cs = state.characters[def.id];
-  const need = content.balance.acquisitionTiers[def.tier].cumulativeShards;
+  const need = content.balance.rosterProgression.recruitShards;
   const bestStake = Math.max(0, ...(content.encounterNodesByCharacter[def.id] ?? [])
     .filter(node => !nodeStateFirstClaimed(state, node.id))
     .map(node => node.firstClear?.shards?.qty ?? 0));
