@@ -1,0 +1,176 @@
+{
+  "settings": {
+    "spawnChanceBp": 2500,
+    "grades": [
+      {
+        "id": "local",
+        "displayName": "Local Disturbance",
+        "minOwned": 5,
+        "minMasteryRank": "unfamiliar",
+        "frontCount": 2,
+        "teamSize": 2,
+        "powerRatioBp": 10500
+      },
+      {
+        "id": "major",
+        "displayName": "Major Crisis",
+        "minOwned": 8,
+        "minMasteryRank": "known",
+        "frontCount": 3,
+        "teamSize": 2,
+        "powerRatioBp": 11000
+      },
+      {
+        "id": "world",
+        "displayName": "World Crisis",
+        "minOwned": 12,
+        "minMasteryRank": "established",
+        "frontCount": 3,
+        "teamSize": 3,
+        "powerRatioBp": 11500
+      }
+    ],
+    "power": {
+      "favoredTagBonusBp": 2000,
+      "excelBp": 12000,
+      "minimumRecommended": 500
+    },
+    "minimumClearedNodes": 3
+  },
+  "fronts": [
+    {
+      "id": "containment",
+      "name": "Containment",
+      "favored": [
+        "world",
+        "archetype"
+      ],
+      "description": "Hold the edge of it before the rest of {world} has to learn the word for what happened."
+    },
+    {
+      "id": "relief",
+      "name": "Relief",
+      "favored": [
+        "archetype",
+        "faction"
+      ],
+      "description": "People are already displaced. Someone has to reach them before the second night."
+    },
+    {
+      "id": "investigation",
+      "name": "Investigation",
+      "favored": [
+        "archetype",
+        "world"
+      ],
+      "description": "Nobody yet knows what began this. Until someone does, every other answer is a guess."
+    },
+    {
+      "id": "evacuation",
+      "name": "Evacuation",
+      "favored": [
+        "faction",
+        "archetype"
+      ],
+      "description": "One clear route out of {world}, held open long enough for everyone slow to use it."
+    },
+    {
+      "id": "intervention",
+      "name": "Intervention",
+      "favored": [
+        "world",
+        "faction"
+      ],
+      "description": "The thing itself, met directly, by whoever can stand in front of it."
+    }
+  ],
+  "texts": {
+    "struggle": "{front} held longer than the response could safely reach. Nothing was lost.",
+    "success": "{front} steadied under a measured response.",
+    "excel": "{front} was secured before the danger could spread."
+  },
+  "naming": {
+    "name": "Emergency in {world}",
+    "opening": "Something has broken open across {world}. Each front needs a different answer, and nobody can be in two places at once."
+  },
+  "consolation": [
+    {
+      "kind": "resource",
+      "id": "intelligence",
+      "qty": 1
+    }
+  ],
+  "caches": [
+    {
+      "id": "supply",
+      "name": "Field Supply",
+      "description": "One stored provision for a targeted push.",
+      "rewards": [
+        {
+          "kind": "resource",
+          "id": "field_supply",
+          "qty": 1
+        }
+      ]
+    },
+    {
+      "id": "intel",
+      "name": "Intelligence Brief",
+      "description": "The response leaves useful knowledge behind.",
+      "rewards": [
+        {
+          "kind": "resource",
+          "id": "intelligence",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "materials",
+      "name": "Material Bundle",
+      "description": "Practical salvage returns to the Workshop.",
+      "rewards": [
+        {
+          "kind": "material",
+          "family": "metal",
+          "qty": 8
+        }
+      ]
+    },
+    {
+      "id": "components",
+      "name": "Recovered Stock",
+      "description": "What the response could carry back, in bulk.",
+      "rewards": [
+        {
+          "kind": "material",
+          "family": "mineral",
+          "qty": 6
+        },
+        {
+          "kind": "resource",
+          "id": "intelligence",
+          "qty": 1
+        }
+      ]
+    }
+  ],
+  "boons": [
+    {
+      "type": "free_world_node_runs",
+      "runs": 3,
+      "prose": "The next three successful runs here cost no Energy."
+    },
+    {
+      "type": "bonus_world_material_runs",
+      "runs": 3,
+      "qty": 1,
+      "prose": "The next three successful runs here return one additional normal material."
+    },
+    {
+      "type": "instant_intelligence",
+      "qty": 2,
+      "prose": "The response yields two Intelligence immediately."
+    }
+  ]
+}

@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadContent } from './helpers.mjs';
-import { newPlayerState, applyDailyReset } from '../src/core/state.js';
+import { loadContent, newGame } from './helpers.mjs';
+import { applyDailyReset } from '../src/core/state.js';
 import { makeRng } from '../src/core/rng.js';
 import {
   cancelCycle, evaluateRequirement, generateCycleBoard, launchCycle,
-  offerFeasibility, previewExpedition, rerollOffer, togglePinOffer, resolveDueCycle
+  offerFeasibility, previewExpedition, rerollOffer, togglePinOffer, resolveDueCycle, requirementProse
 } from '../src/core/expeditions.js';
 import { fieldSupplyLimits } from '../src/core/energy.js';
 
@@ -18,7 +18,7 @@ function advanceDays(localContent, state, days) {
 }
 
 test('requirements and result tiers are declarative and immediate', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   const ids = content.characters.filter(d => state.characters[d.id].owned).slice(0, 2).map(d => d.id);
   const party = ids.map(id => ({ id, world: content.characterById[id].world,
     archetype: content.characterById[id].archetype, stars: 2, power: 2000 }));
@@ -34,7 +34,7 @@ test('requirements and result tiers are declarative and immediate', () => {
 });
 
 test('the cycle board has five routes, stays feasible, and waits indefinitely', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   const board = state.expeditions.board;
   assert.equal(board.offers.length, 5);
   assert.equal(board.cycle, 1);
@@ -47,7 +47,7 @@ test('the cycle board has five routes, stays feasible, and waits indefinitely', 
 });
 
 test('recommended Power scales from the strongest owned heroes, not the roster average', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   // Promote two heroes far above the rest; a 2-person route must price for them.
   state.characters.char_suzume.stars = 7;
   state.characters.char_suzume.gearTier = content.maxGearTier;
@@ -62,7 +62,7 @@ test('recommended Power scales from the strongest owned heroes, not the roster a
 });
 
 test('a random-material reward draws real materials at the authored grade', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   const basicFamilies = new Set();
   for (let seed = 0; seed < 40; seed++) {
     const board = generateCycleBoard(content, state, makeRng(seed));
@@ -79,7 +79,7 @@ test('a random-material reward draws real materials at the authored grade', () =
 });
 
 test('cycle rewards are visibly scaled up by cycleScaleBp on the board itself', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   const scaleBp = content.expeditions.settings.cycleScaleBp;
   assert.ok(scaleBp > 10000);
   const board = generateCycleBoard(content, state, makeRng(9));
@@ -88,35 +88,65 @@ test('cycle rewards are visibly scaled up by cycleScaleBp on the board itself', 
   assert.ok(anyLarge, 'board quantities exceed unscaled authored maxima');
 });
 
-test('board generation supports libraries without a guaranteed Supply template', () => {
+test('board generation copes with a library carrying no Supply route', () => {
   const localContent = loadContent();
-  localContent.expeditions.settings.guaranteedSupplyTemplateId = null;
-  const state = newPlayerState(localContent, T0);
+  for (const template of localContent.expeditions.templates) delete template.supply;
+  const state = newGame(localContent, T0);
   assert.equal(state.expeditions.board.offers.length, 5);
   assert.equal(state.expeditions.board.offers.some(offer => offer.offerKind === 'supply'), false);
   assert.doesNotThrow(() => applyDailyReset(localContent, state, T0 + DAY));
 });
 
-test('across-world routes never receive an impossible associated-world requirement', () => {
-  const localContent = loadContent();
-  const template = structuredClone(localContent.expeditions.templates[0]);
-  template.id = 'across_world_regression';
-  template.world = null;
-  template.requirementIds = ['req_associated'];
-  template.requirementCount = 1;
-  localContent.expeditions.templates = [template];
-  localContent.expeditions.templateById = { [template.id]: template };
-  localContent.expeditions.fallbackTemplate = template;
-  localContent.expeditions.settings.guaranteedSupplyTemplateId = null;
-  const state = newPlayerState(localContent, T0);
-  assert.ok(state.expeditions.board.offers.every(offer => offer.world === null));
-  assert.ok(state.expeditions.board.offers.every(offer =>
-    !offer.requirements.some(requirement => requirement.world === '@associated')));
+test('a world requirement only ever lands on a route of that world', () => {
+  // `@associated` is gone: a world-scoped route names its world outright at
+  // compile time, so a requirement can no longer arrive somewhere it cannot
+  // be satisfied. Every board generated here must hold that.
+  for (let seed = 0; seed < 30; seed++) {
+    const state = newGame(content, T0);
+    const board = generateCycleBoard(content, state, makeRng(seed));
+    for (const offer of board.offers) {
+      for (const requirement of offer.requirements) {
+        if (!requirement.world) continue;
+        assert.equal(requirement.world, offer.world,
+          `${offer.name} asks for ${requirement.world} but belongs to ${offer.world}`);
+      }
+    }
+  }
+});
+
+test('requirement prose is rendered from the predicate, never authored', () => {
+  for (const requirement of content.expeditions.requirements) {
+    assert.equal(requirement.text, requirementProse(requirement, content),
+      `${requirement.id} carries prose that has drifted from its rule`);
+  }
+  // The rendering itself says what the rule says.
+  assert.equal(requirementProse({ type: 'distinct_worlds', count: 3 }),
+    'Include characters from three different worlds.');
+  assert.equal(requirementProse({ type: 'party_size', count: 1 }), 'Send one character.');
+  assert.equal(requirementProse({ type: 'star_character', stars: 4, count: 2 }),
+    'Include two characters at four stars or above.');
+  const world = content.worlds[0];
+  assert.equal(requirementProse({ type: 'world_count', count: 2, world: world.id }, content),
+    `Include two characters from ${world.displayName}.`);
+});
+
+test('world-scoped archetypes become one route per world, named for it', () => {
+  const perWorld = content.expeditions.templates.filter(template => template.world);
+  assert.ok(perWorld.length >= content.worlds.length, 'every world carries routes of its own');
+  for (const template of perWorld) {
+    const world = content.worldById[template.world];
+    assert.ok(template.titles.some(title => title.includes(world.displayName)),
+      `${template.id} never names ${world.displayName}`);
+    assert.ok(!template.titles.some(title => title.includes('{world}')), 'an unfilled placeholder escaped');
+  }
+  // Identical predicates share one definition rather than multiplying.
+  const ids = content.expeditions.requirements.map(r => r.id);
+  assert.equal(new Set(ids).size, ids.length);
 });
 
 test('every board has exactly one fixed, unscaled Supply route', () => {
   for (let seed = 0; seed < 40; seed++) {
-    const state = newPlayerState(content, T0);
+    const state = newGame(content, T0);
     const board = generateCycleBoard(content, state, makeRng(seed));
     const offers = board.offers.filter(offer => offer.offerKind === 'supply');
     assert.equal(offers.length, 1);
@@ -125,7 +155,7 @@ test('every board has exactly one fixed, unscaled Supply route', () => {
 });
 
 test('launching the Supply route reserves capacity; cancelling the cycle releases it', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   const offer = state.expeditions.board.offers.find(item => item.offerKind === 'supply');
   const party = offerFeasibility(content, state, offer).party;
   assert.ok(party, 'supply route is feasible');
@@ -138,7 +168,7 @@ test('launching the Supply route reserves capacity; cancelling the cycle release
 });
 
 test('a cycle launches together, blocks overlapping parties, and returns together', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   const board = state.expeditions.board;
   const feasible = board.offers
     .map(offer => ({ offer, party: offerFeasibility(content, state, offer).party }))
@@ -189,8 +219,8 @@ test('character-lead routes take a chosen revealed hero of the route world', () 
   localContent.expeditions.templates = [lead];
   localContent.expeditions.templateById = { [lead.id]: lead };
   localContent.expeditions.fallbackTemplate = lead;
-  localContent.expeditions.settings.guaranteedSupplyTemplateId = null;
-  const state = newPlayerState(localContent, T0);
+  for (const template of localContent.expeditions.templates) delete template.supply;
+  const state = newGame(localContent, T0);
   for (const def of localContent.characters) if (state.characters[def.id].owned) state.characters[def.id].stars = 3;
   generateCycleBoard(localContent, state, makeRng(5));
   const offer = state.expeditions.board.offers.find(o => o.baseRewards.some(e => e.kind === 'shards' && e.choice));
@@ -212,7 +242,7 @@ test('character-lead routes take a chosen revealed hero of the route world', () 
 });
 
 test('rerolls and pins are per-cycle; a pinned unlaunched route carries to the next board', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   const first = state.expeditions.board.offers.find(offer => offer.offerKind !== 'supply');
   assert.equal(rerollOffer(content, state, first.id, makeRng(8)).ok, true);
   assert.equal(state.expeditions.allowances.freeRerollsUsed, 1);
@@ -234,7 +264,7 @@ test('rerolls and pins are per-cycle; a pinned unlaunched route carries to the n
 });
 
 test('an Operations boost visibly improves the next board routes of its world', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   const world = content.worlds[0];
   state.programs[world.id] = {
     procurement: { meter: 0, delivered: 0, family: null },

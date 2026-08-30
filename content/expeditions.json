@@ -1,0 +1,478 @@
+{
+  "settings": {
+    "offerCount": 5,
+    "slotCount": 3,
+    "freeRerolls": 1,
+    "freePins": 1,
+    "minimumFeasible": 2,
+    "generationAttempts": 40,
+    "cycleLengthDays": 4,
+    "cycleScaleBp": 40000,
+    "intelligenceCosts": {
+      "reroll": 1,
+      "pin": 1,
+      "reveal": 1
+    },
+    "resultMultipliersBp": {
+      "completed": 10000,
+      "successful": 12500,
+      "exceptional": 15000
+    }
+  },
+  "archetypes": [
+    {
+      "id": "field_supply",
+      "scope": "global",
+      "weight": 0,
+      "partySize": 2,
+      "supply": true,
+      "requirements": [
+        {
+          "type": "distinct_archetypes",
+          "count": 2
+        }
+      ],
+      "requirementCount": 1,
+      "optionals": [
+        {
+          "type": "distinct_worlds",
+          "count": 2
+        }
+      ],
+      "reward": {
+        "entries": [
+          {
+            "kind": "material",
+            "id": "@random_material",
+            "grade": "basic",
+            "min": 3,
+            "max": 5
+          },
+          {
+            "kind": "resource",
+            "id": "intelligence",
+            "min": 1,
+            "max": 1
+          }
+        ]
+      },
+      "powerRatioBp": [
+        9000,
+        10000
+      ],
+      "titles": [
+        "A Field Cache Beyond the Gate"
+      ],
+      "descriptions": [
+        "A reliable route to the provisions that can carry a goal a little further."
+      ]
+    },
+    {
+      "id": "procurement",
+      "scope": "world",
+      "weight": 10,
+      "partySize": 2,
+      "requirements": [
+        {
+          "type": "world_count",
+          "count": 1
+        },
+        {
+          "type": "combined_stars",
+          "count": 4
+        }
+      ],
+      "requirementCount": 1,
+      "optionals": [
+        {
+          "type": "distinct_archetypes",
+          "count": 2
+        },
+        {
+          "type": "combined_stars",
+          "count": 6
+        }
+      ],
+      "reward": {
+        "entries": [
+          {
+            "kind": "material",
+            "id": "@random_material",
+            "grade": "improved",
+            "min": 3,
+            "max": 5
+          }
+        ]
+      },
+      "powerRatioBp": [
+        9000,
+        10500
+      ],
+      "titles": [
+        "Supply Line: {world}",
+        "Procurement Run in {world}"
+      ],
+      "descriptions": [
+        "Ordinary work, carefully done, and the stores at {world} come back full."
+      ]
+    },
+    {
+      "id": "character_lead",
+      "scope": "world",
+      "weight": 4,
+      "partySize": 2,
+      "requirements": [
+        {
+          "type": "world_count",
+          "count": 1
+        }
+      ],
+      "requirementCount": 1,
+      "optionals": [
+        {
+          "type": "star_character",
+          "stars": 3,
+          "count": 1
+        },
+        {
+          "type": "distinct_worlds",
+          "count": 2
+        }
+      ],
+      "reward": {
+        "entries": [
+          {
+            "kind": "material",
+            "id": "@random_material",
+            "grade": "basic",
+            "min": 2,
+            "max": 4
+          }
+        ],
+        "rare": [
+          {
+            "kind": "resource",
+            "id": "intelligence",
+            "qty": 1,
+            "chanceBp": 7000
+          }
+        ],
+        "shardPool": "associated_or_any",
+        "shardRange": [
+          2,
+          4
+        ]
+      },
+      "powerRatioBp": [
+        9500,
+        10500
+      ],
+      "titles": [
+        "A Promising Lead in {world}",
+        "Reconnaissance in {world}"
+      ],
+      "descriptions": [
+        "Someone in {world} is worth finding, and worth bringing home."
+      ]
+    },
+    {
+      "id": "world_specialist",
+      "scope": "world",
+      "weight": 8,
+      "partySize": 3,
+      "requirements": [
+        {
+          "type": "same_world",
+          "count": 2
+        },
+        {
+          "type": "world_count",
+          "count": 2
+        }
+      ],
+      "requirementCount": 1,
+      "optionals": [
+        {
+          "type": "combined_stars",
+          "count": 6
+        },
+        {
+          "type": "power_over_recommended",
+          "percentBp": 1000
+        }
+      ],
+      "reward": {
+        "entries": [
+          {
+            "kind": "material",
+            "id": "@random_material",
+            "grade": "improved",
+            "min": 4,
+            "max": 8
+          },
+          {
+            "kind": "resource",
+            "id": "intelligence",
+            "min": 1,
+            "max": 1
+          }
+        ]
+      },
+      "powerRatioBp": [
+        10000,
+        11000
+      ],
+      "titles": [
+        "{world} Specialist Route",
+        "Work Only {world} Can Finish"
+      ],
+      "descriptions": [
+        "The kind of errand that asks for people who already know {world}."
+      ]
+    },
+    {
+      "id": "archetype_specialist",
+      "scope": "global",
+      "weight": 6,
+      "partySize": 2,
+      "requirements": [
+        {
+          "type": "distinct_archetypes",
+          "count": 2
+        },
+        {
+          "type": "star_character",
+          "stars": 3,
+          "count": 1
+        }
+      ],
+      "requirementCount": 1,
+      "optionals": [
+        {
+          "type": "distinct_worlds",
+          "count": 2
+        },
+        {
+          "type": "combined_stars",
+          "count": 6
+        }
+      ],
+      "reward": {
+        "entries": [
+          {
+            "kind": "resource",
+            "id": "intelligence",
+            "min": 1,
+            "max": 2
+          },
+          {
+            "kind": "material",
+            "id": "@random_material",
+            "grade": "basic",
+            "min": 2,
+            "max": 3
+          }
+        ]
+      },
+      "powerRatioBp": [
+        9000,
+        10000
+      ],
+      "titles": [
+        "A Question of Temperament",
+        "The Right Hands for It"
+      ],
+      "descriptions": [
+        "A brief that asks for a particular turn of mind rather than a particular home."
+      ]
+    },
+    {
+      "id": "same_world_squad",
+      "scope": "global",
+      "weight": 6,
+      "partySize": 3,
+      "requirements": [
+        {
+          "type": "same_world",
+          "count": 3
+        }
+      ],
+      "requirementCount": 1,
+      "optionals": [
+        {
+          "type": "combined_stars",
+          "count": 9
+        },
+        {
+          "type": "star_character",
+          "stars": 4,
+          "count": 1
+        }
+      ],
+      "reward": {
+        "entries": [
+          {
+            "kind": "material",
+            "id": "@random_material",
+            "grade": "improved",
+            "min": 4,
+            "max": 6
+          },
+          {
+            "kind": "resource",
+            "id": "intelligence",
+            "min": 1,
+            "max": 1
+          }
+        ]
+      },
+      "powerRatioBp": [
+        10000,
+        11000
+      ],
+      "titles": [
+        "People Who Already Trust Each Other",
+        "One House, One Road"
+      ],
+      "descriptions": [
+        "Work that goes faster when nobody has to be introduced."
+      ]
+    },
+    {
+      "id": "diverse_coalition",
+      "scope": "global",
+      "weight": 6,
+      "partySize": 3,
+      "requirements": [
+        {
+          "type": "distinct_worlds",
+          "count": 3
+        },
+        {
+          "type": "distinct_archetypes",
+          "count": 3
+        }
+      ],
+      "requirementCount": 1,
+      "optionals": [
+        {
+          "type": "combined_stars",
+          "count": 9
+        },
+        {
+          "type": "power_over_recommended",
+          "percentBp": 1000
+        }
+      ],
+      "reward": {
+        "entries": [
+          {
+            "kind": "material",
+            "id": "@random_material",
+            "grade": "advanced",
+            "min": 3,
+            "max": 5
+          },
+          {
+            "kind": "resource",
+            "id": "intelligence",
+            "min": 1,
+            "max": 2
+          }
+        ]
+      },
+      "powerRatioBp": [
+        10000,
+        11500
+      ],
+      "titles": [
+        "A Map Left Unfinished",
+        "Quiet Roads, Useful Rumours"
+      ],
+      "descriptions": [
+        "The work asks for breadth rather than battle."
+      ]
+    },
+    {
+      "id": "high_power",
+      "scope": "global",
+      "weight": 4,
+      "partySize": 4,
+      "requirements": [
+        {
+          "type": "combined_stars",
+          "count": 12
+        },
+        {
+          "type": "star_character",
+          "stars": 5,
+          "count": 1
+        }
+      ],
+      "requirementCount": 1,
+      "optionals": [
+        {
+          "type": "power_over_recommended",
+          "percentBp": 1500
+        },
+        {
+          "type": "distinct_worlds",
+          "count": 3
+        }
+      ],
+      "reward": {
+        "entries": [
+          {
+            "kind": "material",
+            "id": "@random_material",
+            "grade": "advanced",
+            "min": 5,
+            "max": 8
+          },
+          {
+            "kind": "resource",
+            "id": "intelligence",
+            "min": 2,
+            "max": 2
+          }
+        ],
+        "rare": [
+          {
+            "kind": "resource",
+            "id": "intelligence",
+            "qty": 2,
+            "chanceBp": 8000
+          }
+        ]
+      },
+      "powerRatioBp": [
+        11000,
+        12500
+      ],
+      "titles": [
+        "Work Beyond the Gate",
+        "The Road That Asks Too Much"
+      ],
+      "descriptions": [
+        "A long venture that pays what it costs, and only to a party that can afford it."
+      ]
+    }
+  ],
+  "reports": {
+    "completed": [
+      "The party returned with everything promised, even if the road asked more of them.",
+      "The route proved demanding, but the agreed supplies came home intact.",
+      "Careful work carried the party through. Nothing promised was lost."
+    ],
+    "successful": [
+      "The plan held. The party returned ahead of the expected margin.",
+      "The recommendation proved sound, and the return was clean.",
+      "Good preparation left room to gather more along the road."
+    ],
+    "exceptional": [
+      "The party found more than the route promised and brought the rare lead home.",
+      "An optional trail opened along the way, and the party followed it well.",
+      "Breadth and preparation turned ordinary work into an uncommon return."
+    ]
+  }
+}

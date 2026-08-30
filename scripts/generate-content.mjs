@@ -28,10 +28,74 @@ const balance = {
     advanced:  { energy: 8,  repeat: { count: 2, bonusChanceBp: 3500 } },
     world:     { energy: 10, repeat: { count: 2, bonusChanceBp: 0 } }
   },
-  acquisitionTiers: {
-    minor:  { unlockStar: 1, cumulativeShards: 10 },
-    medium: { unlockStar: 4, cumulativeShards: 110 },
-    major:  { unlockStar: 7, cumulativeShards: 450 }
+  // Every hero is worth the same: one recruitment cost, one joining Star, and
+  // the same seven-Star ladder afterwards. The starting five are drawn from
+  // the whole roster when a save is created, not marked in the content.
+  rosterProgression: {
+    starterCount: 5,
+    recruitShards: 10,   // cumulative shards to recruit any hero
+    recruitStar: 1,      // the Star a recruited hero joins at
+    revealShardStake: 2  // shards staked by first-clearing a reveal node
+  },
+  // Campaign generation. World Hub supplies chapter titles and node names;
+  // every number below is the game's, so renaming a node can never move a
+  // threshold, a drop, or a reward.
+  //
+  // Thresholds grow by a constant proportion per node rather than along a
+  // hand-drawn ladder: power itself grows multiplicatively (Stars, then Gear
+  // tiers), so a constant ratio asks the same relative improvement each step.
+  campaigns: {
+    // The un-gated opening track. It reveals the first party of every world
+    // in progression order, so a World Campaign can be opened before it is
+    // itself reachable — a world needs five of its own owned to unlock.
+    main: {
+      chapterSize: 10,
+      thresholdStart: 5500,
+      thresholdGrowthBp: 277,
+      thresholdRound: 50,
+      checkpointEvery: 5,
+      advancedFromPosition: 7,   // positions 7..10 of a chapter are 'advanced'
+      // One material grade per chapter; the last entry repeats if an author
+      // publishes more chapters than the ladder names.
+      gradeLadder: ['basic', 'improved', 'advanced', 'superior', 'superior', 'masterwork'],
+      firstClearMaterials: 3,
+      checkpointMaterials: 5,
+      // Optional objectives ride on checkpoint nodes, cycling through these
+      // party conditions. They never gate progress; they pay once. The
+      // compiler skips any whose condition the live content cannot satisfy.
+      objectives: [
+        { tagId: 'tag_world_diversity', rule: 'distinct_world_count', count: 2,
+          text: 'Clear with characters from 2 different worlds', rewardQty: 3 },
+        { tagId: 'tag_world_cohesion', rule: 'same_world_count', count: 3,
+          text: 'Clear with 3 characters from one world', rewardQty: 3 }
+      ]
+    },
+    world: {
+      nodes: 30,
+      chapterSize: 10,
+      thresholdStart: 9500,
+      thresholdGrowthBp: 251,
+      thresholdRound: 50,
+      // Worlds open in whatever order the drawn roster allows, so they are
+      // deliberately equal in difficulty. Raise this to make later worlds in
+      // the progression order harder than earlier ones.
+      perWorldGrowthBp: 0,
+      gradeByChapter: ['improved', 'improved', 'advanced'],
+      relicPieceNodes: [4, 9, 15, 21],
+      firstClearMaterials: 3
+    },
+    // Node materials rotate through the family order so a campaign always
+    // opens every family at the grades it drops, instead of drawing at random
+    // and leaving a recipe unbuildable.
+    familyRotation: { mainStep: 1, worldStep: 1, worldOffsetPerWorld: 2 }
+  },
+  // Faction synergy. World Hub says who belongs to which faction; how much
+  // that is worth in a party is the game's to tune, once, for all of them.
+  factions: {
+    thresholds: [
+      { count: 2, bonusBp: 200 },
+      { count: 3, bonusBp: 400 }
+    ]
   },
   partySize: 5,
   partyPresetCount: 6,
@@ -65,6 +129,9 @@ const balance = {
     ],
     weights: { campaign: 350, heroes: 350, gear: 200, relic: 100 },
     heroWeightsBp: { revealed: 1500, owned: 3500, stars: 5000 },
+    // Mastery cosmetics are awarded in the world's authored order: the first
+    // named cosmetic at the first rank below, the second at the next, and so on.
+    cosmeticRanks: ['known', 'established', 'rooted', 'mastered'],
     milestones: {
       known:       { supplies: 1, materialCache: 8 },
       established: { shardChoice: 15 },
@@ -184,8 +251,10 @@ function lines(a, t, ac, k, e, s) {
   return { attire: a, tool: t, accessory: ac, keepsake: k, emblem: e, signature: s };
 }
 
+// `tier`, `starting` and `color` are still accepted positionally so the cast
+// below reads unchanged; none of them reaches the manifest.
 function hero(id, displayName, world, archetype, faction, tier, starting, color, description, lore, equipmentLines) {
-  return { id, displayName, world, archetype, faction, extraTags: [], tier, starting, color, glyph: displayName[0], description, lore, equipmentLines };
+  return { id, displayName, world, archetype, faction, description, lore, equipmentLines };
 }
 
 const characters = [
@@ -314,35 +383,7 @@ const tags = [
     id, displayName, category: 'faction', activationRule: 'tag_count', stackingGroup: id,
     thresholds: large ? [ { count: 2, bonusBp: 200 }, { count: 3, bonusBp: 400 } ] : [ { count: 2, bonusBp: 200 } ],
     explanation
-  })),
-  // Optional extra tags (species/profession-style examples)
-  {
-    id: 'tag_scholar', displayName: 'Scholars', category: 'profession',
-    activationRule: 'tag_count', stackingGroup: 'tag_scholar',
-    thresholds: [ { count: 2, bonusBp: 200 } ],
-    explanation: 'Two scholars in one party never run out of theories.'
-  },
-  {
-    id: 'tag_artisan', displayName: 'Artisans', category: 'profession',
-    activationRule: 'tag_count', stackingGroup: 'tag_artisan',
-    thresholds: [ { count: 2, bonusBp: 200 } ],
-    explanation: 'Makers respect makers, whatever the workshop.'
-  },
-  {
-    id: 'tag_musician', displayName: 'Musicians', category: 'profession',
-    activationRule: 'tag_count', stackingGroup: 'tag_musician',
-    thresholds: [ { count: 2, bonusBp: 200 } ],
-    explanation: 'Two musicians will always find a duet.'
-  },
-  {
-    id: 'tag_pilot', displayName: 'Pilots', category: 'profession',
-    activationRule: 'tag_count', stackingGroup: 'tag_pilot',
-    thresholds: [ { count: 2, bonusBp: 200 } ],
-    explanation: 'Flyers trust flyers with the difficult routes.'
-  },
-  { id: 'tag_herbalist', displayName: 'Herbalist', category: 'profession', activationRule: 'tag_count', stackingGroup: 'tag_herbalist', thresholds: [], explanation: 'A flavor tag with no party bonus in the MVP.' },
-  { id: 'tag_hunter', displayName: 'Hunter', category: 'profession', activationRule: 'tag_count', stackingGroup: 'tag_hunter', thresholds: [], explanation: 'A flavor tag with no party bonus in the MVP.' },
-  { id: 'tag_medic', displayName: 'Medic', category: 'profession', activationRule: 'tag_count', stackingGroup: 'tag_medic', thresholds: [], explanation: 'A flavor tag with no party bonus in the MVP.' }
+  }))
 ];
 
 // ---------------------------------------------------------------- recipes
@@ -393,9 +434,11 @@ for (const archetype of Object.keys(ARCHETYPES)) {
 // Tier name prefixes for equipment presentation across the ten tiers.
 const TIER_PREFIXES = ['', 'Sturdy ', 'Refined ', 'Tempered ', 'Gleaming ', 'Exquisite ', 'Superior ', 'Ornate ', 'Masterwork ', 'Mythic '];
 
-// ---------------------------------------------------------------- campaigns
-const MAIN_RANGES = [[5500, 7500], [7800, 10500]];
-const MAIN_GRADES = ['basic', 'improved'];
+// ------------------------------------------------------- campaign node names
+// Node names are the only campaign content a publication supplies. Their
+// thresholds, material families and grades, types, rewards, relic positions
+// and reveal placements are compiled from balance.campaigns, so renaming a
+// node here can never move any of them.
 const MAIN_NODE_NAMES = [
   ['Cliffside Waterfall Path', 'First-Year Arrival Gate', 'Bell-Silent Training Yard', 'A Spark in the Alchemy Wing',
    'Shrine Road Under Lanterns', 'Detention in the Moving Greenhouse', 'Masks at the Moonlit Tea House',
@@ -405,296 +448,353 @@ const MAIN_NODE_NAMES = [
    'Foxfire Through the Waterfalls', 'The Heart-Shaped Crucible', 'The False Saint Opens the Gate',
    'Checkpoint: Shadows Across the Academy']
 ];
-const MAIN_FAMILIES = [
-  ['metal', 'fiber', 'mineral', 'compound', 'mechanism', 'essence', 'metal', 'fiber', 'mineral', 'compound'],
-  ['mechanism', 'essence', 'metal', 'fiber', 'mineral', 'compound', 'mechanism', 'essence', 'metal', 'fiber']
-];
-const SHADOW_ASSIGN = [
-  'char_suzume', 'char_ashley', 'char_hoshi', 'char_bridget', 'char_ayame',
-  'char_elian', 'char_mei', 'char_tix', 'char_tsubaki', 'char_carol',
-  'char_genjiro', 'char_kin', 'char_kaguya', 'char_liadriel', 'char_yuki',
-  'char_malefia', 'char_kimiko', 'char_aurora', 'char_sakura', 'char_irina'
-];
-const SHADOW_NAMES = [
-  'Bells Without Sound', 'Spark in the First-Year Hall', 'Beads of the Bound Spirit', 'Stone Beneath the Flame',
-  'The Beacon Draws the Dark', 'Rules Written in Ice', 'Silver Threads at the Tea House', 'The Hedge That Walked Away',
-  'The Open Gates', 'Lightning Takes the Stage', 'The Jagan’s Whisper', 'Mist Behind the Spotlight',
-  'Gilded Memory Threads', 'A Light Without Enemies', 'Red and Blue at the Shrine',
-  'The Eclipse Issues a Challenge', 'Thousand Faces, One Mask', 'Love in the Alchemy Lab',
-  'The False Saint’s Hunger', 'Every Door in Its Place'
-];
+const MAIN_CHAPTER_TITLES = ['Two Edens, One Omen', 'Shadows Across the Academy'];
 
-function lerpThreshold(lo, hi, i, n) {
-  return Math.round((lo + ((hi - lo) * i) / (n - 1)) / 50) * 50;
-}
-
-const nodes = [];
-for (let ch = 0; ch < 2; ch++) {
-  const [lo, hi] = MAIN_RANGES[ch];
-  for (let i = 0; i < 10; i++) {
-    const num = ch * 10 + i + 1;
-    const isCheckpoint = (i + 1) % 5 === 0; // positions 5, 10
-    const threshold = lerpThreshold(lo, hi, i, 10);
-    const family = MAIN_FAMILIES[ch][i];
-    const grade = MAIN_GRADES[ch];
-    const node = {
-      id: `main_${num}`,
-      campaign: 'main', chapter: ch + 1, position: i + 1, number: num,
-      displayName: MAIN_NODE_NAMES[ch][i],
-      type: i >= 6 ? 'advanced' : 'ordinary',
-      threshold,
-      checkpoint: isCheckpoint,
-      material: matId(family, grade),
-      previous: num === 1 ? null : `main_${num - 1}`
-    };
-    if (isCheckpoint) {
-      node.firstClear = { materials: [{ materialId: node.material, qty: 5 }], milestone: `Chapter ${ch + 1} checkpoint` };
-    } else {
-      node.firstClear = { materials: [{ materialId: node.material, qty: 3 }] };
-    }
-    nodes.push(node);
-  }
-}
-
-// Optional objectives on a few main nodes (one-time fixed reward, never gates progress)
-const OBJECTIVES = {
-  main_5:  { tagId: 'tag_world_diversity', rule: 'distinct_world_count', count: 2, text: 'Clear with characters from 2 different worlds', reward: { materials: [{ materialId: matId('essence', 'basic'), qty: 3 }] } },
-  main_15: { tagId: 'faction_spiritwardens', rule: 'tag_count', count: 2, text: 'Clear with 2 Spiritwardens', reward: { materials: [{ materialId: matId('essence', 'improved'), qty: 3 }] } }
+const WC_CHAPTER_TITLES = {
+  world_hidden_village: ['Behind the Waterfall Veil', 'Shrines and Hungry Spirits', 'Masks of the Imperial Night'],
+  world_magic_academy: ['First-Year Misadventures', 'Lessons in Complementary Magic', 'The Faculty\u2019s Impossible Semester']
 };
-for (const node of nodes) {
-  if (OBJECTIVES[node.id]) node.objective = OBJECTIVES[node.id];
-}
-
-// World campaigns: 3 chapters x 10 nodes each, all type 'world'.
-const WC_RANGES = [[9500, 12500], [12800, 15800], [16100, 19500]];
-const WC_GRADES = ['improved', 'improved', 'advanced'];
 const WC_NAMES = {
   world_hidden_village: [
     ['Waterfall Veil Approach', 'Cliff-Carved Gate', 'Apothecary of Clear Sight', 'Bells on the Training Roof',
      'Kunoichi Trial Grounds', 'Rope Bridge in the Mist', 'Shinobi Archive Vault', 'Moonlit Watchtower',
      'Forest Perimeter Breach', 'Lanterns at the Village Seal'],
     ['Forgotten Shrine Road', 'Foxfire Cedar Grove', 'Corrupted Wayside Altar', 'Oni Footprints in Snow',
-     'Hoshi’s Living Ward', 'Red Ravine', 'Blue Silence Lake', 'The Purple Guardian',
+     'Hoshi\u2019s Living Ward', 'Red Ravine', 'Blue Silence Lake', 'The Purple Guardian',
      'Cavern of Spiritual Seams', 'Shrine That Holds the Mountain'],
     ['Dangerous District Tea House', 'Silver Threads Above the Alley', 'Samurai Gate of Honor',
-     'Gilded Geisha House', 'Court of a Thousand Masks', 'Memory Market at Midnight', 'Beacon’s Procession',
-     'False Saint’s Sanctuary', 'Palace Roofs Under Foxfire', 'Hidden War Revealed']
+     'Gilded Geisha House', 'Court of a Thousand Masks', 'Memory Market at Midnight', 'Beacon\u2019s Procession',
+     'False Saint\u2019s Sanctuary', 'Palace Roofs Under Foxfire', 'Hidden War Revealed']
   ],
   world_magic_academy: [
     ['Prismatic Arrival Gate', 'First-Year Homeroom', 'Singed Textbook', 'Grounded Practice Hall',
      'Alchemy Lab Tea Break', 'Greenhouse Gone Wild', 'Mist in the Library Stacks',
      'Lightning on the Duelling Lawn', 'Dormitory Curfew Dash', 'Welcome Festival'],
     ['Spatial Geometry Classroom', 'Misplaced Summoning Circle', 'Icebound Rulebook Trial',
-     'Fire Safety Detention', 'Love Potion Misdelivery', 'Pip’s Hedge Maze', 'Darkness in the Auditorium',
+     'Fire Safety Detention', 'Love Potion Misdelivery', 'Pip\u2019s Hedge Maze', 'Darkness in the Auditorium',
      'Light Across the Observatory', 'Faculty Operations Office', 'Midterm Practical: Controlled Chaos'],
     ['Moonlit School Ball', 'Spotlight and Shadow Backstage', 'Sun-Eclipse Challenge',
      'Hall of Complementary Elements', 'Walking Tower Staircase', 'Alchemy Fair Catastrophe',
-     'Summoned Guests at Dinner', 'Garden Beneath the Academy', 'Heart of Eden’s Leyline',
+     'Summoned Guests at Dinner', 'Garden Beneath the Academy', 'Heart of Eden\u2019s Leyline',
      'Final Examination: Harmony']
   ]
 };
-worlds.forEach((world, wi) => {
-  const wkey = `wc_${world.id}`;
-  for (let ch = 0; ch < 3; ch++) {
-    const [lo, hi] = WC_RANGES[ch];
-    for (let i = 0; i < 10; i++) {
-      const num = ch * 10 + i + 1;
-      const family = FAMILIES[(wi * 3 + ch * 2 + i) % 6];
-      nodes.push({
-        id: `${wkey}_${num}`,
-        campaign: wkey, world: world.id, chapter: ch + 1, position: i + 1, number: num,
-        displayName: WC_NAMES[world.id][ch][i],
-        type: 'world',
-        threshold: lerpThreshold(lo, hi, i, 10),
-        material: matId(family, WC_GRADES[ch]),
-        previous: num === 1 ? null : `${wkey}_${num - 1}`,
-        firstClear: {
-          materials: [{ materialId: matId(family, WC_GRADES[ch]), qty: 3 }],
-          archiveFragment: `frag_${world.id}_${num}`
-        }
-      });
-    }
-  }
-});
 
-// ---------------------------------------------------------------- archives
-const ARCHIVE_META = {
+// ------------------------------------------------------------------- relics
+const RELICS = {
   world_hidden_village: {
-    collections: ['Veiled Village Records', 'Shrines and Hungry Spirits', 'Masks of the Imperial Night'],
-    relics: [
-      ['Silent Bell', 'First Mission Scroll', 'Apothecary Clarity Pill Box', 'Shinobi Code Tablet', 'Waterfall Gate Key'],
-      ['Jagan Ward Patch', 'Ren’s Iron Prayer Bead', 'Red-Blue Binding Seal', 'Forgotten Shrine Offering', 'Foxfire Cedar Talisman'],
-      ['Silver Thread Spool', 'Gilded Memory Strand', 'Beacon’s Hand Mirror', 'False Saint’s Devouring Seal', 'Porcelain Fox Mask Fragment']
-    ],
-    collectionSkins: [
-      ['char_suzume', 'Suzume — Festival of Silent Bells'],
-      ['char_yuki', 'Yuki — Shrine in Bloom'],
-      ['char_kaguya', 'Kaguya — Unwoven Gold']
-    ],
-    fullSkin: ['char_kimiko', 'Kimiko — Dawn Without the Mask'],
-    loreIntro: 'Recovered from the Hidden Village’s secret war and catalogued behind the waterfall veil.'
+    name: 'The Unbroken Bell',
+    lore: 'Cast for a village that had to learn silence, and broken on the night it first needed to be heard.',
+    pieces: [
+      ['Silent Bell Crown', 'The lip of the bell, filed smooth so it would never ring by accident.'],
+      ['Shinobi Code Tablet', 'The clause that made silence a duty rather than a skill.'],
+      ['Red-Blue Binding Seal', 'A ward pressed by two hands that did not trust each other.'],
+      ['Porcelain Fox Mask Fragment', 'What the empire left behind when the masks came off.']
+    ]
   },
   world_magic_academy: {
-    collections: ['First-Year Misadventures', 'Lessons in Complementary Magic', 'The Faculty’s Impossible Semester'],
-    relics: [
-      ['Singed Fire Primer', 'Bridget’s Perfect Timetable', 'Pip’s Unauthorized Hall Pass', 'Melted Detention Bell', 'Welcome Festival Ribbon'],
-      ['Ice Geometry Compass', 'Bottled Corridor Mist', 'Carol’s Lightning Medal', 'Eclipse Challenge Card', 'Liadriel’s Glittering Bookmark'],
-      ['Aurora’s Heart-Shaped Crucible', 'Irina’s Spatial Master Key', 'Misplaced Summoning Chalk', 'Midterm Incident Report', 'Final Harmony Diploma']
-    ],
-    collectionSkins: [
-      ['char_ashley', 'Ashley — Founders’ Festival Fireworks'],
-      ['char_malefia', 'Malefia — Radiant Eclipse Formal'],
-      ['char_aurora', 'Aurora — Hearts-in-Bloom Faculty Dress']
-    ],
-    fullSkin: ['char_irina', 'Irina — Midnight Observatory Uniform'],
-    loreIntro: 'Preserved from an Academy semester where every lesson, friendship, and accident became part of Eden history.'
+    name: 'The Harmonic Orrery',
+    lore: 'Built by a faculty that could not agree, and therefore proved that opposites hold each other up.',
+    pieces: [
+      ['Ice Geometry Compass', 'Draws only shapes that can bear weight.'],
+      ['Heart-Shaped Crucible', 'Every reaction it holds ends warmer than it began.'],
+      ['Spatial Master Key', 'Opens the corridor you needed, not the one you asked for.'],
+      ['Final Harmony Diploma', 'Signed by everyone who once refused to sign anything together.']
+    ]
   }
 };
 
-const archives = worlds.map(world => {
-  const meta = ARCHIVE_META[world.id];
-  const wkey = `wc_${world.id}`;
-  const collections = meta.collections.map((cname, c) => ({
-    id: `${world.id}_col_${c + 1}`,
-    displayName: cname,
-    rewardSkin: {
-      type: 'skin', id: `skin_${world.id}_collection_${c + 1}`,
-      characterId: meta.collectionSkins[c][0], skinName: meta.collectionSkins[c][1]
-    },
-    relics: meta.relics[c].map((rname, r) => {
-      const relicIndex = c * 5 + r; // 0..14
-      const nodeA = relicIndex * 2 + 1, nodeB = relicIndex * 2 + 2;
-      return {
-        id: `${world.id}_relic_${relicIndex + 1}`,
-        displayName: rname,
-        position: r + 1,
-        lore: `${meta.loreIntro} ${rname} is item ${r + 1} of “${cname}”; its two fragments trace the paired campaign incidents that returned it to the Archive.`,
-        fragments: [
-          { id: `frag_${world.id}_${nodeA}`, sourceNode: `${wkey}_${nodeA}` },
-          { id: `frag_${world.id}_${nodeB}`, sourceNode: `${wkey}_${nodeB}` }
-        ]
-      };
-    })
-  }));
-  return {
-    id: `archive_${world.id}`,
-    world: world.id,
-    displayName: `${world.displayName} Archive`,
-    collections,
-    fullReward: {
-      type: 'skin', id: `skin_${world.id}_full`,
-      characterId: meta.fullSkin[0], skinName: meta.fullSkin[1]
-    }
-  };
-});
+// -------------------------------------------------------- Mastery cosmetics
+// Ordered: the first goes to the first cosmetic milestone, and so on. Which
+// Mastery rank that is stays in balance.mastery.cosmeticRanks.
+const COSMETICS = {
+  world_hidden_village: [
+    ['char_suzume', 'Suzume \u2014 Festival of Silent Bells'],
+    ['char_yuki', 'Yuki \u2014 Shrine in Bloom'],
+    ['char_kaguya', 'Kaguya \u2014 Unwoven Gold'],
+    ['char_kimiko', 'Kimiko \u2014 Dawn Without the Mask']
+  ],
+  world_magic_academy: [
+    ['char_ashley', 'Ashley \u2014 Founders\u2019 Festival Fireworks'],
+    ['char_malefia', 'Malefia \u2014 Radiant Eclipse Formal'],
+    ['char_aurora', 'Aurora \u2014 Hearts-in-Bloom Faculty Dress'],
+    ['char_irina', 'Irina \u2014 Midnight Observatory Uniform']
+  ]
+};
 
 // ---------------------------------------------------------------- write files
 // The shipped game is SYSTEM content only (rules-level data: balance,
-// archetypes, materials, components, recipes, universal tag rules). All
-// playable content — worlds, characters, campaigns, archives — belongs to the
-// player-authored creator database. The worlds defined above are exported as
-// an importable, fully editable sample content pack instead.
+// archetypes, materials, components, recipes, universal tag rules). Everything
+// playable travels as a Creative Manifest: identities, names, lore and art.
+// The sample manifest below is what the tests compile against.
 
-const parseMat = (id) => { const [, family, grade] = id.split('_'); return { family, grade }; };
-
-// Main and Shadow campaigns -> paired creator chapter rows. Main is
-// material-only. Shadow alternates the two Eden worlds and uses every launch
-// character exactly once.
-const mainChapters = [];
-const shadowChapters = [];
-for (let ch = 1; ch <= 2; ch++) {
-  const authored = nodes.filter(n => n.campaign === 'main' && n.chapter === ch)
-    .sort((a, b) => a.position - b.position);
-  const chNodes = authored.map(n => {
-      const { family, grade } = parseMat(n.material);
-      const row = { name: n.displayName, threshold: n.threshold, family, grade };
-      if (n.objective) row.objective = n.objective;
-      return row;
-    });
-  mainChapters.push({ nodes: chNodes });
-  shadowChapters.push({
-    nodes: authored.map((n, i) => {
-      const { family, grade } = parseMat(n.material);
-      const globalIndex = (ch - 1) * 10 + i;
-      return {
-        name: SHADOW_NAMES[globalIndex],
-        threshold: n.threshold,
-        family,
-        grade,
-        shardCharacterId: SHADOW_ASSIGN[globalIndex]
-      };
-    })
-  });
-}
-
-// Worlds -> creator world format (published so an import yields a ready game)
-const packWorlds = worlds.map(world => {
-  const wkey = `wc_${world.id}`;
-  const campaignNodes = nodes.filter(n => n.campaign === wkey)
-    .sort((a, b) => a.number - b.number)
-    .map(n => {
-      const { family, grade } = parseMat(n.material);
-      return { name: n.displayName, threshold: n.threshold, family, grade };
-    });
-  const archive = archives.find(a => a.world === world.id);
-  return {
-    id: world.id, status: 'published',
-    displayName: world.displayName, tagline: world.tagline,
-    icon: world.icon, palette: world.palette, image: null,
-    campaignNodes,
-    archive: {
-      collections: archive.collections.map(col => ({
-        name: col.displayName,
-        rewardSkin: {
-          characterId: col.rewardSkin.characterId,
-          name: col.rewardSkin.skinName,
-          portrait: null,
-          fullBody: null
-        },
-        relics: col.relics.map(r => ({ name: r.displayName, lore: r.lore, image: null }))
-      })),
-      fullSkin: { characterId: archive.fullReward.characterId, name: archive.fullReward.skinName, portrait: null, fullBody: null }
-    }
-  };
-});
-
-// Characters -> creator character format
-const packCharacters = characters.map(c => ({
-  id: c.id, worldId: c.world,
-  displayName: c.displayName, glyph: c.glyph, color: c.color,
-  archetype: c.archetype, tier: c.tier, starting: !!c.starting,
-  faction: c.faction ?? null, extraTags: c.extraTags ?? [],
-  description: c.description, lore: c.lore,
-  portrait: null, fullBody: null,
-  equipment: Object.fromEntries(SLOTS.map(s => [s, { name: c.equipmentLines[s], image: null }]))
+const manifestWorlds = worlds.map(world => ({
+  id: world.id,
+  displayName: world.displayName,
+  tagline: world.tagline,
+  description: world.tagline,
+  icon: world.icon,
+  palette: world.palette,
+  image: null,
+  chapterTitles: WC_CHAPTER_TITLES[world.id],
+  chapterImages: [null, null, null],
+  nodeNames: WC_NAMES[world.id].flat(),
+  relic: {
+    name: RELICS[world.id].name,
+    lore: RELICS[world.id].lore,
+    pieces: RELICS[world.id].pieces.map(([name, lore]) => ({ name, lore, image: null }))
+  },
+  masteryCosmetics: COSMETICS[world.id].map(([characterId, name]) => ({
+    characterId, name, portrait: null, fullBody: null
+  }))
 }));
 
-// Faction tag definitions travel with the pack; universal rules stay system.
-const packFactions = tags.filter(t => t.category === 'faction').map(t => ({
-  id: t.id, displayName: t.displayName, explanation: t.explanation, thresholds: t.thresholds
-}));
-const systemTags = tags.filter(t => t.category !== 'faction');
+// Roster order is meaning: the first five of a world are the ones the Main
+// Campaign introduces, which is what makes that world openable at all.
+const manifestCharacters = manifestWorlds.flatMap(world =>
+  characters.filter(c => c.world === world.id).map(c => ({
+    id: c.id,
+    worldId: c.world,
+    displayName: c.displayName,
+    description: c.description,
+    lore: c.lore,
+    archetype: c.archetype,
+    faction: c.faction ?? null,
+    portrait: null,
+    fullBody: null,
+    equipment: Object.fromEntries(SLOTS.map(slot => [slot, { name: c.equipmentLines[slot], image: null }]))
+  })));
 
-const samplePack = {
-  version: 4,
-  worlds: packWorlds,
-  characters: packCharacters,
-  factions: packFactions,
-  mainChapters,
-  shadowChapters
+// ----------------------------------------------------- Expedition archetypes
+// The route library is the game's, not a publication's. Each archetype owns
+// its party size, predicates, reward curve, Power ratio and frequency; when a
+// world arrives, the compiler makes world-scoped variants of the world-scoped
+// ones automatically. Requirement prose is rendered from the predicate, so a
+// `distinct_worlds: 3` route already knows how to describe itself.
+const RANDOM_MATERIAL = '@random_material';
+const material = (grade, min, max) => ({ kind: 'material', id: RANDOM_MATERIAL, grade, min, max });
+const intel = (min, max = min) => ({ kind: 'resource', id: 'intelligence', min, max });
+
+const expeditionArchetypes = [
+  {
+    id: 'field_supply', scope: 'global', weight: 0, partySize: 2,
+    // The one route that always appears. That guarantee is an engine rule:
+    // the board reserves a place for whichever archetype carries `supply`.
+    supply: true,
+    requirements: [{ type: 'distinct_archetypes', count: 2 }],
+    requirementCount: 1,
+    optionals: [{ type: 'distinct_worlds', count: 2 }],
+    reward: { entries: [material('basic', 3, 5), intel(1)] },
+    powerRatioBp: [9000, 10000],
+    titles: ['A Field Cache Beyond the Gate'],
+    descriptions: ['A reliable route to the provisions that can carry a goal a little further.']
+  },
+  {
+    id: 'procurement', scope: 'world', weight: 10, partySize: 2,
+    requirements: [{ type: 'world_count', count: 1 }, { type: 'combined_stars', count: 4 }],
+    requirementCount: 1,
+    optionals: [{ type: 'distinct_archetypes', count: 2 }, { type: 'combined_stars', count: 6 }],
+    reward: { entries: [material('improved', 3, 5)] },
+    powerRatioBp: [9000, 10500],
+    titles: ['Supply Line: {world}', 'Procurement Run in {world}'],
+    descriptions: ['Ordinary work, carefully done, and the stores at {world} come back full.']
+  },
+  {
+    id: 'character_lead', scope: 'world', weight: 4, partySize: 2,
+    requirements: [{ type: 'world_count', count: 1 }],
+    requirementCount: 1,
+    optionals: [{ type: 'star_character', stars: 3, count: 1 }, { type: 'distinct_worlds', count: 2 }],
+    // A lead range makes this a character-lead route: the player chooses a
+    // revealed hero of the route's world at launch.
+    reward: {
+      entries: [material('basic', 2, 4)],
+      rare: [{ kind: 'resource', id: 'intelligence', qty: 1, chanceBp: 7000 }],
+      shardPool: 'associated_or_any', shardRange: [2, 4]
+    },
+    powerRatioBp: [9500, 10500],
+    titles: ['A Promising Lead in {world}', 'Reconnaissance in {world}'],
+    descriptions: ['Someone in {world} is worth finding, and worth bringing home.']
+  },
+  {
+    id: 'world_specialist', scope: 'world', weight: 8, partySize: 3,
+    requirements: [{ type: 'same_world', count: 2 }, { type: 'world_count', count: 2 }],
+    requirementCount: 1,
+    optionals: [{ type: 'combined_stars', count: 6 }, { type: 'power_over_recommended', percentBp: 1000 }],
+    reward: { entries: [material('improved', 4, 8), intel(1)] },
+    powerRatioBp: [10000, 11000],
+    titles: ['{world} Specialist Route', 'Work Only {world} Can Finish'],
+    descriptions: ['The kind of errand that asks for people who already know {world}.']
+  },
+  {
+    id: 'archetype_specialist', scope: 'global', weight: 6, partySize: 2,
+    requirements: [{ type: 'distinct_archetypes', count: 2 }, { type: 'star_character', stars: 3, count: 1 }],
+    requirementCount: 1,
+    optionals: [{ type: 'distinct_worlds', count: 2 }, { type: 'combined_stars', count: 6 }],
+    reward: { entries: [intel(1, 2), material('basic', 2, 3)] },
+    powerRatioBp: [9000, 10000],
+    titles: ['A Question of Temperament', 'The Right Hands for It'],
+    descriptions: ['A brief that asks for a particular turn of mind rather than a particular home.']
+  },
+  {
+    id: 'same_world_squad', scope: 'global', weight: 6, partySize: 3,
+    requirements: [{ type: 'same_world', count: 3 }],
+    requirementCount: 1,
+    optionals: [{ type: 'combined_stars', count: 9 }, { type: 'star_character', stars: 4, count: 1 }],
+    reward: { entries: [material('improved', 4, 6), intel(1)] },
+    powerRatioBp: [10000, 11000],
+    titles: ['People Who Already Trust Each Other', 'One House, One Road'],
+    descriptions: ['Work that goes faster when nobody has to be introduced.']
+  },
+  {
+    id: 'diverse_coalition', scope: 'global', weight: 6, partySize: 3,
+    requirements: [{ type: 'distinct_worlds', count: 3 }, { type: 'distinct_archetypes', count: 3 }],
+    requirementCount: 1,
+    optionals: [{ type: 'combined_stars', count: 9 }, { type: 'power_over_recommended', percentBp: 1000 }],
+    reward: { entries: [material('advanced', 3, 5), intel(1, 2)] },
+    powerRatioBp: [10000, 11500],
+    titles: ['A Map Left Unfinished', 'Quiet Roads, Useful Rumours'],
+    descriptions: ['The work asks for breadth rather than battle.']
+  },
+  {
+    id: 'high_power', scope: 'global', weight: 4, partySize: 4,
+    requirements: [{ type: 'combined_stars', count: 12 }, { type: 'star_character', stars: 5, count: 1 }],
+    requirementCount: 1,
+    optionals: [{ type: 'power_over_recommended', percentBp: 1500 }, { type: 'distinct_worlds', count: 3 }],
+    reward: {
+      entries: [material('advanced', 5, 8), intel(2)],
+      rare: [{ kind: 'resource', id: 'intelligence', qty: 2, chanceBp: 8000 }]
+    },
+    powerRatioBp: [11000, 12500],
+    titles: ['Work Beyond the Gate', 'The Road That Asks Too Much'],
+    descriptions: ['A long venture that pays what it costs, and only to a party that can afford it.']
+  }
+];
+
+const expeditions = {
+  settings: {
+    offerCount: 5, slotCount: 3, freeRerolls: 1, freePins: 1, minimumFeasible: 2,
+    generationAttempts: 40, cycleLengthDays: 4, cycleScaleBp: 40000,
+    intelligenceCosts: { reroll: 1, pin: 1, reveal: 1 },
+    resultMultipliersBp: { completed: 10000, successful: 12500, exceptional: 15000 }
+  },
+  archetypes: expeditionArchetypes,
+  reports: {
+    completed: [
+      'The party returned with everything promised, even if the road asked more of them.',
+      'The route proved demanding, but the agreed supplies came home intact.',
+      'Careful work carried the party through. Nothing promised was lost.'
+    ],
+    successful: [
+      'The plan held. The party returned ahead of the expected margin.',
+      'The recommendation proved sound, and the return was clean.',
+      'Good preparation left room to gather more along the road.'
+    ],
+    exceptional: [
+      'The party found more than the route promised and brought the rare lead home.',
+      'An optional trail opened along the way, and the party followed it well.',
+      'Breadth and preparation turned ordinary work into an uncommon return.'
+    ]
+  }
 };
+
+// ---------------------------------------------------------- Crisis templates
+// A Crisis is generated from the game's own Front templates, scoped to an
+// eligible world. Nothing about it is authored: the fiction is generic, the
+// world supplies its name and artwork, and the difficulty is computed at spawn
+// time from the roster the player could actually field.
+const crises = {
+  settings: {
+    spawnChanceBp: 2500,
+    grades: [
+      { id: 'local', displayName: 'Local Disturbance', minOwned: 5, minMasteryRank: 'unfamiliar', frontCount: 2, teamSize: 2, powerRatioBp: 10500 },
+      { id: 'major', displayName: 'Major Crisis', minOwned: 8, minMasteryRank: 'known', frontCount: 3, teamSize: 2, powerRatioBp: 11000 },
+      { id: 'world', displayName: 'World Crisis', minOwned: 12, minMasteryRank: 'established', frontCount: 3, teamSize: 3, powerRatioBp: 11500 }
+    ],
+    // Recommended Front Power is the strongest disjoint teams the roster could
+    // field, times the grade's ratio. Above 10000 that means raw Power alone
+    // falls short and a matched favoured tag is what carries a Front — which is
+    // the puzzle. A fixed authored number could not do this: a maxed roster
+    // outgrew the hardest authored Front by three to five times.
+    power: { favoredTagBonusBp: 2000, excelBp: 12000, minimumRecommended: 500 },
+    // Enough distinct openings that a world's Crisis is not always the same
+    // three; the grade decides how many are drawn.
+    minimumClearedNodes: 3
+  },
+  // `favored` names the *kind* of tag a Front rewards; the compiler resolves
+  // each to a concrete tag actually present in that world's roster.
+  fronts: [
+    { id: 'containment', name: 'Containment', favored: ['world', 'archetype'],
+      description: 'Hold the edge of it before the rest of {world} has to learn the word for what happened.' },
+    { id: 'relief', name: 'Relief', favored: ['archetype', 'faction'],
+      description: 'People are already displaced. Someone has to reach them before the second night.' },
+    { id: 'investigation', name: 'Investigation', favored: ['archetype', 'world'],
+      description: 'Nobody yet knows what began this. Until someone does, every other answer is a guess.' },
+    { id: 'evacuation', name: 'Evacuation', favored: ['faction', 'archetype'],
+      description: 'One clear route out of {world}, held open long enough for everyone slow to use it.' },
+    { id: 'intervention', name: 'Intervention', favored: ['world', 'faction'],
+      description: 'The thing itself, met directly, by whoever can stand in front of it.' }
+  ],
+  // Front outcome prose. `{front}` is the Front's own name.
+  texts: {
+    struggle: '{front} held longer than the response could safely reach. Nothing was lost.',
+    success: '{front} steadied under a measured response.',
+    excel: '{front} was secured before the danger could spread.'
+  },
+  naming: {
+    name: 'Emergency in {world}',
+    opening: 'Something has broken open across {world}. Each front needs a different answer, and nobody can be in two places at once.'
+  },
+  consolation: [{ kind: 'resource', id: 'intelligence', qty: 1 }],
+  // A cache names a material *family*; the grade is resolved when the Crisis
+  // spawns, from the best grade that world has actually opened, so a Cache is
+  // still worth taking four hundred days in.
+  caches: [
+    { id: 'supply', name: 'Field Supply', description: 'One stored provision for a targeted push.',
+      rewards: [{ kind: 'resource', id: 'field_supply', qty: 1 }] },
+    { id: 'intel', name: 'Intelligence Brief', description: 'The response leaves useful knowledge behind.',
+      rewards: [{ kind: 'resource', id: 'intelligence', qty: 2 }] },
+    { id: 'materials', name: 'Material Bundle', description: 'Practical salvage returns to the Workshop.',
+      rewards: [{ kind: 'material', family: 'metal', qty: 8 }] },
+    { id: 'components', name: 'Recovered Stock', description: 'What the response could carry back, in bulk.',
+      rewards: [{ kind: 'material', family: 'mineral', qty: 6 }, { kind: 'resource', id: 'intelligence', qty: 1 }] }
+  ],
+  // One per world, by progression position, so worlds differ from each other.
+  boons: [
+    { type: 'free_world_node_runs', runs: 3, prose: 'The next three successful runs here cost no Energy.' },
+    { type: 'bonus_world_material_runs', runs: 3, qty: 1, prose: 'The next three successful runs here return one additional normal material.' },
+    { type: 'instant_intelligence', qty: 2, prose: 'The response yields two Intelligence immediately.' }
+  ]
+};
+
+const usedFactions = new Set(manifestCharacters.map(c => c.faction).filter(Boolean));
+const samplePack = {
+  manifestVersion: 1,
+  lineage: null,
+  worlds: manifestWorlds,
+  characters: manifestCharacters,
+  // Faction identity travels with the manifest; how much a faction is worth in
+  // a party is balance.factions, and applies to all of them equally.
+  factions: tags.filter(t => t.category === 'faction' && usedFactions.has(t.id))
+    .map(t => ({ id: t.id, displayName: t.displayName, explanation: t.explanation })),
+  mainChapters: MAIN_NODE_NAMES.map((nodeNames, index) => ({
+    title: MAIN_CHAPTER_TITLES[index], image: null, nodeNames
+  })),
+  // Board artwork is a publication's; the routes are generated from
+  // content/expeditions.json.
+  expeditionArt: { global: null, worlds: {} }
+};
+const systemTags = tags.filter(t => t.category !== 'faction');
 
 const files = {
   'balance.json': balance,
-  'worlds.json': [],
   'archetypes.json': ARCHETYPES,
   'materials.json': { families: FAMILY_META, grades: GRADE_META, gradeOrder: GRADES, familyOrder: FAMILIES, materials },
   'components.json': { pairs: COMPONENT_PAIRS, components },
   'characters.json': { slots: SLOT_META, slotOrder: SLOTS, tierPrefixes: TIER_PREFIXES, characters: [] },
   'tags.json': systemTags,
   'recipes.json': { tierProfiles, templates: recipeTemplates },
-  'nodes.json': [],
-  'archives.json': [],
+  'expeditions.json': expeditions,
+  'crises.json': crises,
   'sample-pack.json': samplePack
 };
 for (const [name, data] of Object.entries(files)) {
@@ -702,4 +802,6 @@ for (const [name, data] of Object.entries(files)) {
   console.log(`wrote content/${name}`);
 }
 console.log(`\nSystem: ${materials.length} materials, ${components.length} components, ${recipeTemplates.length} templates.`);
-console.log(`Sample pack: ${packWorlds.length} worlds, ${packCharacters.length} characters, ${mainChapters.length} paired Main/Shadow chapters, ${packWorlds.reduce((a, w) => a + w.campaignNodes.length, 0)} world nodes.`);
+console.log(`Sample manifest: ${manifestWorlds.length} worlds, ${manifestCharacters.length} characters, ` +
+  `${samplePack.mainChapters.length} Main Campaign chapters, ` +
+  `${manifestWorlds.reduce((n, w) => n + w.nodeNames.length, 0)} world node names \u2014 and no numbers.`);

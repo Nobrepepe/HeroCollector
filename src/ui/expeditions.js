@@ -2,7 +2,7 @@
 // `slotCount` routes with disjoint parties, launches them together, and the
 // whole cycle returns together four days later. The board waits indefinitely;
 // rerolls and pins are per-cycle.
-import { enableMouseDragScroll, h, fmt } from './dom.js';
+import { h, fmt } from './dom.js';
 import { characterPowerForState } from '../core/power.js';
 import {
   cancelCycle, launchCycle, previewExpedition,
@@ -60,12 +60,12 @@ export function renderExpeditions(store, root, offerId) {
   root.appendChild(boardCosts(store));
 
   const shelf = h('section.expedition-shelf', h('div.eyebrow', 'Routes this cycle'));
-  const row = h('div.expedition-offers');
-  enableMouseDragScroll(row);
-  for (const offer of offers) row.appendChild(offerCard(store, offer));
-  if (offers.length) row.appendChild(h('div.expedition-shelf-fade', { 'aria-hidden': 'true' }));
-  shelf.appendChild(row);
-  if (offers.length) shelf.appendChild(h('p.caption.expedition-shelf-note', 'drag sideways · every route opens its own party builder'));
+  const list = h('div.expedition-routes');
+  offers.forEach((offer, index) => {
+    list.appendChild(routeRow(store, offer));
+    if (index < offers.length - 1) list.appendChild(h('div.expedition-route-rule', { 'aria-hidden': 'true' }));
+  });
+  shelf.appendChild(list);
   root.appendChild(shelf);
 
   root.appendChild(launchPanel(store, staged));
@@ -149,35 +149,47 @@ function boardCosts(store) {
         : `Pinning costs ${costs.pin} · reveal costs ${costs.reveal}`));
 }
 
-function offerCard(store, offer) {
+/* One route, one row. The plate is the same 16:9 file the party screen opens
+   into, so choosing a route and walking into it are the same picture. A
+   world-scoped route uses its world's backdrop; an across-world route uses the
+   production's board art. */
+function routeRow(store, offer) {
   const world = offer.world ? store.content.worldById[offer.world] : null;
   const image = store.content.images.expedition[world?.id ?? 'global'] ?? null;
   const supply = offer.offerKind === 'supply';
   const stagedEntry = cyclePlan(store)[offer.id];
   const boosted = offer.baseRewards.some(entry => entry.operations);
-  const classes = ['expedition-offer'];
+
+  const classes = ['expedition-route'];
   if (supply) classes.push('is-supply');
   if (offer.pinned) classes.push('is-pinned');
   if (stagedEntry) classes.push('is-staged');
   if (!image) classes.push('is-unarted');
-  const card = h(`button.${classes.join('.')}`, {
+
+  const row = h(`button.${classes.join('.')}`, {
     onclick: () => store.go(`#/expeditions/${offer.id}`),
-    style: image ? { backgroundImage: `url("${image}")` } : {},
     'aria-label': `${offer.name}, ${offer.partySize} characters, recommends ${fmt(offer.recommendedPower)} Power${offer.pinned ? ', pinned' : ''}${stagedEntry ? ', staged for launch' : ''}`
   });
-  if (image) card.appendChild(h('span.expedition-offer-scrim', { 'aria-hidden': 'true' }));
-  else card.appendChild(h('span.expedition-offer-slot', { 'aria-hidden': 'true' }, 'offer art\n660 × 860'));
-  if (offer.pinned) card.appendChild(h('span.expedition-offer-pin', 'pinned'));
-  if (stagedEntry) card.appendChild(h('span.expedition-offer-pin.is-staged', 'staged'));
-  card.appendChild(h('span.expedition-offer-copy',
+  row.appendChild(image
+    ? h('span.expedition-route-plate', { style: { backgroundImage: `url("${image}")` }, 'aria-hidden': 'true' })
+    : h('span.expedition-route-plate.is-empty', { 'aria-hidden': 'true' }, 'route plate · 1920 × 1080'));
+  row.appendChild(h('span.expedition-route-scrim', { 'aria-hidden': 'true' }));
+
+  const marks = [];
+  if (offer.pinned) marks.push('pinned');
+  if (stagedEntry) marks.push('staged');
+  row.appendChild(h('span.expedition-route-copy',
     h('span.eyebrow' + (supply ? '.good' : ''), supply
       ? 'Guaranteed Field Supply'
       : `${world?.displayName ?? 'Across worlds'}${boosted ? ' · Operations bonus' : ''}`),
     h('span.title', offer.name),
-    h('span.caption', image
-      ? `${offer.partySize} characters · recommends ${fmt(offer.recommendedPower)} Power`
-      : 'awaiting art')));
-  return card;
+    marks.length ? h('span.expedition-route-marks', marks.join(' · ')) : null));
+
+  row.appendChild(h('span.expedition-route-meta',
+    h('span', `${countWord(offer.partySize)} character${offer.partySize === 1 ? '' : 's'}`),
+    h('span.expedition-route-power', `recommends ${fmt(offer.recommendedPower)} Power`)));
+  row.appendChild(h('span.expedition-route-action', 'Build party →'));
+  return row;
 }
 
 function reportsThread(store) {
@@ -235,7 +247,7 @@ function renderOffer(store, root, offerId) {
   page.appendChild(h('div.expedition-scene' + (scene ? '' : '.art-fallback'), {
     style: scene ? { backgroundImage: `url("${scene}")` } : {}, 'aria-hidden': 'true'
   }));
-  if (!scene) page.appendChild(h('div.expedition-scene-slot', { 'aria-hidden': 'true' }, 'offer art — 660 × 860'));
+  if (!scene) page.appendChild(h('div.expedition-scene-slot', { 'aria-hidden': 'true' }, 'route plate — 1920 × 1080'));
   page.appendChild(h('button.link.expedition-back', { onclick: () => store.go('#/expeditions') }, '← Expeditions'));
   page.appendChild(h('header.expedition-detail-head',
     h('div.eyebrow', `${offer.offerKind === 'supply' ? 'Guaranteed Supply' : world?.displayName ?? 'Across worlds'} · returns with the cycle in ${content.expeditions.settings.cycleLengthDays} days`),
@@ -418,7 +430,7 @@ function sentenceStem(text) {
 // Names, in the empty slot, what would satisfy the requirement that is still
 // short — so an open place says what belongs in it.
 function slotHint(store, offer, source = {}) {
-  const world = source.world === '@associated' ? offer.world : source.world;
+  const world = source.world ?? offer.world;
   const worldName = world ? store.content.worldById[world]?.displayName : null;
   switch (source.type) {
     case 'star_character':

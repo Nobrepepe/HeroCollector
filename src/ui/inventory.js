@@ -76,9 +76,7 @@ function benchSection(store, model) {
   }
   const { content, state } = store;
   const image = content.images.equipment[`${candidate.characterId}:${candidate.slot}`];
-  const art = h('div.workshop-piece-art.bleed-portrait' + (image ? '' : '.art-fallback'), {
-    style: { '--character-color': candidate.character.color }
-  });
+  const art = h('div.workshop-piece-art.bleed-portrait' + (image ? '' : '.art-fallback'));
   if (image) art.appendChild(h('img', { src: image, alt: candidate.analysis.equipmentName }));
   else art.appendChild(h('span', candidate.slotMeta.icon));
   section.appendChild(art);
@@ -89,9 +87,7 @@ function benchSection(store, model) {
       h('div.workshop-power',
         h('span.display-l', `+${fmt(candidate.powerGain)}`),
         h('span.good', `power for ${candidate.character.displayName}, the moment it is equipped`)),
-      h('div.workshop-powerbar', {
-        style: { '--character-color': candidate.character.color }
-      }, h('i', { style: { width: `${Math.min(94, candidate.powerBefore / (candidate.powerBefore + candidate.powerGain) * 100)}%` } })),
+      h('div.workshop-powerbar', h('i', { style: { width: `${Math.min(94, candidate.powerBefore / (candidate.powerBefore + candidate.powerGain) * 100)}%` } })),
       h('div.caption', `${fmt(candidate.powerBefore)} now · ${fmt(candidate.powerBefore + candidate.powerGain)} after`),
       h('p.workshop-cost', candidate.analysis.craftable
         ? costSentence(content, state, candidate)

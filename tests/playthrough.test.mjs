@@ -5,14 +5,14 @@
 // Development Focus, Programs, Field Supplies, and Expedition cycles).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadContent } from './helpers.mjs';
+import { loadContent, newGame } from './helpers.mjs';
 import { makeRng } from '../src/core/rng.js';
 import { evaluateParty } from '../src/core/synergy.js';
 import { activeTier } from '../src/core/power.js';
 import { equipmentRecipe } from '../src/core/content.js';
 import { validateSave } from '../src/core/validate.js';
 import {
-  newPlayerState, applyDailyReset, clearNode, checkClear, nodeState,
+  applyDailyReset, clearNode, checkClear, nodeState,
   craftComponent, upcraft, craftEquipment, completeGearTier, promoteStar,
   unlockCharacter, checkCompleteTier, checkPromoteStar, checkUnlockCharacter,
   checkCraftEquipment, maxCraftableComponents, nodeUnlocked, matQty, compQty,
@@ -35,12 +35,11 @@ function ownedIds(s) {
 // The whole shard journey for one hero is 450 cumulative; how much is left?
 function shardRemaining(s, id) {
   const cs = s.characters[id];
-  const def = content.characterById[id];
   const starCosts = content.balance.starShards;
   if (!cs.owned) {
-    const tier = content.balance.acquisitionTiers[def.tier];
-    let rest = tier.cumulativeShards;
-    for (let star = tier.unlockStar; star < 7; star++) rest += starCosts[star];
+    const { recruitShards, recruitStar } = content.balance.rosterProgression;
+    let rest = recruitShards;
+    for (let star = recruitStar; star < 7; star++) rest += starCosts[star];
     return Math.max(0, rest - cs.shards);
   }
   let rest = 0;
@@ -218,7 +217,7 @@ function upcraftToward(s, materialId) {
 test('full playthrough: campaign, roster, gear, and relics complete', { timeout: 300000 }, () => {
   const rng = makeRng(20260724);
   let now = Date.parse('2026-07-24T12:00:00');
-  const s = newPlayerState(content, now);
+  const s = newGame(content, now);
   const maxDays = 4000;
   let day = 0;
 

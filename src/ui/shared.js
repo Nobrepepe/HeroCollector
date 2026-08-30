@@ -13,16 +13,12 @@ export function activeSkin(store, characterId) {
 }
 
 export function portraitSlot({
-  src = null, color = 'var(--muted-2)', glyph = '✦', alt = '',
+  src = null, glyph = '✦', alt = '',
   size = 'md', state = 'met', pulse = false, decorative = false
 } = {}) {
   const classes = ['portrait-slot', size, state];
   if (pulse) classes.push('pulses');
-  const el = h(`div.${classes.join('.')}`, {
-    style: { '--portrait-color': color },
-    'aria-hidden': decorative ? 'true' : null
-  });
-  el.appendChild(h('span.portrait-slot__glow', { 'aria-hidden': 'true' }));
+  const el = h(`div.${classes.join('.')}`, { 'aria-hidden': decorative ? 'true' : null });
   if (src) {
     el.appendChild(h('img.portrait-slot__image', {
       src, alt: decorative ? '' : alt, draggable: 'false'
@@ -42,8 +38,8 @@ export function portrait(store, characterId, size = 'md', options = {}) {
   if (skin?.portrait) src = skin.portrait;
   const el = portraitSlot({
     src,
-    color: def.color,
-    glyph: def.glyph,
+    // No authored glyph: the initial is what a name already contains.
+    glyph: def.displayName[0].toUpperCase(),
     alt: def.displayName,
     size,
     state: options.state ?? 'met',
@@ -75,9 +71,6 @@ export function tagChips(store, def) {
   chips.push(h('span.chip', world.icon, world.displayName));
   chips.push(h('span.chip', arch.icon, arch.name));
   if (def.faction) chips.push(h('span.chip', store.content.tagById[def.faction].displayName));
-  for (const t of def.extraTags ?? []) chips.push(h('span.chip', store.content.tagById[t].displayName));
-  chips.push(h('span.chip', { title: 'Acquisition tier measures commitment, not strength' },
-    def.tier[0].toUpperCase() + def.tier.slice(1)));
   return h('div', chips);
 }
 

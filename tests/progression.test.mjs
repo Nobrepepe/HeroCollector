@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadContent } from './helpers.mjs';
+import { loadContent, newGame } from './helpers.mjs';
 import {
-  newPlayerState, craftAndEquipEquipment, togglePin, copyParty, clearParty,
+  craftAndEquipEquipment, togglePin, copyParty, clearParty,
   selectPartyPreset, preferredPartyIndex, checkCraftAndEquipEquipment,
   setPartyMember, syncSaveWithContent, SCHEMA_VERSION
 } from '../src/core/state.js';
@@ -21,7 +21,7 @@ function stockGoalMaterials(state, analysis, adjustment = 0) {
 }
 
 test('progression: direct raw materials make a missing-component goal chain-ready', () => {
-  const state = newPlayerState(content, NOW);
+  const state = newGame(content, NOW);
   const initial = analyzeEquipmentGoal(content, state, 'char_suzume', 'attire');
   assert.equal(initial.state, 'missing');
   stockGoalMaterials(state, initial);
@@ -36,7 +36,7 @@ test('progression: direct raw materials make a missing-component goal chain-read
 });
 
 test('progression: existing components reduce material demand', () => {
-  const state = newPlayerState(content, NOW);
+  const state = newGame(content, NOW);
   const before = analyzeEquipmentGoal(content, state, 'char_suzume', 'attire');
   const componentId = Object.keys(before.totalComponentDemand)[0];
   state.inventory.components[componentId] = 1;
@@ -60,7 +60,7 @@ test('progression: legal conversions are deterministic and respect the grade cei
 });
 
 test('progression: craft and equip is atomic, exact, and removes only its pin', () => {
-  const state = newPlayerState(content, NOW);
+  const state = newGame(content, NOW);
   const analysis = analyzeEquipmentGoal(content, state, 'char_suzume', 'attire');
   stockGoalMaterials(state, analysis);
   togglePin(state, { type: 'equipment', characterId: 'char_suzume', slot: 'attire' }, content);
@@ -72,7 +72,7 @@ test('progression: craft and equip is atomic, exact, and removes only its pin', 
   assert.equal(state.pins.some(p => p.slot === 'tool'), true);
   for (const value of Object.values(state.inventory.materials)) assert.ok(value >= 0);
 
-  const failedState = newPlayerState(content, NOW);
+  const failedState = newGame(content, NOW);
   const snapshot = structuredClone(failedState);
   const failed = craftAndEquipEquipment(content, failedState, 'char_suzume', 'attire', NOW);
   assert.equal(failed.ok, false);
@@ -80,7 +80,7 @@ test('progression: craft and equip is atomic, exact, and removes only its pin', 
 });
 
 test('progression: atomic equipment action performs previewed upward conversions', () => {
-  const state = newPlayerState(content, NOW);
+  const state = newGame(content, NOW);
   state.characters.char_suzume.gearTier = 2;
   const analysis = analyzeEquipmentGoal(content, state, 'char_suzume', 'attire');
   for (const [improvedId, amount] of Object.entries(analysis.totalMaterialDemand)) {
@@ -97,7 +97,7 @@ test('progression: atomic equipment action performs previewed upward conversions
 });
 
 test('progression: combined goals allocate inventory once and expose contention', () => {
-  const state = newPlayerState(content, NOW);
+  const state = newGame(content, NOW);
   togglePin(state, { type: 'equipment', characterId: 'char_suzume', slot: 'attire' }, content);
   togglePin(state, { type: 'equipment', characterId: 'char_hoshi', slot: 'attire' }, content);
   const first = analyzeEquipmentGoal(content, state, 'char_suzume', 'attire');
@@ -111,7 +111,7 @@ test('progression: combined goals allocate inventory once and expose contention'
 });
 
 test('pins support more than eight goals and shard objectives cleanly migrate', () => {
-  const state = newPlayerState(content, NOW);
+  const state = newGame(content, NOW);
   for (const character of content.characters.slice(0, 10)) {
     const result = togglePin(state, { type: 'character', characterId: character.id }, content);
     if (state.characters[character.id].stars < 7) assert.equal(result.ok, true);
@@ -120,7 +120,7 @@ test('pins support more than eight goals and shard objectives cleanly migrate', 
 });
 
 test('party copy is independent, clear is scoped, and node preference falls back', () => {
-  const state = newPlayerState(content, NOW);
+  const state = newGame(content, NOW);
   const original = [...state.parties[0].members];
   assert.ok(copyParty(state, 1, 0).ok);
   state.parties[0].members[0] = null;
@@ -137,20 +137,20 @@ test('party copy is independent, clear is scoped, and node preference falls back
   assert.equal(state.parties[0].members[1], null);
 });
 
-test('saves are schema 6 only — older schemas are refused, not adapted', () => {
-  const state = newPlayerState(content, NOW);
+test('saves are schema 7 only — older schemas are refused, not adapted', () => {
+  const state = newGame(content, NOW);
   assert.equal(state.schemaVersion, SCHEMA_VERSION);
-  assert.equal(SCHEMA_VERSION, 6);
+  assert.equal(SCHEMA_VERSION, 7);
   assert.equal(validateSave(content, state).ok, true);
   const old = structuredClone(state);
-  old.schemaVersion = 5;
+  old.schemaVersion = 6;
   assert.equal(validateSave(content, old).ok, false);
   state.ui.nodePartyById.main_1 = 99;
   assert.equal(validateSave(content, state).ok, false);
 });
 
 test('switching content packs resets shared Main progress, keeps world-scoped progress', () => {
-  const state = newPlayerState(content, NOW);
+  const state = newGame(content, NOW);
   state.nodes.main_1 = { cleared: true, firstClearClaimed: true, objectiveClaimed: false };
   const wcNode = content.nodes.find(n => n.campaign !== 'main');
   state.nodes[wcNode.id] = { cleared: true, firstClearClaimed: true, objectiveClaimed: false };
@@ -177,7 +177,7 @@ test('switching content packs resets shared Main progress, keeps world-scoped pr
 });
 
 test('a content switch refills the first party after dormant members detach', () => {
-  const state = newPlayerState(content, NOW);
+  const state = newGame(content, NOW);
   state.parties[0].members = ['ghost_a', 'ghost_b', 'ghost_c', null, null];
   for (const id of ['ghost_a', 'ghost_b', 'ghost_c']) {
     state.characters[id] = { owned: true, stars: 1, shards: 0, gearTier: 0, slots: {}, revealed: true, selectedSkinId: null };
@@ -189,7 +189,7 @@ test('a content switch refills the first party after dormant members detach', ()
 });
 
 test('import pipeline synchronizes removed live references before validation', () => {
-  const state = newPlayerState(content, NOW);
+  const state = newGame(content, NOW);
   state.characters.char_removed_custom = {
     owned: true, stars: 3, shards: 9, gearTier: 1,
     slots: {}, revealed: true, selectedSkinId: null

@@ -13,6 +13,18 @@ import { isRevealed } from './focus.js';
 import { addOperationsCompletion } from './programs.js';
 
 const pick = (rng, list) => list[Math.floor(rng.next() * list.length)];
+// Weighted choice without materialising the pool. Global route weights scale
+// with the world count, so a large library made `Array(weight).fill()` build
+// thousands of entries per generation attempt, on every daily reset.
+const pickWeighted = (rng, list) => {
+  const total = list.reduce((sum, item) => sum + Math.max(1, item.weight ?? 1), 0);
+  let roll = rng.next() * total;
+  for (const item of list) {
+    roll -= Math.max(1, item.weight ?? 1);
+    if (roll < 0) return item;
+  }
+  return list[list.length - 1];
+};
 const shuffle = (rng, list) => {
   const out = [...list];
   for (let i = out.length - 1; i > 0; i--) {
@@ -36,15 +48,62 @@ export function partySnapshot(content, state, ids) {
     return {
       id, power: characterPowerForState(content, state, id), stars: cs.stars,
       world: def.world, archetype: def.archetype,
-      tags: [def.faction, ...(def.extraTags ?? [])].filter(Boolean)
+      tags: [def.faction].filter(Boolean)
     };
   });
+}
+
+const COUNT_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+const countWord = (n) => COUNT_WORDS[n] ?? String(n);
+
+/**
+ * What a route asks, rendered from the predicate itself. A `distinct_worlds: 3`
+ * requirement already contains everything needed to say what it wants, so it
+ * does not also carry authored prose that could drift away from the rule.
+ *
+ * `content` needs only `worlds` and `archetypes`, so the compiler can call
+ * this before a full content set exists.
+ */
+export function requirementProse(requirement, content = {}) {
+  const n = requirement.count ?? 1;
+  const worldName = requirement.world
+    ? (content.worlds ?? []).find(world => world.id === requirement.world)?.displayName
+    : null;
+  const archetypeName = requirement.archetype
+    ? content.archetypes?.[requirement.archetype]?.name ?? requirement.archetype
+    : null;
+  switch (requirement.type) {
+    case 'party_size':
+      return `Send ${countWord(n)} character${n === 1 ? '' : 's'}.`;
+    case 'world_count':
+      return worldName
+        ? `Include ${countWord(n)} character${n === 1 ? '' : 's'} from ${worldName}.`
+        : `Include ${countWord(n)} who knows this world.`;
+    case 'archetype_count':
+      return `Bring ${countWord(n)} ${archetypeName ?? 'matching'} character${n === 1 ? '' : 's'}.`;
+    case 'same_world':
+      return `Send ${countWord(n)} characters from the same world.`;
+    case 'distinct_worlds':
+      return `Include characters from ${countWord(n)} different worlds.`;
+    case 'distinct_archetypes':
+      return `Bring ${countWord(n)} different archetypes.`;
+    case 'combined_stars':
+      return `Bring at least ${countWord(n)} combined stars.`;
+    case 'combined_power':
+      return `Bring at least ${n.toLocaleString()} combined Power.`;
+    case 'power_over_recommended':
+      return `Exceed the recommendation by ${requirement.percentBp / 100} percent.`;
+    case 'star_character':
+      return `Include ${countWord(n)} character${n === 1 ? '' : 's'} at ${countWord(requirement.stars ?? 1)} stars or above.`;
+    default:
+      return 'An unknown condition.';
+  }
 }
 
 export function evaluateRequirement(requirement, party, offer = {}) {
   const worlds = new Set(party.map(c => c.world));
   const archetypes = new Set(party.map(c => c.archetype));
-  const targetWorld = requirement.world === '@associated' ? offer.world : requirement.world;
+  const targetWorld = requirement.world;
   let current = 0;
   let contributors = [];
   switch (requirement.type) {
@@ -74,10 +133,10 @@ export function evaluateRequirement(requirement, party, offer = {}) {
       contributors = party.map(c => c.id); break;
     case 'star_character':
       contributors = party.filter(c => c.stars >= requirement.stars).map(c => c.id); current = contributors.length; break;
-    default: return { met: false, current: 0, target: requirement.count ?? 1, contributors: [], text: requirement.text ?? 'Unknown requirement.' };
+    default: return { met: false, current: 0, target: requirement.count ?? 1, contributors: [], text: requirementProse(requirement) };
   }
   const target = requirement.count ?? 1;
-  return { met: current >= target, current, target, contributors, text: requirement.text ?? `${current} of ${target}` };
+  return { met: current >= target, current, target, contributors, text: requirement.text ?? requirementProse(requirement) };
 }
 
 export function previewExpedition(content, state, offer, ids) {
@@ -124,16 +183,10 @@ function instantiateOffer(content, state, template, rng, cycle, position) {
   const settings = content.expeditions.settings;
   const requirementDefs = content.expeditions.requirementById;
   const optionalDefs = content.expeditions.optionalById;
-  const world = template.world === '@any'
-    ? pick(rng, content.worlds).id : template.world ?? null;
-  // An across-world route has no associated world, so an @associated
-  // requirement would be impossible by construction.
-  const eligibleRequirementIds = template.requirementIds.filter(id => {
-    const requirement = requirementDefs[id];
-    return world || requirement?.world !== '@associated';
-  });
-  const reqIds = shuffle(rng, eligibleRequirementIds).slice(0, template.requirementCount ?? 1);
-  const requirements = [{ type: 'party_size', count: template.partySize, text: `Send ${template.partySize} characters.` },
+  const world = template.world ?? null;
+  const reqIds = shuffle(rng, template.requirementIds).slice(0, template.requirementCount ?? 1);
+  const partySize = { type: 'party_size', count: template.partySize };
+  const requirements = [{ ...partySize, text: requirementProse(partySize) },
     ...reqIds.map(id => structuredClone(requirementDefs[id])).filter(Boolean)];
   const optional = structuredClone(optionalDefs[pick(rng, template.optionalIds)]);
   // Recommended Power scales from the player's strongest heroes — the ones who
@@ -167,7 +220,7 @@ function instantiateOffer(content, state, template, rng, cycle, position) {
     templateId: template.id, name: pick(rng, template.titles), description: pick(rng, template.descriptions),
     world, partySize: template.partySize, requirements, optional,
     recommendedPower: Math.max(1, Math.round(topPowers.reduce((n, p) => n + p, 0) * sampledRatio / 10000)),
-    offerKind: template.id === settings.guaranteedSupplyTemplateId ? 'supply' : 'standard',
+    offerKind: template.supply ? 'supply' : 'standard',
     baseRewards: rewards, fixedRewards: (template.fixedRewards ?? []).map(entry => ({ ...structuredClone(entry), fixed: true })), rareReward: rare, rareRevealed: false,
     rareRoll: Math.floor(rng.next() * 10000), pinned: false
   };
@@ -177,18 +230,18 @@ export function generateCycleBoard(content, state, rng, { pinned = null } = {}) 
   const settings = content.expeditions.settings;
   const cycle = state.expeditions.cycle;
   const offers = pinned ? [{ ...structuredClone(pinned), pinned: false }] : [];
-  const guaranteed = content.expeditions.templateById?.[settings.guaranteedSupplyTemplateId]
-    ?? content.expeditions.templates.find(template => template.id === settings.guaranteedSupplyTemplateId);
+  // Every board keeps a place for the Field Supply route. That guarantee is
+  // the engine's, not a flag someone can forget to set on a template.
+  const guaranteed = content.expeditions.templates.find(template => template.supply);
   if (guaranteed && guaranteed.enabled !== false && !offers.some(offer => offer.offerKind === 'supply')) {
     offers.push(instantiateOffer(content, state, guaranteed, rng, cycle, offers.length));
   }
-  const templates = content.expeditions.templates.filter(t => t.enabled !== false && t.id !== settings.guaranteedSupplyTemplateId);
+  const templates = content.expeditions.templates.filter(t => t.enabled !== false && !t.supply);
   for (let position = offers.length; position < settings.offerCount; position++) {
     if (!templates.length) break;
     let chosen = null;
     for (let attempt = 0; attempt < settings.generationAttempts; attempt++) {
-      const weighted = templates.flatMap(t => Array(Math.max(1, t.weight ?? 1)).fill(t));
-      const template = pick(rng, weighted);
+      const template = pickWeighted(rng, templates);
       const candidate = instantiateOffer(content, state, template, rng, cycle, position);
       if (offers.some(o => o.templateId === candidate.templateId && o.requirements[1]?.type === candidate.requirements[1]?.type)) continue;
       chosen = candidate; break;
@@ -353,8 +406,7 @@ export function rerollOffer(content, state, offerId, rng) {
   if (!free && !addResource(state, INTELLIGENCE_ID, -content.expeditions.settings.intelligenceCosts.reroll)) {
     return { ok: false, reasons: ['Not enough Intelligence.'] };
   }
-  const pool = content.expeditions.templates.filter(template => template.enabled !== false
-    && template.id !== content.expeditions.settings.guaranteedSupplyTemplateId);
+  const pool = content.expeditions.templates.filter(template => template.enabled !== false && !template.supply);
   if (!pool.length) return { ok: false, reasons: ['No other enabled route template can replace this offer.'] };
   const replacement = instantiateOffer(content, state, pick(rng, pool), rng, board.cycle, index);
   board.offers[index] = replacement;

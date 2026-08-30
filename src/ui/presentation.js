@@ -83,7 +83,7 @@ export function rankTodayHook(content, state, readyItems, frontiers) {
     const cs = state.characters[def.id];
     const need = cs.owned
       ? (cs.stars < 7 ? content.balance.starShards[cs.stars] : null)
-      : content.balance.acquisitionTiers[def.tier].cumulativeShards;
+      : content.balance.rosterProgression.recruitShards;
     return need == null ? [] : [{ kind: 'shards', def, cs, need, gap: Math.max(0, need - cs.shards), order }];
   }).filter(item => item.gap > 0).sort((a, b) => a.gap - b.gap || a.order - b.order);
   if (shardCandidates.length) return shardCandidates[0];

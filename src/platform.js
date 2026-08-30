@@ -2,7 +2,7 @@
 // localStorage/IndexedDB) for development previews. The rest of the app never
 // knows which one it is running on.
 
-const CONTENT_FILES = ['balance', 'worlds', 'archetypes', 'materials', 'components', 'characters', 'tags', 'recipes', 'nodes', 'archives'];
+const CONTENT_FILES = ['balance', 'archetypes', 'materials', 'components', 'characters', 'tags', 'recipes', 'expeditions', 'crises'];
 const LS_KEY = 'hero-collector-save';
 const LS_BACKUP = 'hero-collector-save-backup';
 

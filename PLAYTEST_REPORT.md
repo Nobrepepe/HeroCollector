@@ -262,7 +262,15 @@ means a deeper trough of uninvested ones.
 **Fix:** base `recommendedPower` on something independent of roster composition — the campaign chapter the
 player has reached, or the top-`partySize` average rather than the whole-roster average.
 
-### F-2 · Crises almost never fail — 745 mastered, 1 endured in 783 spawns
+### F-2 · Crises almost never fail — FIXED
+
+> **Resolved.** Front Power is no longer authored. It is computed when a Crisis
+> spawns, from the strongest disjoint teams the roster could actually field
+> (`crisisFrontPowers` in `src/core/crises.js`), so the gap below cannot open
+> again. Measured over 900 days on three seeds: 12–14% endured, 33–34%
+> resolved, 52–54% mastered. The original finding is kept below.
+
+### F-2 (original) · Crises almost never fail — 745 mastered, 1 endured in 783 spawns
 
 95.1% mastered, 4.7% resolved, **one** endured (day 413, during a roster transition). Recommended Powers sit
 2.9–5.0× below what a maxed team brings, and the gap widened with the expansion because the character Power

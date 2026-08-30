@@ -1,8 +1,8 @@
 // Development Focus: deterministic, allocation-driven shard generation.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadContent } from './helpers.mjs';
-import { newPlayerState, clearNode } from '../src/core/state.js';
+import { loadContent, newGame } from './helpers.mjs';
+import { clearNode } from '../src/core/state.js';
 import { makeRng } from '../src/core/rng.js';
 import {
   FOCUS_SLOTS, assignFocus, clearFocusSlot, focusStatus, applyFocusEnergy,
@@ -13,7 +13,7 @@ const content = loadContent();
 const T0 = Date.parse('2026-07-25T12:00:00');
 
 function readyState() {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   return state;
 }
 

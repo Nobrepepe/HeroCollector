@@ -63,19 +63,84 @@
       }
     }
   },
-  "acquisitionTiers": {
-    "minor": {
-      "unlockStar": 1,
-      "cumulativeShards": 10
+  "rosterProgression": {
+    "starterCount": 5,
+    "recruitShards": 10,
+    "recruitStar": 1,
+    "revealShardStake": 2
+  },
+  "campaigns": {
+    "main": {
+      "chapterSize": 10,
+      "thresholdStart": 5500,
+      "thresholdGrowthBp": 277,
+      "thresholdRound": 50,
+      "checkpointEvery": 5,
+      "advancedFromPosition": 7,
+      "gradeLadder": [
+        "basic",
+        "improved",
+        "advanced",
+        "superior",
+        "superior",
+        "masterwork"
+      ],
+      "firstClearMaterials": 3,
+      "checkpointMaterials": 5,
+      "objectives": [
+        {
+          "tagId": "tag_world_diversity",
+          "rule": "distinct_world_count",
+          "count": 2,
+          "text": "Clear with characters from 2 different worlds",
+          "rewardQty": 3
+        },
+        {
+          "tagId": "tag_world_cohesion",
+          "rule": "same_world_count",
+          "count": 3,
+          "text": "Clear with 3 characters from one world",
+          "rewardQty": 3
+        }
+      ]
     },
-    "medium": {
-      "unlockStar": 4,
-      "cumulativeShards": 110
+    "world": {
+      "nodes": 30,
+      "chapterSize": 10,
+      "thresholdStart": 9500,
+      "thresholdGrowthBp": 251,
+      "thresholdRound": 50,
+      "perWorldGrowthBp": 0,
+      "gradeByChapter": [
+        "improved",
+        "improved",
+        "advanced"
+      ],
+      "relicPieceNodes": [
+        4,
+        9,
+        15,
+        21
+      ],
+      "firstClearMaterials": 3
     },
-    "major": {
-      "unlockStar": 7,
-      "cumulativeShards": 450
+    "familyRotation": {
+      "mainStep": 1,
+      "worldStep": 1,
+      "worldOffsetPerWorld": 2
     }
+  },
+  "factions": {
+    "thresholds": [
+      {
+        "count": 2,
+        "bonusBp": 200
+      },
+      {
+        "count": 3,
+        "bonusBp": 400
+      }
+    ]
   },
   "partySize": 5,
   "partyPresetCount": 6,
@@ -105,7 +170,8 @@
     },
     "operations": {
       "threshold": 2,
-      "relicThreshold": 1
+      "relicThreshold": 1,
+      "bonusQty": 4
     }
   },
   "mastery": {
@@ -147,6 +213,12 @@
       "owned": 3500,
       "stars": 5000
     },
+    "cosmeticRanks": [
+      "known",
+      "established",
+      "rooted",
+      "mastered"
+    ],
     "milestones": {
       "known": {
         "supplies": 1,
@@ -162,30 +234,6 @@
       "mastered": {
         "shardChoice": 25
       }
-    }
-  },
-  "worldHub": {
-    "$comment": "Defaults for World Hub package fields the contract no longer carries, plus those an author leaves blank. These lived as literals inside the package adapter, where the person authoring in World Hub could neither see nor change them. The values match what the live Shin Eden production actually authored, so removing those fields changed no behaviour.",
-    "factionBonusBp": {
-      "two": 200,
-      "three": 400
-    },
-    "expedition": {
-      "weight": 10,
-      "requirementCount": 1,
-      "powerRatioBp": 10000
-    },
-    "crisis": {
-      "weight": 10,
-      "minimumClearedNodes": 3,
-      "frontPower": {
-        "local": 100,
-        "major": 300,
-        "world": 900
-      }
-    },
-    "reward": {
-      "rare": false
     }
   }
 }

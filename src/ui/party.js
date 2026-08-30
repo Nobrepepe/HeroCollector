@@ -149,8 +149,7 @@ function partyFigures(store, party, recommendation, partyIndex, root) {
         isOutgoing ? recommendation.incomingId : null),
       'aria-label': memberId
         ? `Change ${store.content.characterById[memberId].displayName} in party slot ${slotIndex + 1}`
-        : `Choose a character for empty party slot ${slotIndex + 1}`,
-      style: { '--character-color': memberId ? store.content.characterById[memberId].color : 'var(--muted-2)' }
+        : `Choose a character for empty party slot ${slotIndex + 1}`
     });
     if (!memberId) {
       button.append(

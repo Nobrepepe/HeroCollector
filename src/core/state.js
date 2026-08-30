@@ -5,7 +5,7 @@ import { characterPower, activeTier, cumulativeGearPower } from './power.js';
 import { evaluateParty, partyLegality, objectiveSatisfied } from './synergy.js';
 import { equipmentRecipe, equipmentName } from './content.js';
 import { analyzeEquipmentGoal, analyzePinnedGoals } from './progression.js';
-import { makeRng } from './rng.js';
+import { hashSeed, makeRng } from './rng.js';
 import { grantRewardEntries } from './resources.js';
 import { generateCycleBoard, resolveDueCycle } from './expeditions.js';
 import { FIELD_SUPPLY_ID, fieldSupplyLimits, frontierMomentumPreview, resetDailyEnergySystems, surgedPower } from './energy.js';
@@ -18,20 +18,81 @@ import {
   expireActiveCrisis, generateCrisisForDay
 } from './crises.js';
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
+
+// ------------------------------------------------------------ starting five
+// Every hero is worth the same, so which five a save begins with is a property
+// of the save rather than of the content. The draw is seeded from the save's
+// own creation timestamp: the same save always reproduces its own five, and no
+// pack can decide them. Distinct archetypes come first because a party of five
+// identical archetypes can never light a synergy ring.
+export function drawStarters(content, createdAt, count) {
+  const rng = makeRng(hashSeed(`starters:${createdAt}`));
+  const pool = content.characters.map(def => def.id);
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rng.next() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const chosen = [];
+  const archetypes = new Set();
+  for (const id of pool) {
+    if (chosen.length >= count) break;
+    const archetype = content.characterById[id].archetype;
+    if (archetypes.has(archetype)) continue;
+    archetypes.add(archetype);
+    chosen.push(id);
+  }
+  // Fewer archetypes than slots (or a small roster): fill from what is left.
+  for (const id of pool) {
+    if (chosen.length >= count) break;
+    if (!chosen.includes(id)) chosen.push(id);
+  }
+  return chosen;
+}
+
+// The save's recorded five, topped up from the live roster when some of them
+// are not in the content — a different pack must never leave a save with
+// nobody to play. A hero who merely went dormant keeps `owned` in
+// `state.characters` and returns owned when their content does.
+function ensureStarters(content, state) {
+  const count = content.balance.rosterProgression.starterCount;
+  const kept = (state.starters ?? []).filter(id => content.characterById[id]);
+  if (kept.length >= count || !content.characters.length) {
+    state.starters = kept;
+    return [];
+  }
+  const added = [];
+  for (const id of drawStarters(content, state.createdAt, content.characters.length)) {
+    if (kept.length >= count) break;
+    if (kept.includes(id)) continue;
+    kept.push(id);
+    added.push(id);
+  }
+  state.starters = kept;
+  return added;
+}
 
 // ------------------------------------------------------------- new state
-export function newPlayerState(content, now = Date.now()) {
+// `starters` names the five explicitly instead of drawing them — the dev
+// panel's reset-with-a-chosen-roster, and the only way a test can talk about
+// a particular hero without depending on the draw.
+export function newPlayerState(content, now = Date.now(), { starters: chosen = null } = {}) {
   const b = content.balance;
+  const createdAt = new Date(now).toISOString();
+  const starters = chosen
+    ? chosen.filter(id => content.characterById[id])
+    : drawStarters(content, createdAt, b.rosterProgression.starterCount);
+  const isStarter = new Set(starters);
   const characters = {};
   for (const def of content.characters) {
+    const starting = isStarter.has(def.id);
     characters[def.id] = {
-      owned: !!def.starting,
-      stars: def.starting ? 1 : 0,
+      owned: starting,
+      stars: starting ? b.rosterProgression.recruitStar : 0,
       shards: 0,
       gearTier: 0,
       slots: emptySlots(content),
-      revealed: !!def.starting,
+      revealed: starting,
       selectedSkinId: null
     };
   }
@@ -39,17 +100,19 @@ export function newPlayerState(content, now = Date.now()) {
   for (let i = 0; i < b.partyPresetCount; i++) {
     parties.push({ name: `Party ${i + 1}`, members: [null, null, null, null, null] });
   }
-  // Default first party: the starting characters (padded to five slots).
-  const starters = content.characters.filter(d => d.starting).map(d => d.id).slice(0, 5);
+  // Default first party: the drawn five (padded to five slots).
   if (starters.length > 0) {
-    parties[0].members = [...starters, ...Array(5 - starters.length).fill(null)];
+    parties[0].members = [...starters.slice(0, 5), ...Array(Math.max(0, 5 - starters.length)).fill(null)];
     parties[0].name = 'Starters';
   }
   const state = {
     schemaVersion: SCHEMA_VERSION,
     contentVersion: content.version,
     contentLineage: content.lineage ?? null,
-    createdAt: new Date(now).toISOString(),
+    createdAt,
+    // The five this save began with. Recorded rather than derived, so the
+    // roster stays stable even if the content set changes underneath it.
+    starters,
     energy: b.energy.dailyGrant,
     lastResetKey: null,
     rng: null, // { seed, state } when a dev seed is set
@@ -131,8 +194,6 @@ export function syncSaveWithContent(content, state) {
         slots: emptySlots(content), revealed: false, selectedSkinId: null
       };
     }
-    // Starting characters are granted at 1★ — including when content becomes
-    // ready after the save was created, or a character is newly flagged.
     const cs = state.characters[def.id];
     cs.revealed ??= cs.owned;
     cs.selectedSkinId ??= null;
@@ -140,12 +201,18 @@ export function syncSaveWithContent(content, state) {
       cs.selectedSkinId = null;
       report.push(`Cleared a selected skin for ${def.displayName} whose content is no longer live.`);
     }
-    if (def.starting && !cs.owned) {
-      cs.owned = true;
-      cs.stars = Math.max(1, cs.stars);
-      cs.revealed = true;
-      report.push(`Granted starting character ${def.displayName}.`);
-    }
+  }
+  // The starting five: drawn once when the save is created, topped up here
+  // when the content set no longer holds enough of them. This runs after the
+  // loop above so a newly drawn starter already has a state entry.
+  const drawn = ensureStarters(content, state);
+  for (const id of state.starters) {
+    const cs = state.characters[id];
+    if (!cs || cs.owned) continue;
+    cs.owned = true;
+    cs.stars = Math.max(content.balance.rosterProgression.recruitStar, cs.stars);
+    cs.revealed = true;
+    report.push(`${drawn.includes(id) ? 'Drew' : 'Granted'} starting character ${content.characterById[id].displayName}.`);
   }
   let dormant = 0;
   for (const id of Object.keys(state.characters)) {
@@ -745,23 +812,23 @@ export function checkUnlockCharacter(content, state, characterId) {
   const cs = state.characters[characterId];
   if (!def || !cs) return { ok: false, reasons: ['Unknown character.'] };
   if (cs.owned) return { ok: false, reasons: ['Already owned.'] };
-  const tier = content.balance.acquisitionTiers[def.tier];
-  if (cs.shards < tier.cumulativeShards) {
-    return { ok: false, reasons: [`Need ${tier.cumulativeShards} shards to unlock (have ${cs.shards}).`], tier };
+  const cost = content.balance.rosterProgression;
+  if (cs.shards < cost.recruitShards) {
+    return { ok: false, reasons: [`Need ${cost.recruitShards} shards to unlock (have ${cs.shards}).`], cost };
   }
-  return { ok: true, reasons: [], tier };
+  return { ok: true, reasons: [], cost };
 }
 
-// Unlock consumes the cumulative shard threshold and creates the character at
-// its acquisition Star (Minor 1★, Medium 4★, Major 7★).
+// Recruiting consumes the shard threshold and creates the character at the
+// joining Star. Every hero costs the same: they differ in fiction, not price.
 export function unlockCharacter(content, state, characterId, now = Date.now()) {
   const check = checkUnlockCharacter(content, state, characterId);
   if (!check.ok) return { ok: false, reasons: check.reasons };
   const cs = state.characters[characterId];
-  cs.shards -= check.tier.cumulativeShards;
+  cs.shards -= check.cost.recruitShards;
   cs.owned = true;
   cs.revealed = true;
-  cs.stars = check.tier.unlockStar;
+  cs.stars = check.cost.recruitStar;
   cleanupCompletedPins(content, state);
   const def = content.characterById[characterId];
   logProgress(state, `Unlocked ${def.displayName} at ${cs.stars} Star${cs.stars > 1 ? 's' : ''}!`, now);
@@ -838,7 +905,7 @@ export function togglePin(state, pin, content = null) {
     if (!cs || !def) return { ok: false, reasons: ['Unknown character.'] };
     if (!cs.owned) {
       normalized.objective = 'unlock';
-      normalized.targetStars = content.balance.acquisitionTiers[def.tier].unlockStar;
+      normalized.targetStars = content.balance.rosterProgression.recruitStar;
     } else {
       if (cs.stars >= 7) return { ok: false, reasons: ['This character has no remaining shard goal.'] };
       normalized.objective = 'promotion';

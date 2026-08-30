@@ -3,8 +3,8 @@
 // when the star actually bought something, and that the wording names it.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadContent } from './helpers.mjs';
-import { newPlayerState, promoteStar, togglePin } from '../src/core/state.js';
+import { loadContent, newGame } from './helpers.mjs';
+import { promoteStar, togglePin } from '../src/core/state.js';
 import { evaluateParty } from '../src/core/synergy.js';
 import { promotionSnapshot, promotionConsequences, rankShift, starName } from '../src/core/consequences.js';
 
@@ -13,8 +13,8 @@ const T0 = Date.parse('2026-07-25T12:00:00');
 // A save with the five starters in party one, and one of them holding exactly
 // the shards their next star costs.
 function ready(content, { stars = null } = {}) {
-  const state = newPlayerState(content, T0);
-  const party = content.characters.filter(def => def.starting).slice(0, 5).map(def => def.id);
+  const state = newGame(content, T0);
+  const party = [...state.starters];
   state.parties[0].members = [...party];
   const id = party[0];
   const cs = state.characters[id];
@@ -113,8 +113,8 @@ test('never more than three lines, and never zero', () => {
   assert.equal(promotionConsequences(content, state, id, before).length, 3);
 
   const bare = loadContent();
-  const solo = newPlayerState(bare, T0);
-  const loner = bare.characters.find(def => def.starting).id;
+  const solo = newGame(bare, T0);
+  const loner = solo.starters[0];
   solo.parties.forEach(p => { p.members = [null, null, null, null, null]; });
   solo.characters[loner].shards = bare.balance.starShards[solo.characters[loner].stars];
   const snapshot = promotionSnapshot(bare, solo, loner);

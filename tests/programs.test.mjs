@@ -2,8 +2,8 @@
 // relic slot whose effect applies only to payouts earned after placement.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadContent, maxOut } from './helpers.mjs';
-import { newPlayerState, clearNode, applyDailyReset } from '../src/core/state.js';
+import { loadContent, maxOut, newGame } from './helpers.mjs';
+import { clearNode, applyDailyReset } from '../src/core/state.js';
 import { makeRng } from '../src/core/rng.js';
 import {
   programState, addProcurementEnergy, addDevelopmentShards, addOperationsCompletion,
@@ -22,7 +22,7 @@ function completeRelic(state, worldId) {
 }
 
 test('clearing a world node feeds that world Procurement with the Energy paid', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   const party = state.parties[0].members.filter(Boolean);
   // main_1 has no world tag in the sample pack: no Procurement feed
   assert.ok(clearNode(content, state, 'main_1', party, 1, makeRng(2), T0).ok);
@@ -35,7 +35,7 @@ test('clearing a world node feeds that world Procurement with the Energy paid', 
 });
 
 test('Procurement ships the chosen family at the world opened grade; no family, it banks', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   addProcurementEnergy(content, state, WORLD, CONFIG.procurement.threshold * 2 + 5);
   // no family chosen: the meter banks in full, nothing is lost silently
   deliverProgramPayouts(content, state);
@@ -54,7 +54,7 @@ test('Procurement ships the chosen family at the world opened grade; no family, 
 });
 
 test('Development converts applied shards into bonus shards for the chosen hero', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   setDevelopmentHero(content, state, WORLD, 'char_suzume');
   addDevelopmentShards(content, state, WORLD, CONFIG.development.threshold);
   const events = deliverProgramPayouts(content, state);
@@ -66,14 +66,14 @@ test('Development converts applied shards into bonus shards for the chosen hero'
 });
 
 test('Operations banks route boosts per completed-route threshold', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   addOperationsCompletion(content, state, WORLD, CONFIG.operations.threshold);
   deliverProgramPayouts(content, state);
   assert.equal(state.programs[WORLD].operations.boostCycles, 1);
 });
 
 test('the relic installs into exactly one Program and only once reconstructed', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   assert.equal(installRelic(content, state, WORLD, 'procurement').ok, false);
   completeRelic(state, WORLD);
   assert.equal(installRelic(content, state, WORLD, 'procurement').ok, true);
@@ -87,7 +87,7 @@ test('the relic installs into exactly one Program and only once reconstructed', 
 });
 
 test('relic effects are read at payout time — placement affects only the future', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   setProcurementFamily(content, state, WORLD, 'metal');
   addProcurementEnergy(content, state, WORLD, CONFIG.procurement.threshold);
   // deliver once without the relic
@@ -102,7 +102,7 @@ test('relic effects are read at payout time — placement affects only the futur
 });
 
 test('payouts run inside the daily reset with no interaction required', () => {
-  const state = newPlayerState(content, T0);
+  const state = newGame(content, T0);
   setProcurementFamily(content, state, WORLD, 'metal');
   addProcurementEnergy(content, state, WORLD, CONFIG.procurement.threshold);
   const summary = applyDailyReset(content, state, T0 + 86400000);
