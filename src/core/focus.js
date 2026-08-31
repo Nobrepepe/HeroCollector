@@ -63,22 +63,39 @@ export function clearFocusSlot(state, slot) {
   return { ok: true, slot };
 }
 
+// What a given Energy figure would produce, per slot, without writing a thing.
+// Today's headline, the Node screen's cost line and applyFocusEnergy() all read
+// this one function, so a promise made before the run and the payout after it
+// can never disagree.
+export function focusYield(content, state, energy) {
+  const spend = Number.isInteger(energy) && energy > 0 ? energy : 0;
+  return FOCUS_SLOTS.map(slot => {
+    const entry = state.focus.slots[slot];
+    const rate = focusRate(content, slot);
+    const halted = focusHalted(state, entry.characterId);
+    // A halted slot banks nothing and pays nothing: its progress stands still.
+    const progress = halted ? entry.progress : entry.progress + spend;
+    const shards = halted ? 0 : Math.floor(progress / rate);
+    return {
+      slot, name: FOCUS_SLOT_NAMES[slot], rate, halted,
+      characterId: entry.characterId,
+      shards, remainder: progress - shards * rate
+    };
+  });
+}
+
 // Advance all three meters by the Energy just spent. Full meters convert into
 // shards immediately (no claim step); remainders carry over indefinitely.
 // Returns one grant per slot that produced shards.
 export function applyFocusEnergy(content, state, energy) {
   const grants = [];
   if (!Number.isInteger(energy) || energy <= 0) return grants;
-  for (const slot of FOCUS_SLOTS) {
-    const entry = state.focus.slots[slot];
-    if (focusHalted(state, entry.characterId)) continue;
-    const rate = focusRate(content, slot);
-    entry.progress += energy;
-    const shards = Math.floor(entry.progress / rate);
-    if (shards > 0) {
-      entry.progress -= shards * rate;
-      state.characters[entry.characterId].shards += shards;
-      grants.push({ slot, characterId: entry.characterId, shards });
+  for (const paid of focusYield(content, state, energy)) {
+    if (paid.halted) continue;
+    state.focus.slots[paid.slot].progress = paid.remainder;
+    if (paid.shards > 0) {
+      state.characters[paid.characterId].shards += paid.shards;
+      grants.push({ slot: paid.slot, characterId: paid.characterId, shards: paid.shards });
     }
   }
   return grants;

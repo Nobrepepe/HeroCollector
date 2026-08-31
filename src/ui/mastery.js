@@ -1,16 +1,24 @@
-// World Mastery: the visible 0–1,000 track, its milestone rewards, and the
-// four-piece relic. Cosmetics and finite caches live here; nothing on this
+// World Mastery, led by the relic (design turn 15b/16).
+//
+// The score here is fully derived — campaign, heroes, gear and the relic
+// pieces — so it moves when you play anywhere else, which makes it a
+// consequence rather than a goal. The four buried pieces are the goal: the
+// only part of this track you go somewhere to get, and the only thing on it
+// you finish by hand. Cosmetics and finite caches live here; nothing on this
 // screen is a passive percentage.
 import { h, fmt } from './dom.js';
 import { openModal, render, toast } from '../app.js';
-import { dressModal, modalHead, modalAction, modalActions, modalDismiss, artPlaceholder } from './modal.js';
+import { dressModal, modalHead, modalAction, modalActions, modalDismiss } from './modal.js';
 import {
-  worldMasteryBreakdown, masteryRank, masteryRankById,
+  worldMasteryBreakdown, masteryRank,
   applyMasteryMilestones, resolveMasteryChoice
 } from '../core/mastery.js';
-import { relicStatus } from '../core/relics.js';
+import { relicStatus, restoreRelic } from '../core/relics.js';
+import { PROGRAM_NAMES } from '../core/programs.js';
 import { isRevealed } from '../core/focus.js';
 import { portrait, selectorWorldName } from './shared.js';
+import { countWord } from './presentation.js';
+import { playRelicRestore, settleRelicRestore } from './relic-restore.js';
 
 export function renderMastery(store, root, arg) {
   const { content, state } = store;
@@ -28,45 +36,18 @@ export function renderMastery(store, root, arg) {
     onclick: () => store.go(`#/worlds/${world.id}`)
   }, `← ${selectorWorldName(world)}`));
   page.appendChild(h('header.mastery-head',
-    h('div.eyebrow', `${world.displayName} · Mastery`),
-    h('h1.mastery-title', rank.displayName),
-    h('p.muted', rank.next
-      ? `${fmt(breakdown.score)} of ${fmt(breakdown.max)} — ${fmt(rank.next.at - breakdown.score)} points from ${rank.next.displayName}.`
-      : `${fmt(breakdown.score)} of ${fmt(breakdown.max)} — everything this world can teach has been learned.`)));
+    h('div.eyebrow', `${world.displayName} · Mastery · ${rank.displayName}`)));
 
-  page.appendChild(trackBar(content, breakdown));
-  page.appendChild(breakdownPanel(breakdown));
+  // The relic leads. Mastery's score is fully derived — it moves when you play
+  // anywhere else — so it is a consequence, not a goal; the four buried pieces
+  // are the only part of this track you go somewhere to get.
+  page.appendChild(ledgerBlock(store, world, breakdown, rank));
   page.appendChild(milestonesPanel(store, world, breakdown));
-  page.appendChild(relicPanel(store, world));
   root.appendChild(page);
-}
 
-function trackBar(content, breakdown) {
-  const bar = h('div.mastery-track', { 'aria-label': `${breakdown.score} of ${breakdown.max} Mastery` });
-  bar.appendChild(h('i.mastery-track-fill', { style: { width: `${Math.min(100, breakdown.score / breakdown.max * 100)}%` } }));
-  for (const rank of content.balance.mastery.ranks) {
-    if (rank.at <= 0) continue;
-    bar.appendChild(h('span.mastery-marker' + (breakdown.score >= rank.at ? '.is-passed' : ''), {
-      style: { left: `${rank.at / breakdown.max * 100}%` }, title: `${rank.displayName} · ${rank.at}`
-    }));
-  }
-  return bar;
-}
-
-function breakdownPanel(breakdown) {
-  const line = (label, earned, of, detail) => h('div.mastery-part',
-    h('div.mastery-part-top', h('span', label), h('span.mastery-part-score', `${fmt(earned)} / ${fmt(of)}`)),
-    h('div.small.muted', detail));
-  return h('section.panel.mastery-breakdown',
-    h('div.eyebrow', 'Where the points come from'),
-    line('Campaign first clears', breakdown.campaign, breakdown.parts.campaign.of,
-      `${breakdown.parts.campaign.cleared} of ${breakdown.parts.campaign.poolSize} nodes cleared`),
-    line('Heroes — discovery, recruitment, Stars', breakdown.heroes, breakdown.parts.heroes.of,
-      `${breakdown.parts.heroes.rosterSize} heroes belong to this world`),
-    line('Gear development across the roster', breakdown.gear, breakdown.parts.gear.of,
-      'every Gear Tier completed by this world’s heroes counts'),
-    line('Relic pieces', breakdown.relic, breakdown.parts.relic.of,
-      `${breakdown.parts.relic.pieces} of 4 recovered`));
+  // A binding that just committed plays here, on the settled page, before the
+  // browser has painted it.
+  playRelicRestore(store, page, world.id);
 }
 
 function milestonesPanel(store, world, breakdown) {
@@ -166,39 +147,183 @@ function openShardChoice(store, world, choice) {
   });
 }
 
-function relicPanel(store, world) {
+// ------------------------------------------------------------- the ledger
+// One image per world, torn in four. Each cell renders a quarter of the same
+// plate at background-size: 200% 200%, so a recovered piece uncovers part of
+// the actual relic rather than showing a fourth icon — by the third piece you
+// can nearly read the thing. A world with no relic art renders this exact
+// layout, empty; the fixed cell is the design either way.
+const QUADRANTS = ['0% 0%', '100% 0%', '0% 100%', '100% 100%'];
+
+function ledgerBlock(store, world, breakdown, rank) {
   const { content, state } = store;
   const status = relicStatus(content, state, world.id);
-  const panel = h('section.panel.mastery-relic');
-  panel.appendChild(h('div.eyebrow', 'The relic'));
+  const block = h('section.mastery-ledger');
   if (!status) {
-    panel.appendChild(h('p.muted', 'No relic has been written for this world.'));
-    return panel;
+    // No relic authored here: the track is the whole screen, and says so.
+    block.appendChild(h('div.mastery-ledger-side',
+      h('h2.mastery-relic-name', 'No relic'),
+      h('p.muted', 'No relic has been written for this world. Nothing about the track is missing while that stays true.'),
+      trackPanel(store, world, breakdown, rank)));
+    return block;
   }
-  panel.appendChild(h('h2.mastery-relic-name', status.relic.displayName));
-  if (status.relic.lore) panel.appendChild(h('p.muted', status.relic.lore));
-  const row = h('div.relic-pieces');
+  block.appendChild(h('div.mastery-ledger-board',
+    relicBoard(store, status),
+    h('p.relic-board-note', boardNote(status))));
+  block.appendChild(h('div.mastery-ledger-side',
+    h('h2.mastery-relic-name', status.relic.displayName),
+    status.relic.lore ? h('p.mastery-relic-lore', status.relic.lore) : null,
+    h('div.fade-rule.mastery-ledger-rule'),
+    pieceList(store, status),
+    bindingLine(store, world, status),
+    trackPanel(store, world, breakdown, rank)));
+  return block;
+}
+
+function relicBoard(store, status) {
+  const image = store.content.images.relic[status.relic.world] ?? null;
+  const board = h('div.relic-board' + (status.restored ? '.is-bound' : ''), {
+    role: 'img',
+    'aria-label': `${status.relic.displayName} — ${countWord(status.ownedCount)} of ${countWord(status.total)} pieces recovered${status.restored ? ', bound whole' : ''}`
+  });
+  // The next unrecovered piece is the next station; everything past it is
+  // fainter, because the track never states what lies beyond it.
+  const nextIndex = status.pieces.findIndex(entry => !entry.owned);
+  status.pieces.forEach((entry, index) => {
+    const beyond = !entry.owned && nextIndex !== -1 && index > nextIndex;
+    const cell = h('div.relic-cell' + (entry.owned ? '.is-owned' : beyond ? '.is-beyond' : ''), {
+      'aria-hidden': 'true'
+    });
+    if (entry.owned && image) {
+      Object.assign(cell.style, {
+        backgroundImage: `url("${image}")`,
+        backgroundSize: '200% 200%',
+        backgroundPosition: QUADRANTS[index % 4]
+      });
+    }
+    board.appendChild(cell);
+  });
+  // The bound plate: the same asset unquartered. It is rendered whether or not
+  // the relic is bound so the restore sequence has something to cross-fade to.
+  const plate = h('div.relic-plate', { 'aria-hidden': 'true' });
+  if (image) plate.style.backgroundImage = `url("${image}")`;
+  else plate.classList.add('is-unarted');
+  board.appendChild(plate);
+  return board;
+}
+
+function boardNote(status) {
+  if (status.restored) return 'Whole, and back in one piece.';
+  if (status.complete) return 'All four are held, and the gaps are still there.';
+  return `${countWord(status.ownedCount, { capitalize: true })} of ${countWord(status.total)} recovered. `
+    + 'The relic is the only part of Mastery you go somewhere to get.';
+}
+
+function pieceList(store, status) {
+  const perPiece = Math.floor((store.content.balance.mastery.weights.relic ?? 0) / status.total);
+  const list = h('div.relic-piece-list');
   for (const entry of status.pieces) {
-    const image = content.images.relic[entry.piece.id] ?? null;
-    row.appendChild(h('div.relic-piece' + (entry.owned ? '.is-owned' : ''),
-      image
-        ? h('img.relic-piece-art', { src: image, alt: '' })
-        : artPlaceholder('relic piece — 1024², transparent', { className: 'relic-piece-art' }),
-      h('div.relic-piece-name', entry.piece.displayName),
-      entry.piece.lore ? h('div.small.muted', entry.piece.lore) : null,
-      h('div.small' + (entry.owned ? '.good' : '.muted'),
-        entry.owned
-          ? 'recovered'
-          : entry.sourceNode
-            ? ['buried at ', h('button.link', {
-              onclick: () => store.go(`#/node/${entry.sourceNode.id}`)
-            }, `${entry.sourceNode.displayName} →`)]
-            : 'its source is not live')));
+    list.appendChild(h('div.relic-piece-row' + (entry.owned ? '.is-owned' : ''),
+      h('span.relic-piece-mark', { 'aria-hidden': 'true' }, entry.owned ? '✓' : '◇'),
+      h('span.relic-piece-name', entry.piece.displayName),
+      h('span.relic-piece-lore', { title: entry.piece.lore || null }, entry.piece.lore || ''),
+      h('span.relic-piece-where', entry.owned
+        ? h('span.good', `recovered · +${perPiece}`)
+        : entry.sourceNode
+          ? h('button.link', { onclick: () => store.go(`#/node/${entry.sourceNode.id}`) },
+            `${entry.sourceNode.displayName} →`)
+          : h('span.muted', 'its source is not live'))));
   }
-  panel.appendChild(row);
-  panel.appendChild(h('p.small.muted',
-    status.complete
-      ? ['The relic is whole. ', h('button.link', { onclick: () => store.go(`#/programs/${world.id}`) }, 'Install it into a Program →')]
-      : 'Individual pieces add Mastery; the reconstructed relic installs into one Program.'));
+  return list;
+}
+
+// The one thing on this track the player does rather than earns. Holding four
+// pieces is not owning the relic: until this is pressed the Program slot stays
+// empty, so the button is the mechanism and not a flourish over it.
+function bindingLine(store, world, status) {
+  const { state } = store;
+  const line = h('div.relic-binding');
+  if (!status.complete) {
+    line.appendChild(h('p.small.muted',
+      'Each piece adds Mastery on its own. The relic installs into one Program only once it is whole.'));
+    return line;
+  }
+  if (!status.restored) {
+    line.appendChild(h('p.relic-binding-copy',
+      'The gaps are still there. It is not whole until you say so.'));
+    line.appendChild(h('button.btn.primary.relic-bind-button', {
+      onclick: () => bindWithFeedback(store, world)
+    }, 'Restore it whole →'));
+    return line;
+  }
+  const slot = state.programs[world.id]?.relicSlot ?? null;
+  line.appendChild(h('p.relic-binding-copy',
+    slot
+      ? `Whole, and installed in ${PROGRAM_NAMES[slot]}.`
+      : 'Whole, and not yet installed. It improves whichever Program it is placed in.'));
+  line.appendChild(h('button.link', {
+    onclick: () => store.go(`#/programs/${world.id}`)
+  }, slot ? 'Move it →' : 'Install it into a Program →'));
+  return line;
+}
+
+// The binding commits before a single frame plays, exactly as a promotion
+// does: the sequence re-dresses a settled screen and walks it forward, so
+// leaving mid-way simply leaves a bound relic behind.
+async function bindWithFeedback(store, world) {
+  settleRelicRestore();
+  const result = await store.tx(() => restoreRelic(store.content, store.state, world.id), { rerender: false });
+  if (!result.ok || location.hash !== `#/mastery/${world.id}`) { render(); return; }
+  store.ui.relicRestore = { worldId: world.id };
+  render();
+}
+
+// The score is fully derived — campaign, heroes, gear, and the pieces above —
+// which is exactly why it sits underneath them rather than leading. The bar is
+// segmented by where the points came from, and it names the next station only.
+function trackPanel(store, world, breakdown, rank) {
+  const { content } = store;
+  const parts = [
+    { key: 'campaign', label: 'Campaign', earned: breakdown.campaign },
+    { key: 'heroes', label: 'Heroes', earned: breakdown.heroes },
+    { key: 'gear', label: 'Gear', earned: breakdown.gear },
+    { key: 'relic', label: 'Relic', earned: breakdown.relic, of: breakdown.parts.relic.of }
+  ];
+  const bar = h('div.mastery-track', { 'aria-label': `${breakdown.score} of ${breakdown.max} Mastery` });
+  for (const part of parts) {
+    bar.appendChild(h(`i.mastery-track-part.is-${part.key}`, {
+      style: { width: `${Math.min(100, part.earned / breakdown.max * 100)}%` },
+      title: `${part.label} ${fmt(part.earned)}`
+    }));
+  }
+  bar.appendChild(h('i.mastery-track-rest'));
+  const legend = h('div.mastery-track-legend');
+  for (const part of parts) {
+    legend.appendChild(h('span.mastery-track-key' + (part.key === 'relic' ? '.is-relic' : ''),
+      part.of ? `${part.label} ${fmt(part.earned)} of ${fmt(part.of)}` : `${part.label} ${fmt(part.earned)}`));
+  }
+  const panel = h('section.mastery-standing',
+    h('div.eyebrow', 'The track, as a consequence'),
+    h('div.mastery-standing-reading',
+      h('span.mastery-standing-score', fmt(breakdown.score)),
+      h('span.muted', rank.next
+        ? `of ${fmt(breakdown.max)} · ${rank.next.displayName} opens at ${fmt(rank.next.at)}`
+        : `of ${fmt(breakdown.max)} · everything this world can teach has been learned`)),
+    bar, legend);
+  // The next station, and nothing beyond it.
+  if (rank.next) {
+    const milestone = content.balance.mastery.milestones?.[rank.next.id] ?? {};
+    const promises = [];
+    if (milestone.supplies) promises.push(`${countWord(milestone.supplies)} Field Suppl${milestone.supplies === 1 ? 'y' : 'ies'}`);
+    if (milestone.materialCache) promises.push(`a cache of ${countWord(milestone.materialCache)} materials in a family you pick`);
+    if (milestone.shardChoice) promises.push(`${countWord(milestone.shardChoice)} shards for a hero you pick`);
+    for (const skin of (world.masterySkins ?? []).filter(entry => entry.rank === rank.next.id)) {
+      promises.push(`${content.characterById[skin.characterId]?.displayName ?? 'a hero'}’s “${skin.skinName}” look`);
+    }
+    if (promises.length) {
+      panel.appendChild(h('p.mastery-standing-next',
+        `${rank.next.displayName} brings ${promises.join(', ')}.`));
+    }
+  }
   return panel;
 }

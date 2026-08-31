@@ -50,10 +50,12 @@ function normalizeWorld(world, index) {
     relic: {
       name: str(world.relic?.name, `The ${displayName} Relic`),
       lore: str(world.relic?.lore),
+      // One square plate for the relic entire. Each recovered piece uncovers a
+      // quarter of it, so a piece is a name and a line of lore, not a picture.
+      image: world.relic?.image ?? null,
       pieces: list(world.relic?.pieces).map((piece, i) => ({
         name: str(piece?.name, `Piece ${['I', 'II', 'III', 'IV'][i] ?? i + 1}`),
-        lore: str(piece?.lore),
-        image: piece?.image ?? null
+        lore: str(piece?.lore)
       }))
     },
     // Ordered: the first cosmetic goes to the first Mastery cosmetic rank, the

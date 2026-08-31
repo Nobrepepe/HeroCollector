@@ -80,15 +80,20 @@ function synergyChanges(before, after) {
   return { activated, lost, changed };
 }
 
-export function openCharacterPicker(store, { partyIndex, slotIndex, onSelect, recommendedId = null }) {
+// The picker works off a set of five, not off a preset: the party screen hands
+// it a saved preset's members, a node hands it the five that node will run
+// with. Both get the same synergy preview because both are just five slots.
+export function openCharacterPicker(store, {
+  members, slotIndex, title, onSelect, recommendedId = null
+}) {
   return openModal((modal, close) => {
     let search = '';
     const preferences = store.ui.pickerPreferences;
     const renderPicker = () => {
       modal.replaceChildren();
-      const current = store.state.parties[partyIndex].members[slotIndex];
+      const current = members[slotIndex];
       modal.appendChild(modalHead(
-        `${store.state.parties[partyIndex].name} · place ${slotIndex + 1} of ${store.content.balance.partySize}`,
+        `${title} · place ${slotIndex + 1} of ${store.content.balance.partySize}`,
         current ? 'Who stands here instead?' : 'Who stands here?',
         { size: 'm' }));
       modal.appendChild(characterFilterBar(store, preferences, renderPicker, {
@@ -107,16 +112,14 @@ export function openCharacterPicker(store, { partyIndex, slotIndex, onSelect, re
       modal.appendChild(grid);
       const renderGrid = () => {
         grid.replaceChildren();
-        const party = store.state.parties[partyIndex];
-        const beforeMembers = party.members.filter(Boolean);
-        const before = evaluateParty(store.content, store.state, beforeMembers);
+        const before = evaluateParty(store.content, store.state, members.filter(Boolean));
         const candidates = filterCharacters(store.content, store.state, preferences, new Set(), search)
           .filter(def => store.state.characters[def.id].owned);
         for (const def of candidates) {
           const cs = store.state.characters[def.id];
-          const otherSlot = party.members.findIndex((id, index) => id === def.id && index !== slotIndex);
+          const otherSlot = members.findIndex((id, index) => id === def.id && index !== slotIndex);
           const unavailable = otherSlot >= 0;
-          const nextSlots = [...party.members];
+          const nextSlots = [...members];
           nextSlots[slotIndex] = def.id;
           const after = evaluateParty(store.content, store.state, nextSlots.filter(Boolean));
           const changes = synergyChanges(before, after);

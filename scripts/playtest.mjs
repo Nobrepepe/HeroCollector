@@ -27,7 +27,7 @@ import {
   previewExpedition, launchCycle, offerFeasibility, expeditionCharacterIds
 } from '../src/core/expeditions.js';
 import { FOCUS_SLOTS, assignFocus, isRevealed } from '../src/core/focus.js';
-import { relicStatus } from '../src/core/relics.js';
+import { relicStatus, restoreRelic } from '../src/core/relics.js';
 import {
   worldMasteryBreakdown, masteryRank, resolveMasteryChoice, pendingMasteryChoices
 } from '../src/core/mastery.js';
@@ -223,7 +223,14 @@ function manageAllocation() {
     const worldTarget = targets.find(id => content.characterById[id].world === w.id);
     if (worldTarget) setDevelopmentHero(content, s, w.id, worldTarget);
     const relic = relicStatus(content, s, w.id);
-    if (relic?.complete && !s.programs[w.id]?.relicSlot) {
+    // The simulated player goes and binds it the day the fourth piece lands;
+    // an unbound relic cannot be installed, so this is the whole sequence.
+    if (relic?.complete && !relic.restored) {
+      const bound = restoreRelic(content, s, w.id);
+      if (!bound.ok) bug('relic_bind', `binding failed: ${bound.reasons.join('; ')}`);
+      else mark(`relic_bound_${w.id}`, `${w.displayName} relic bound whole`);
+    }
+    if (relicStatus(content, s, w.id)?.restored && !s.programs[w.id]?.relicSlot) {
       installRelic(content, s, w.id, 'procurement');
       stats.relicInstalledDays[w.id] = s.dayNumber;
       mark(`relic_installed_${w.id}`, `${w.displayName} relic installed into Procurement`);
@@ -654,7 +661,7 @@ const result = {
     [k, `${v.filter(n => nodeState(s, n.id).cleared).length}/${v.length}`])),
   relics: content.worlds.map(w => {
     const r = relicStatus(content, s, w.id);
-    return { world: w.displayName, pieces: `${r?.ownedCount ?? 0}/${r?.total ?? 4}`, complete: !!r?.complete, installed: s.programs[w.id]?.relicSlot ?? null };
+    return { world: w.displayName, pieces: `${r?.ownedCount ?? 0}/${r?.total ?? 4}`, complete: !!r?.complete, bound: !!r?.restored, installed: s.programs[w.id]?.relicSlot ?? null };
   }),
   mastery: content.worlds.map(w => ({ world: w.displayName, ...worldMasteryBreakdown(content, s, w.id) })),
   inventoryTail: Object.fromEntries(Object.entries(s.inventory.materials).filter(([, q]) => q > 0)),

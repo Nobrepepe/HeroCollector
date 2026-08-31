@@ -131,13 +131,22 @@ function relicPanel(store, world, overview) {
       h('button.link', { onclick: () => store.go(`#/mastery/${world.id}`) }, 'See where the rest are buried →')));
     return panel;
   }
+  // Four pieces held is not a relic. The slot stays empty until the binding
+  // happens on the Mastery track, so this offers the way there rather than a
+  // row of buttons that would each be refused.
+  if (!relic.restored) {
+    panel.appendChild(h('p.muted',
+      `All four pieces of ${relic.relic.displayName} are held, and it is still in pieces. It installs into nothing until it is whole. `,
+      h('button.link', { onclick: () => store.go(`#/mastery/${world.id}`) }, 'Restore it whole →')));
+    return panel;
+  }
   const effects = {
     procurement: `shipments grow to ${overview.procurement.shipmentQty + (overview.relicSlot === 'procurement' ? 0 : content.balance.programs.procurement.relicBonusQty)} materials`,
     development: `bonus shards arrive every ${content.balance.programs.development.relicThreshold} applied instead of ${content.balance.programs.development.threshold}`,
     operations: `route boosts bank every ${content.balance.programs.operations.relicThreshold === 1 ? 'completed route' : `${content.balance.programs.operations.relicThreshold} completed routes`}`
   };
   panel.appendChild(h('p',
-    `${relic.relic.displayName} is whole. Installed in a Program it visibly improves that Program’s payouts; it can be moved freely, and only future payouts feel the difference.`));
+    `${relic.relic.displayName} is bound whole. Installed in a Program it visibly improves that Program’s payouts; it can be moved freely, and only future payouts feel the difference.`));
   const row = h('div.program-relic-slots');
   for (const programId of PROGRAM_IDS) {
     const active = overview.relicSlot === programId;

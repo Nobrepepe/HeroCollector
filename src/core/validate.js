@@ -410,9 +410,14 @@ export function validateSave(content, state) {
     }
   }
 
-  // --- relic pieces and Mastery
+  // --- relic pieces, bindings, and Mastery
   for (const [pieceId, value] of Object.entries(state.relics.pieces)) {
     if (value !== true) errors.push(`Invalid relic piece state: ${pieceId}`);
+  }
+  // A binding for a world whose content left the game is dormant progress like
+  // any other, so only the shape is checked here.
+  for (const [worldId, value] of Object.entries(state.relics.restored ?? {})) {
+    if (value !== true) errors.push(`Invalid relic binding state: ${worldId}`);
   }
   const rankIds = new Set((content.balance.mastery?.ranks ?? []).map(rank => rank.id));
   for (const [worldId, entry] of Object.entries(state.mastery)) {
@@ -535,6 +540,18 @@ export function validateSave(content, state) {
       if (!content.nodeById[nodeId]) errors.push(`Party preference references unknown node ${nodeId}`);
       if (!Number.isInteger(index) || index < 0 || index >= state.parties.length) {
         errors.push(`Invalid party preference index for ${nodeId}`);
+      }
+    }
+    for (const [nodeId, members] of Object.entries(ui.nodePartyMembersById ?? {})) {
+      if (!content.nodeById[nodeId]) errors.push(`Node party references unknown node ${nodeId}`);
+      if (!Array.isArray(members) || members.length !== content.balance.partySize) {
+        errors.push(`Invalid node party for ${nodeId}`);
+        continue;
+      }
+      const filled = members.filter(Boolean);
+      if (new Set(filled).size !== filled.length) errors.push(`Node party for ${nodeId} repeats a character`);
+      for (const id of filled) {
+        if (!state.characters[id]?.owned) errors.push(`Node party for ${nodeId} holds unowned ${id}`);
       }
     }
   }

@@ -103,7 +103,15 @@ test('every packaged art class resolves through the media path', () => {
     assert.ok(images.portrait[characterId]?.startsWith('hcpkg://'), `portrait ${characterId}`);
   }
   assert.ok(Object.values(images.equipment).some((url) => url?.startsWith('hcpkg://')), 'equipment art');
-  assert.ok(Object.values(images.relic).some((url) => url?.startsWith('hcpkg://')), 'relic piece art');
+  /* Relic art is one square plate per world (hc_relic_art), quartered by the
+     Mastery track — it replaced four per-piece assetRefs. These fixtures were
+     published by World Hub under the older contract, so they carry no plate at
+     all: what is checked here is the keying, which is what the Mastery screen
+     reads, and that no piece id survived the move. */
+  for (const [key, url] of Object.entries(images.relic)) {
+    assert.ok(content.worldById[key], `relic art is keyed by world, not by piece: ${key}`);
+    assert.ok(url?.startsWith('hcpkg://'), `relic art ${key}`);
+  }
   assert.ok(Object.values(images.crisis).some((url) => url?.startsWith('hcpkg://')), 'crisis art');
   assert.ok(Object.values(images.skin).length > 0, 'skin art');
 });
@@ -221,7 +229,7 @@ test('the contract asks for creative facts only — every field is accounted for
     // Worlds: look, campaign names, relic fiction, cosmetic order.
     'hc_world_icon', 'hc_palette_primary', 'hc_palette_accent', 'hc_palette_dark',
     'hc_chapter_titles', 'hc_chapter_title', 'hc_campaign_nodes', 'node_name',
-    'hc_relic_name', 'hc_relic_lore', 'hc_relic_pieces', 'piece_name', 'piece_lore', 'piece_art',
+    'hc_relic_name', 'hc_relic_lore', 'hc_relic_pieces', 'piece_name', 'piece_lore',
     'hc_mastery_cosmetics', 'mc_character', 'mc_name', 'mc_art',
     // Characters: who they are, and the art that shows them.
     'hc_archetype', 'hc_faction', 'hc_equipment', 'equip_slot', 'equip_name', 'equip_art',

@@ -7,8 +7,10 @@
 //                 chosen revealed hero of the world.
 //   Operations  — completed Expedition routes from this world → visibly
 //                 improved routes on the next cycle board.
-// The world's reconstructed relic can be installed into exactly one Program
-// slot; effects are read at payout time, so moving it only affects the future.
+// The world's relic can be installed into exactly one Program slot once it has
+// been bound whole on the Mastery track — holding all four pieces is not
+// enough. Effects are read at payout time, so moving it only affects the
+// future, and a relic that somehow loses its binding stops paying at once.
 import { grantRewardEntries } from './resources.js';
 import { relicStatus } from './relics.js';
 import { isRevealed } from './focus.js';
@@ -29,7 +31,7 @@ export function programState(state, worldId) {
 export function relicInstalledIn(content, state, worldId, programId) {
   const ps = state.programs[worldId];
   if (!ps || ps.relicSlot !== programId) return false;
-  return !!relicStatus(content, state, worldId)?.complete;
+  return !!relicStatus(content, state, worldId)?.restored;
 }
 
 export function addProcurementEnergy(content, state, worldId, energy) {
@@ -70,8 +72,12 @@ export function setDevelopmentHero(content, state, worldId, characterId) {
 export function installRelic(content, state, worldId, programId) {
   if (!content.worldById[worldId]) return { ok: false, reasons: ['Unknown world.'] };
   if (programId !== null && !PROGRAM_IDS.includes(programId)) return { ok: false, reasons: ['Unknown Program.'] };
-  if (programId !== null && !relicStatus(content, state, worldId)?.complete) {
-    return { ok: false, reasons: ['Reconstruct all four relic pieces first.'] };
+  if (programId !== null) {
+    const relic = relicStatus(content, state, worldId);
+    if (!relic?.complete) return { ok: false, reasons: ['Recover all four relic pieces first.'] };
+    if (!relic.restored) {
+      return { ok: false, reasons: [`${relic.relic.displayName} is still in four pieces. Bind it whole on the Mastery track first.`] };
+    }
   }
   programState(state, worldId).relicSlot = programId;
   return { ok: true, programId };

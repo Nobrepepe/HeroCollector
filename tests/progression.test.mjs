@@ -4,7 +4,8 @@ import { loadContent, newGame } from './helpers.mjs';
 import {
   craftAndEquipEquipment, togglePin, copyParty, clearParty,
   selectPartyPreset, preferredPartyIndex, checkCraftAndEquipEquipment,
-  setPartyMember, syncSaveWithContent, SCHEMA_VERSION
+  setPartyMember, syncSaveWithContent, SCHEMA_VERSION,
+  nodePartyMembers, nodePartyIsCustom, setNodePartyMember, resetNodeParty
 } from '../src/core/state.js';
 import {
   analyzeEquipmentGoal, analyzePinnedGoals, allocateMaterialDemand
@@ -135,6 +136,56 @@ test('party copy is independent, clear is scoped, and node preference falls back
   assert.ok(occupied);
   assert.ok(setPartyMember(content, state, 0, 1, null).ok);
   assert.equal(state.parties[0].members[1], null);
+});
+
+test('a node keeps its own five without rewriting the preset that filled it', () => {
+  const state = newGame(content, NOW);
+  selectPartyPreset(state, 0, 'main_1');
+  const preset = [...state.parties[0].members];
+  assert.deepEqual(nodePartyMembers(state, 'main_1'), preset, 'the preset pre-fills the node');
+  assert.equal(nodePartyIsCustom(state, 'main_1'), false);
+
+  const outsider = content.characters.find(def => !preset.includes(def.id));
+  state.characters[outsider.id].owned = true;
+  assert.ok(setNodePartyMember(content, state, 'main_1', 2, outsider.id).ok);
+  assert.equal(nodePartyMembers(state, 'main_1')[2], outsider.id);
+  assert.deepEqual(state.parties[0].members, preset, 'the saved preset is untouched');
+  assert.equal(nodePartyIsCustom(state, 'main_1'), true);
+  assert.deepEqual(nodePartyMembers(state, 'main_2'), preset, 'other nodes still read the preset');
+
+  // No one stands in two places: placing someone already here moves them.
+  assert.ok(setNodePartyMember(content, state, 'main_1', 4, outsider.id).ok);
+  const moved = nodePartyMembers(state, 'main_1');
+  assert.equal(moved[2], null);
+  assert.equal(moved[4], outsider.id);
+  assert.equal(validateSave(content, state).ok, true);
+
+  assert.equal(setNodePartyMember(content, state, 'main_1', 9, outsider.id).ok, false);
+  assert.equal(setNodePartyMember(content, state, 'no_such_node', 0, outsider.id).ok, false);
+});
+
+test('a node party falls back to the preset when it is refilled, reselected, or unusable', () => {
+  const state = newGame(content, NOW);
+  const outsider = content.characters.find(def => !state.parties[0].members.includes(def.id));
+  state.characters[outsider.id].owned = true;
+  setNodePartyMember(content, state, 'main_1', 0, outsider.id);
+
+  resetNodeParty(state, 'main_1');
+  assert.equal(nodePartyIsCustom(state, 'main_1'), false);
+  assert.deepEqual(nodePartyMembers(state, 'main_1'), state.parties[0].members);
+
+  // Choosing a preset is the other way back: it re-fills the node from it.
+  setNodePartyMember(content, state, 'main_1', 0, outsider.id);
+  selectPartyPreset(state, 1, 'main_1');
+  assert.equal(nodePartyIsCustom(state, 'main_1'), false);
+
+  // A five that can no longer stand is dropped rather than run.
+  setNodePartyMember(content, state, 'main_1', 0, outsider.id);
+  state.characters[outsider.id].owned = false;
+  assert.equal(validateSave(content, state).ok, false, 'an unowned member is a save error');
+  syncSaveWithContent(content, state);
+  assert.equal(nodePartyIsCustom(state, 'main_1'), false);
+  assert.equal(validateSave(content, state).ok, true);
 });
 
 test('saves are schema 7 only — older schemas are refused, not adapted', () => {
