@@ -44,12 +44,949 @@ a{color:#e9a94f;text-decoration:none}a:hover{color:#f6c67f}
 @keyframes hc-pquiet{0%,8%{opacity:1}13.5%{opacity:0}93%{opacity:0}100%{opacity:1}}
 </style></helmet>
 
+<section class="dv-turn" id="t17">
+<div class="dv-thd"><span class="dv-tid">17</span><span class="dv-tname">Today, rebuilt around deterministic shards — the three Focus boxes and the featured countdown both go</span></div>
+<p style="margin:-8px 0 26px;max-width:1000px;font:400 13.5px/1.7 Figtree,sans-serif;color:#a2958a">Two things on the shipped <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">today-page</code> are arguing for a game that no longer exists. <strong style="color:#f4ece1;font-weight:500">The three Focus cards</strong> imply three decisions, and they are the same decision made once — <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">applyFocusEnergy()</code> advances all three meters off <em>one</em> pool, every run, with no claim step. Three boxes also draw three progress bars that only ever move together. And <strong style="color:#f4ece1;font-weight:500">the featured hero counting shards to her next star</strong> was a hook when shards were a hunt; now that <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">focus.js</code> pays out on a fixed rate, "thirteen shards away" is a division problem, not a reason to play — it will arrive whatever the player does.<br><br>So the scarce thing on Today is <strong style="color:#f4ece1;font-weight:500">Energy</strong>, and the Focus is not a panel, it is a <em>property of spending it</em>. <a class="dv-oid" href="#17a">17a</a> makes that the headline and collapses all three slots into one rail. <a class="dv-oid" href="#17b">17b</a> takes the harder position — Focus is set-and-forget, so it earns no space on Today at all — and gives the freed room back to the day's one real choice. <a class="dv-oid" href="#17c">17c</a> is what dev changes.</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="17a"><div class="dv-olabel"><span class="dv-oid">17a</span>The Focus becomes the headline — one rail, three claims, no boxes</div>
+<div class="dv-card" style="width:1440px;height:900px;position:relative;overflow:hidden;background:#12100f;color:#f4ece1;font-family:Figtree,system-ui,sans-serif">
+<div style="position:absolute;inset:0;background:repeating-linear-gradient(112deg,#241d18 0 11px,#1b1611 11px 22px)"></div>
+<div style="position:absolute;right:0;top:0;width:760px;height:428px;background:repeating-linear-gradient(100deg,#3a2c22 0 10px,#28201a 10px 20px);-webkit-mask-image:linear-gradient(255deg,#000 40%,transparent 88%),linear-gradient(to bottom,transparent,#000 22%,#000 62%,transparent 98%);mask-image:linear-gradient(255deg,#000 40%,transparent 88%),linear-gradient(to bottom,transparent,#000 22%,#000 62%,transparent 98%);-webkit-mask-composite:source-in;mask-composite:intersect"></div>
+<div style="position:absolute;inset:0;background:radial-gradient(110% 80% at 82% 12%,rgba(233,169,79,.18),transparent 58%)"></div>
+<div style="position:absolute;inset:0;background:linear-gradient(96deg,#12100f 34%,rgba(18,16,15,.5) 68%,rgba(18,16,15,.8) 100%)"></div>
+<div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(18,16,15,.7),transparent 30%,rgba(18,16,15,.4) 62%,#12100f 100%)"></div>
+<div style="position:absolute;right:60px;top:326px;font:11px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.34)">Lantern Courtyard — scene plate, tile_16x9</div>
+
+<div style="position:absolute;left:44px;top:38px;width:196px">
+<div style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.1;letter-spacing:.01em">Hero <span style="color:#e9a94f">Collector</span></div>
+<div style="height:24px"></div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;color:#f4ece1"><span style="width:5px;height:5px;border-radius:50%;background:#e9a94f;box-shadow:0 0 14px 3px rgba(233,169,79,.55)"></span>Today</div>
+<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:#8e8278;padding-left:15px">Collection</div>
+<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:#8e8278;padding-left:15px">Party</div>
+<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:#8e8278;padding-left:15px">Journey</div>
+<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:#8e8278;padding-left:15px">Expeditions<span style="margin-left:auto;font-size:11.5px;color:#e9a94f">3 out</span></div>
+<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:#8e8278;padding-left:15px">Worlds</div>
+<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:#8e8278;padding-left:15px">Workshop</div>
+<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:#8e8278;padding-left:15px">Archive</div>
+</div>
+</div>
+<div style="position:absolute;left:44px;bottom:38px;font-size:12.5px;color:#6f645c">Settings</div>
+
+<div style="position:absolute;left:44px;top:394px;width:200px">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Energy</div>
+<div style="display:flex;align-items:baseline;gap:6px;margin-top:2px"><span style="font-family:'Instrument Serif',serif;font-size:40px;line-height:1">96</span><span style="font-size:13px;color:#8e8278">/ 240</span></div>
+<div style="height:2px;margin-top:8px;background:linear-gradient(to right,#e9a94f 0%,#e9a94f 40%,rgba(244,236,225,.16) 40%,transparent 100%)"></div>
+<div style="margin-top:7px;font-size:12px;color:#6f645c">+120 more at 4:00</div>
+<div style="margin-top:16px;display:flex;align-items:baseline;gap:8px">
+<span style="color:#6fc9a0;font-size:13px">◈</span>
+<div>
+<div style="font-size:13px;color:#b8aca1">2 Field Supply <span style="color:#6f645c">of 3 held</span></div>
+<div style="margin-top:2px;font-size:12px;color:#6f645c">one use left today · +30 each</div>
+</div>
+</div>
+</div>
+
+<div style="position:absolute;left:280px;top:64px;width:700px">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Wednesday · day 148</div>
+<div style="font-family:'Instrument Serif',serif;font-size:50px;line-height:1.06;margin-top:8px;text-wrap:pretty">Ninety-six Energy left,<br>and all of it is promised.</div>
+<div style="margin-top:11px;font-size:14.5px;line-height:1.6;color:#b8aca1;max-width:560px;text-wrap:pretty">Spend it today and it returns <span style="color:#f4ece1">nine shards</span> — four to Ashley, three to Liadriel, two to Nozomi. <span style="color:#e9a94f">Change who →</span></div>
+</div>
+
+<div style="position:absolute;left:280px;top:274px;width:660px">
+<div style="display:flex;justify-content:space-between;align-items:baseline">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">The next forty Energy you spend</div>
+<div style="font-size:11.5px;color:#6f645c">every run pays all three</div>
+</div>
+<div style="position:relative;height:72px;margin-top:26px;width:620px">
+<div style="position:absolute;left:0;right:0;top:44px;height:2px;background:linear-gradient(to right,rgba(233,169,79,.75),rgba(233,169,79,.4) 42%,rgba(244,236,225,.16) 80%,transparent)"></div>
+<div style="position:absolute;left:0;top:38px;width:2px;height:14px;background:rgba(244,236,225,.3)"></div>
+<div style="position:absolute;left:0;top:56px;font-size:11px;color:#6f645c">now</div>
+
+<div style="position:absolute;left:93px;top:0;width:150px">
+<div style="font-size:13.5px;font-weight:600;line-height:1.2">Ashley</div>
+<div style="margin-top:2px;font-size:11.5px;line-height:1.2;color:#8e8278">Primary · 1 / 24⚡</div>
+</div>
+<div style="position:absolute;left:93px;top:41px;width:9px;height:9px;margin-left:-4px;border-radius:50%;background:#e9a94f;box-shadow:0 0 12px 3px rgba(233,169,79,.5)"></div>
+<div style="position:absolute;left:93px;top:56px;margin-left:-4px;font-size:12px;color:#e9a94f">in 6⚡</div>
+
+<div style="position:absolute;left:279px;top:0;width:150px">
+<div style="font-size:13.5px;font-weight:600;line-height:1.2">Liadriel</div>
+<div style="margin-top:2px;font-size:11.5px;line-height:1.2;color:#8e8278">Secondary · 1 / 30⚡</div>
+</div>
+<div style="position:absolute;left:279px;top:41px;width:9px;height:9px;margin-left:-4px;border-radius:50%;background:#b48ade;box-shadow:0 0 12px 3px rgba(180,138,222,.45)"></div>
+<div style="position:absolute;left:279px;top:56px;margin-left:-4px;font-size:12px;color:#a2958a">in 18⚡</div>
+
+<div style="position:absolute;left:480px;top:0;width:160px">
+<div style="font-size:13.5px;font-weight:600;line-height:1.2;color:#c3b6a9">Nozomi</div>
+<div style="margin-top:2px;font-size:11.5px;line-height:1.2;color:#8e8278">Long-term · 1 / 40⚡</div>
+</div>
+<div style="position:absolute;left:480px;top:41px;width:9px;height:9px;margin-left:-4px;border-radius:50%;background:rgba(244,236,225,.5)"></div>
+<div style="position:absolute;left:480px;top:56px;margin-left:-4px;font-size:12px;color:#8e8278">in 31⚡</div>
+</div>
+</div>
+
+<div style="position:absolute;left:280px;top:398px;width:660px;height:1px;background:linear-gradient(to right,transparent,rgba(244,236,225,.18) 18%,rgba(244,236,225,.18) 70%,transparent)"></div>
+
+<div style="position:absolute;left:280px;top:426px;width:660px">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Continue</div>
+<div style="margin-top:12px;display:flex;gap:24px;align-items:flex-start">
+<div style="width:118px;height:82px;flex:none;background:repeating-linear-gradient(112deg,#33281f 0 8px,#241c15 8px 16px);-webkit-mask-image:linear-gradient(105deg,#000 55%,transparent);mask-image:linear-gradient(105deg,#000 55%,transparent)"></div>
+<div style="flex:1">
+<div style="font-family:'Instrument Serif',serif;font-size:34px;line-height:1.15">Lantern Courtyard</div>
+<div style="margin-top:5px;font-size:13.5px;color:#a2958a">Main 14 · needs <span style="color:#f4ece1">7,400</span> Power · your Vanguard reads <span style="color:#6fc9a0">8,120</span></div>
+</div>
+<div style="align-self:center;text-align:right">
+<div style="font-size:15px;font-weight:600;color:#e9a94f">Enter →</div>
+<div style="height:1px;margin-top:6px;background:linear-gradient(to right,transparent,#e9a94f)"></div>
+<div style="margin-top:6px;font-size:12px;color:#6f645c;white-space:nowrap">⚡ 6 · pays all three</div>
+</div>
+</div>
+</div>
+
+<div style="position:absolute;left:280px;top:552px;width:660px;height:1px;background:linear-gradient(to right,transparent,rgba(244,236,225,.14) 18%,rgba(244,236,225,.14) 60%,transparent)"></div>
+
+<div style="position:absolute;left:280px;top:578px;width:700px">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Ready when you are</div>
+<div style="margin-top:14px;display:flex;gap:30px;align-items:center">
+<div style="display:flex;gap:12px;align-items:center">
+<div style="position:relative;width:82px;height:46px;flex:none">
+<div style="position:absolute;inset:-6px;background:radial-gradient(closest-side,rgba(226,96,63,.3),transparent 74%)"></div>
+<div style="position:absolute;inset:0;background:repeating-linear-gradient(104deg,#5a3a2a 0 7px,#2a1c16 7px 14px);-webkit-mask-image:radial-gradient(64% 72% at 48% 44%,#000 52%,transparent 92%);mask-image:radial-gradient(64% 72% at 48% 44%,#000 52%,transparent 92%)"></div>
+<div style="position:absolute;inset:-7px;border-radius:6px;border:1px solid rgba(233,169,79,.5);animation:hc-pulse 2.6s ease-in-out infinite"></div>
+</div>
+<div><div style="font-size:14.5px;font-weight:600">Ashley</div><div style="font-size:12.5px;color:#a2958a">fourth gear tier is complete</div><div style="font-size:12.5px;color:#e9a94f;margin-top:2px">Finish it →</div></div>
+</div>
+<div style="display:flex;gap:12px;align-items:center">
+<div style="position:relative;width:82px;height:46px;flex:none">
+<div style="position:absolute;inset:-6px;background:radial-gradient(closest-side,rgba(180,138,222,.28),transparent 74%)"></div>
+<div style="position:absolute;inset:0;background:repeating-linear-gradient(104deg,#4a3a5c 0 7px,#201a28 7px 14px);-webkit-mask-image:radial-gradient(64% 72% at 48% 44%,#000 52%,transparent 92%);mask-image:radial-gradient(64% 72% at 48% 44%,#000 52%,transparent 92%)"></div>
+</div>
+<div><div style="font-size:14.5px;font-weight:600">Malefia</div><div style="font-size:12.5px;color:#a2958a">has enough shards to join</div><div style="font-size:12.5px;color:#e9a94f;margin-top:2px">Promote →</div></div>
+</div>
+<div style="align-self:center">
+<div style="font-family:'Instrument Serif',serif;font-size:30px;line-height:1;color:#f4ece1">+4</div>
+<div style="margin-top:3px;font-size:12.5px;color:#e9a94f">more are ready →</div>
+</div>
+</div>
+</div>
+
+<div style="position:absolute;left:280px;top:700px;width:660px;height:1px;background:linear-gradient(to right,transparent,rgba(244,236,225,.14) 18%,rgba(244,236,225,.14) 55%,transparent)"></div>
+
+<div style="position:absolute;left:280px;top:724px;width:680px">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Tracking</div>
+<div style="margin-top:12px;display:flex;flex-direction:column;gap:16px">
+<div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13.5px"><span>Ashley · fifth star</span><span style="font-family:'Instrument Serif',serif;font-size:19px">62<span style="color:#6f645c;font-size:14px"> / 75</span></span></div>
+<div style="height:2px;margin-top:6px;background:linear-gradient(to right,#e9a94f 0%,#e9a94f 82%,rgba(244,236,225,.14) 82%,rgba(244,236,225,.14) 92%,transparent)"></div>
+<div style="margin-top:7px;display:flex;gap:14px;font-size:11.5px;color:#6f645c"><span>↑</span><span>↓</span><span>open</span><span>unpin</span></div>
+</div>
+<div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13.5px"><span>Liadriel · Whisperbind Cloak</span><span style="font-family:'Instrument Serif',serif;font-size:19px">18<span style="color:#6f645c;font-size:14px"> / 26</span></span></div>
+<div style="height:2px;margin-top:6px;background:linear-gradient(to right,#b48ade 0%,#b48ade 69%,rgba(244,236,225,.14) 69%,rgba(244,236,225,.14) 88%,transparent)"></div>
+<div style="margin-top:7px;display:flex;gap:14px;font-size:11.5px;color:#6f645c"><span style="color:#4a423c">↑</span><span>↓</span><span>open</span><span>unpin</span></div>
+</div>
+</div>
+</div>
+
+<div style="position:absolute;right:44px;top:520px;text-align:right;width:320px">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Recent progress</div>
+<div style="margin-top:8px;font-size:12.5px;color:#6f645c;line-height:1.9">
+<div>Liadriel reached her sixth star</div>
+<div>Lantern Courtyard cleared</div>
+<div>Kin joined the roster</div>
+</div>
+<div style="margin-top:22px;display:flex;justify-content:flex-end;gap:11px;align-items:flex-start">
+<div style="font-size:13px;line-height:1.6;color:#a2958a;text-wrap:pretty;max-width:250px">The Sundering Ward is open until reset. <span style="color:#e9a94f">Review it →</span></div>
+<span style="position:relative;top:7px;width:7px;height:7px;flex:none;border-radius:50%;background:#c9705f;animation:hc-pulse 2.8s ease-in-out infinite"></span>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="17b"><div class="dv-olabel"><span class="dv-oid">17b</span>Focus leaves Today entirely — it lives in the Energy well, and the day leads with its one choice</div>
+<div class="dv-card" style="width:1440px;height:900px;position:relative;overflow:hidden;background:#12100f;color:#f4ece1;font-family:Figtree,system-ui,sans-serif">
+<div style="position:absolute;inset:0;background:repeating-linear-gradient(112deg,#241d18 0 11px,#1b1611 11px 22px)"></div>
+<div style="position:absolute;inset:0;background:radial-gradient(120% 90% at 76% 24%,rgba(201,112,95,.2),transparent 58%)"></div>
+<div style="position:absolute;right:-40px;bottom:0;width:520px;height:840px;background:repeating-linear-gradient(100deg,#3a2c22 0 9px,#2a2019 9px 18px);-webkit-mask-image:radial-gradient(70% 60% at 45% 45%,#000 42%,transparent 78%);mask-image:radial-gradient(70% 60% at 45% 45%,#000 42%,transparent 78%);animation:hc-drift 9s ease-in-out infinite"></div>
+<div style="position:absolute;inset:0;background:linear-gradient(96deg,#12100f 30%,rgba(18,16,15,.5) 64%,rgba(18,16,15,.78) 100%)"></div>
+<div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(18,16,15,.72),transparent 30%,rgba(18,16,15,.3) 64%,#12100f 100%)"></div>
+
+<div style="position:absolute;right:96px;bottom:150px;width:300px;text-align:right">
+<div style="font:11px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.36)">Ashley — character.full_body 900×1600</div>
+<div style="margin-top:12px;font-family:'Instrument Serif',serif;font-size:30px;line-height:1.15">Ashley</div>
+<div style="margin-top:5px;font-size:13.5px;line-height:1.6;color:#a2958a;text-wrap:pretty">Her fourth gear tier is finished and paid for. <span style="color:#e9a94f">Finish it →</span></div>
+</div>
+
+<div style="position:absolute;left:44px;top:38px;width:196px">
+<div style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.1;letter-spacing:.01em">Hero <span style="color:#e9a94f">Collector</span></div>
+<div style="height:24px"></div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;color:#f4ece1"><span style="width:5px;height:5px;border-radius:50%;background:#e9a94f;box-shadow:0 0 14px 3px rgba(233,169,79,.55)"></span>Today</div>
+<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:#8e8278;padding-left:15px">Collection</div>
+<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:#8e8278;padding-left:15px">Party</div>
+<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:#8e8278;padding-left:15px">Journey</div>
+<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:#8e8278;padding-left:15px">Expeditions<span style="margin-left:auto;font-size:11.5px;color:#e9a94f">3 out</span></div>
+<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:#8e8278;padding-left:15px">Worlds</div>
+<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:#8e8278;padding-left:15px">Workshop</div>
+<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:#8e8278;padding-left:15px">Archive</div>
+</div>
+</div>
+<div style="position:absolute;left:44px;bottom:38px;font-size:12.5px;color:#6f645c">Settings</div>
+
+<div style="position:absolute;left:44px;top:372px;width:214px">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Energy</div>
+<div style="display:flex;align-items:baseline;gap:6px;margin-top:2px"><span style="font-family:'Instrument Serif',serif;font-size:40px;line-height:1">96</span><span style="font-size:13px;color:#8e8278">/ 240</span></div>
+<div style="height:2px;margin-top:8px;background:linear-gradient(to right,#e9a94f 0%,#e9a94f 40%,rgba(244,236,225,.16) 40%,transparent 100%)"></div>
+<div style="margin-top:7px;font-size:12px;color:#6f645c">+120 more at 4:00</div>
+
+<div style="margin-top:20px;padding-top:16px;border-top:1px solid rgba(244,236,225,.1)">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Spending it pays</div>
+<div style="margin-top:10px;display:flex;flex-direction:column;gap:9px">
+<div style="display:flex;align-items:baseline;gap:8px;font-size:13px"><span style="width:5px;height:5px;flex:none;border-radius:50%;background:#e9a94f;position:relative;top:-3px"></span><span style="flex:1;color:#c3b6a9">Ashley</span><span style="font-size:11.5px;color:#e9a94f">6⚡</span></div>
+<div style="display:flex;align-items:baseline;gap:8px;font-size:13px"><span style="width:5px;height:5px;flex:none;border-radius:50%;background:#b48ade;position:relative;top:-3px"></span><span style="flex:1;color:#c3b6a9">Liadriel</span><span style="font-size:11.5px;color:#6f645c">18⚡</span></div>
+<div style="display:flex;align-items:baseline;gap:8px;font-size:13px"><span style="width:5px;height:5px;flex:none;border-radius:50%;background:rgba(244,236,225,.45);position:relative;top:-3px"></span><span style="flex:1;color:#c3b6a9">Nozomi</span><span style="font-size:11.5px;color:#6f645c">31⚡</span></div>
+</div>
+<div style="margin-top:10px;font-size:11.5px;line-height:1.55;color:#6f645c;text-wrap:pretty">to their next shard. <span style="color:#e9a94f">Change who →</span></div>
+</div>
+
+<div style="margin-top:18px;display:flex;align-items:baseline;gap:8px">
+<span style="color:#6fc9a0;font-size:13px">◈</span>
+<div>
+<div style="font-size:13px;color:#b8aca1">2 Field Supply <span style="color:#6f645c">of 3 held</span></div>
+<div style="margin-top:2px;font-size:12px;color:#6f645c">one use left today</div>
+</div>
+</div>
+</div>
+
+<div style="position:absolute;left:298px;top:74px;width:660px">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Wednesday · day 148</div>
+<div style="margin-top:12px;display:flex;gap:11px;align-items:flex-start">
+<span style="position:relative;top:22px;width:8px;height:8px;flex:none;border-radius:50%;background:#c9705f;animation:hc-pulse 2.8s ease-in-out infinite"></span>
+<div>
+<div style="font-family:'Instrument Serif',serif;font-size:52px;line-height:1.05;text-wrap:pretty">The Sundering Ward<br>closes at reset.</div>
+<div style="margin-top:12px;font-size:14.5px;line-height:1.6;color:#b8aca1;max-width:520px;text-wrap:pretty">Three Fronts, four heroes each, no Energy, and nothing is lost if you walk away. <span style="color:#e9a94f">Take the first Front →</span></div>
+</div>
+</div>
+</div>
+
+<div style="position:absolute;left:298px;top:320px;width:640px;height:1px;background:linear-gradient(to right,transparent,rgba(244,236,225,.18) 14%,rgba(244,236,225,.18) 68%,transparent)"></div>
+
+<div style="position:absolute;left:298px;top:348px;width:640px">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Continue</div>
+<div style="margin-top:12px;display:flex;gap:24px;align-items:flex-start">
+<div style="width:118px;height:82px;flex:none;background:repeating-linear-gradient(112deg,#33281f 0 8px,#241c15 8px 16px);-webkit-mask-image:linear-gradient(105deg,#000 55%,transparent);mask-image:linear-gradient(105deg,#000 55%,transparent)"></div>
+<div style="flex:1">
+<div style="font-family:'Instrument Serif',serif;font-size:32px;line-height:1.15">Lantern Courtyard</div>
+<div style="margin-top:5px;font-size:13.5px;color:#a2958a">Main 14 · needs <span style="color:#f4ece1">7,400</span> Power · your Vanguard reads <span style="color:#6fc9a0">8,120</span></div>
+</div>
+<div style="align-self:center;text-align:right">
+<div style="font-size:15px;font-weight:600;color:#e9a94f">Enter →</div>
+<div style="height:1px;margin-top:6px;background:linear-gradient(to right,transparent,#e9a94f)"></div>
+<div style="margin-top:6px;font-size:12px;color:#6f645c">⚡ 6</div>
+</div>
+</div>
+</div>
+
+<div style="position:absolute;left:298px;top:498px;width:640px;height:1px;background:linear-gradient(to right,transparent,rgba(244,236,225,.14) 14%,rgba(244,236,225,.14) 58%,transparent)"></div>
+
+<div style="position:absolute;left:298px;top:524px;width:660px">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Ready when you are</div>
+<div style="margin-top:14px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;gap:14px;align-items:center">
+<div style="position:relative;width:82px;height:46px;flex:none">
+<div style="position:absolute;inset:-6px;background:radial-gradient(closest-side,rgba(226,96,63,.3),transparent 74%)"></div>
+<div style="position:absolute;inset:0;background:repeating-linear-gradient(104deg,#5a3a2a 0 7px,#2a1c16 7px 14px);-webkit-mask-image:radial-gradient(64% 72% at 48% 44%,#000 52%,transparent 92%);mask-image:radial-gradient(64% 72% at 48% 44%,#000 52%,transparent 92%)"></div>
+<div style="position:absolute;inset:-7px;border-radius:6px;border:1px solid rgba(233,169,79,.5);animation:hc-pulse 2.6s ease-in-out infinite"></div>
+</div>
+<div style="flex:1"><div style="font-size:14.5px;font-weight:600">Ashley</div><div style="font-size:12.5px;color:#a2958a">fourth gear tier is complete</div></div>
+<div style="font-size:13px;color:#e9a94f">Finish it →</div>
+</div>
+<div style="display:flex;gap:14px;align-items:center">
+<div style="position:relative;width:82px;height:46px;flex:none">
+<div style="position:absolute;inset:-6px;background:radial-gradient(closest-side,rgba(180,138,222,.28),transparent 74%)"></div>
+<div style="position:absolute;inset:0;background:repeating-linear-gradient(104deg,#4a3a5c 0 7px,#201a28 7px 14px);-webkit-mask-image:radial-gradient(64% 72% at 48% 44%,#000 52%,transparent 92%);mask-image:radial-gradient(64% 72% at 48% 44%,#000 52%,transparent 92%)"></div>
+</div>
+<div style="flex:1"><div style="font-size:14.5px;font-weight:600">Malefia</div><div style="font-size:12.5px;color:#a2958a">has enough shards to join</div></div>
+<div style="font-size:13px;color:#e9a94f">Promote →</div>
+</div>
+<div style="display:flex;gap:12px;align-items:baseline;padding-left:96px">
+<span style="font-family:'Instrument Serif',serif;font-size:24px;line-height:1;color:#f4ece1">+4</span>
+<span style="font-size:12.5px;color:#e9a94f">more are ready →</span>
+</div>
+</div>
+</div>
+
+<div style="position:absolute;left:298px;top:756px;width:640px;height:1px;background:linear-gradient(to right,transparent,rgba(244,236,225,.14) 14%,rgba(244,236,225,.14) 52%,transparent)"></div>
+
+<div style="position:absolute;left:298px;top:782px;width:640px;display:flex;gap:44px;align-items:flex-start">
+<div style="flex:1">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Tracking</div>
+<div style="margin-top:10px;display:flex;justify-content:space-between;align-items:baseline;font-size:13px"><span>Ashley · fifth star</span><span style="font-family:'Instrument Serif',serif;font-size:17px">62<span style="color:#6f645c;font-size:13px"> / 75</span></span></div>
+<div style="height:2px;margin-top:5px;background:linear-gradient(to right,#e9a94f 0%,#e9a94f 82%,rgba(244,236,225,.14) 82%,rgba(244,236,225,.14) 92%,transparent)"></div>
+<div style="margin-top:9px;display:flex;justify-content:space-between;align-items:baseline;font-size:13px"><span>Liadriel · Whisperbind Cloak</span><span style="font-family:'Instrument Serif',serif;font-size:17px">18<span style="color:#6f645c;font-size:13px"> / 26</span></span></div>
+<div style="height:2px;margin-top:5px;background:linear-gradient(to right,#b48ade 0%,#b48ade 69%,rgba(244,236,225,.14) 69%,rgba(244,236,225,.14) 88%,transparent)"></div>
+</div>
+<div style="width:200px;flex:none">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Recent progress</div>
+<div style="margin-top:9px;font-size:12px;color:#6f645c;line-height:1.85">
+<div>Liadriel reached her sixth star</div>
+<div>Lantern Courtyard cleared</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="17c"><div class="dv-olabel"><span class="dv-oid">17c</span>What changes in <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">home.js</code> — and the copy rules that follow from determinism</div>
+<div class="dv-card" style="width:1060px;height:900px;position:relative;overflow:hidden;background:#12100f;color:#f4ece1;font-family:Figtree,system-ui,sans-serif;padding:44px 52px;box-sizing:border-box">
+<div style="position:absolute;inset:0;background:radial-gradient(70% 50% at 86% -6%,rgba(233,169,79,.1),transparent 62%)"></div>
+<div style="position:relative">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Deleted</div>
+<div style="margin-top:14px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;gap:22px;align-items:baseline;padding-bottom:11px;border-bottom:1px solid rgba(244,236,225,.09)">
+<span style="width:210px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#c9705f">focusThread()</span>
+<span style="flex:1;font-size:13px;line-height:1.55;color:#a2958a"><code style="font:11.5px ui-monospace,Menlo,monospace;color:#c3b6a9">.focus-thread-row</code> and the three <code style="font:11.5px ui-monospace,Menlo,monospace;color:#c3b6a9">.focus-slot-card</code> buttons go. The rail in <a class="dv-oid" href="#17a">17a</a> reads the same <code style="font:11.5px ui-monospace,Menlo,monospace;color:#c3b6a9">focusStatus()</code> array — one element per slot, positioned by <code style="font:11.5px ui-monospace,Menlo,monospace;color:#c3b6a9">energyToNext / max(energyToNext)</code>. The modal stays untouched.</span>
+</div>
+<div style="display:flex;gap:22px;align-items:baseline;padding-bottom:11px;border-bottom:1px solid rgba(244,236,225,.09)">
+<span style="width:210px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#c9705f">rankTodayHook · 'shards'</span>
+<span style="flex:1;font-size:13px;line-height:1.55;color:#a2958a">The shard hook can no longer win the headline — it is a countdown to something guaranteed. Drop the kind from the ranking in <code style="font:11.5px ui-monospace,Menlo,monospace;color:#c3b6a9">presentation.js</code>, and with it the <em>"give them a Focus slot"</em> branch of <code style="font:11.5px ui-monospace,Menlo,monospace;color:#c3b6a9">routeSentence()</code>. A hero who is <strong style="color:#f4ece1;font-weight:500">revealed but not yet reachable</strong> is still a real hook and stays.</span>
+</div>
+<div style="display:flex;gap:22px;align-items:baseline">
+<span style="width:210px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#c9705f">today-hero, featured</span>
+<span style="flex:1;font-size:13px;line-height:1.55;color:#a2958a"><code style="font:11.5px ui-monospace,Menlo,monospace;color:#c3b6a9">featuredId</code> no longer falls back through the shard hook. In <a class="dv-oid" href="#17b">17b</a> it is <code style="font:11.5px ui-monospace,Menlo,monospace;color:#c3b6a9">ready[0].characterId</code> — the art follows the action the player can take now. In <a class="dv-oid" href="#17a">17a</a> there is no featured hero at all and the ground is <code style="font:11.5px ui-monospace,Menlo,monospace;color:#c3b6a9">sceneImage(frontier)</code>, promoted from thumbnail to plate.</span>
+</div>
+</div>
+
+<div style="margin-top:34px;font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Added</div>
+<div style="margin-top:14px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;gap:22px;align-items:baseline;padding-bottom:11px;border-bottom:1px solid rgba(244,236,225,.09)">
+<span style="width:210px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#6fc9a0">focusYield(content, state, energy)</span>
+<span style="flex:1;font-size:13px;line-height:1.55;color:#a2958a">Pure, in <code style="font:11.5px ui-monospace,Menlo,monospace;color:#c3b6a9">core/focus.js</code>: what a given Energy figure would produce, per slot, without mutating. Both headlines are built from it — <em>96⚡ → 4 / 3 / 2</em> — and so is the Node screen's "+6 to all three" line. It is <code style="font:11.5px ui-monospace,Menlo,monospace;color:#c3b6a9">applyFocusEnergy()</code> with the writes removed; keep them sharing one helper so they can never disagree.</span>
+</div>
+<div style="display:flex;gap:22px;align-items:baseline">
+<span style="width:210px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#6fc9a0">halted slots</span>
+<span style="flex:1;font-size:13px;line-height:1.55;color:#a2958a">A 7★ hero in a slot silently stops paying. With no card to carry the <em>holding</em> warning, a halted slot's pip goes hollow and its label reads <span style="color:#c9705f">paying nothing — reassign</span>. If any slot is halted, the sub-line must say so: the headline promising nine shards is a lie otherwise.</span>
+</div>
+</div>
+
+<div style="margin-top:34px;height:1px;background:linear-gradient(to right,rgba(244,236,225,.14),transparent 88%)"></div>
+
+<div style="margin-top:26px;font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Copy rule, both options</div>
+<div style="margin-top:12px;font-size:13.5px;line-height:1.75;color:#c3b6a9;max-width:900px;text-wrap:pretty">Nothing on Today states a distance to a shard total any more — no <em>"thirteen shards from her fifth star"</em> in a headline. Shards are now a <strong style="color:#f4ece1;font-weight:500">rate</strong>, and a rate is stated as a rate. Star counts stay where the player asked for them: pinned, in Tracking. That is the whole difference between the two screens and the shipped one — Today reports what today's Energy <em>buys</em>, and the player chooses where to spend it.</div>
+
+<div style="margin-top:26px;padding:16px 18px;border-left:2px solid rgba(233,169,79,.5);background:rgba(233,169,79,.05)">
+<div style="font-size:12.5px;line-height:1.65;color:#a2958a;text-wrap:pretty"><strong style="color:#f4ece1;font-weight:500">The open question for you:</strong> in <a class="dv-oid" href="#17b">17b</a> Today no longer teaches the Focus at all — a new player who never opens the Energy well never learns where shards come from. <a class="dv-oid" href="#17a">17a</a> teaches it every day at the cost of the top of the screen. If <a class="dv-oid" href="#17b">17b</a> is the direction, the tutorial has to carry that weight instead.</div>
+</div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">Next, if either lands: the <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">Node</code> screen makes the same promise at the point of spend — <em>this run costs 6⚡ and pays all three</em> — and the Results screen currently lists Focus grants as loose chips. Say the word and I'll redraw both.</p>
+</section>
+
+<section class="dv-turn" id="t16">
+<div class="dv-thd"><span class="dv-tid">16</span><span class="dv-tname">One relic image, torn in four — and the restore that puts it back together</span></div>
+<p style="margin:-8px 0 26px;max-width:1000px;font:400 13.5px/1.7 Figtree,sans-serif;color:#a2958a">Built on <a class="dv-oid" href="#15b">15b</a>. One <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">object.icon</code> at 1024² per world, and the four cells each render a quarter of it — <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">background-size: 200% 200%</code> with a per-quadrant <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">background-position</code>. No slicing step, no extra files, full resolution in every cell, and one asset per world instead of four. The gain is narrative, not technical: a recovered piece <strong style="color:#f4ece1;font-weight:500">uncovers part of the actual relic</strong>, so by the third piece you can nearly read the thing. Note in <a class="dv-oid" href="#16a">16a</a> how the stripes of the placeholder run continuously across the seams — that is the same trick doing the work.<br><br>On seam shape I'd argue against jigsaw tabs: they're equally easy (four complementary <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">clip-path</code> masks, a bump on one edge being a notch on its neighbour) but they say <em>minigame</em>. The Ledger is a torn book, so <a class="dv-oid" href="#16b">16b</a> specs irregular tear seams instead — authored once, reused for every world's relic. <a class="dv-oid" href="#16b">16b</a> also carries the restore sequence and the one state bit dev has to add.</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="16a"><div class="dv-olabel"><span class="dv-oid">16a</span>The board at one, two and four pieces — one image, uncovering</div>
+<div class="dv-card" style="width:1440px;height:900px;position:relative;overflow:hidden;background:#12100f;color:#f4ece1;font-family:Figtree,system-ui,sans-serif">
+<div style="position:absolute;inset:0;background:radial-gradient(52% 40% at 50% -6%,rgba(233,169,79,.09),transparent 62%)"></div>
+
+<div style="position:absolute;left:52px;top:44px;width:900px">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">The ledger block · one asset, four cells</div>
+<div style="margin-top:9px;font-family:'Instrument Serif',serif;font-size:44px;line-height:1.04">Each piece found uncovers<br>more of the same book.</div>
+</div>
+<div style="position:absolute;right:52px;top:52px;width:400px;text-align:right;font-size:13px;line-height:1.75;color:#8e8278">
+<div>one <code style="font:11.5px ui-monospace,Menlo,monospace;color:#a2958a">object.icon</code> · 1024² · per world</div>
+<div>cells at <code style="font:11.5px ui-monospace,Menlo,monospace;color:#a2958a">background-size: 200% 200%</code></div>
+<div>no slicing, no second asset</div>
+</div>
+
+<div style="position:absolute;left:52px;top:246px;display:flex;gap:44px">
+
+<div style="width:380px">
+<div style="display:flex;align-items:baseline;gap:10px">
+<span style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">One of four</span>
+<span style="font-size:12px;color:#6f645c">Established</span>
+</div>
+<div style="margin-top:14px;width:380px;height:380px;position:relative">
+<div style="position:absolute;left:0;top:0;width:186px;height:186px;box-sizing:border-box;background-image:repeating-linear-gradient(108deg,#5a4a2a 0 14px,#2a2216 14px 28px);background-size:380px 380px;background-position:0 0"></div>
+<div style="position:absolute;left:194px;top:0;width:186px;height:186px;box-sizing:border-box;border:1px dashed rgba(244,236,225,.19);background:rgba(244,236,225,.015)"></div>
+<div style="position:absolute;left:0;top:194px;width:186px;height:186px;box-sizing:border-box;border:1px dashed rgba(244,236,225,.19);background:rgba(244,236,225,.015)"></div>
+<div style="position:absolute;left:194px;top:194px;width:186px;height:186px;box-sizing:border-box;border:1px dashed rgba(244,236,225,.12);background:rgba(244,236,225,.01)"></div>
+<div style="position:absolute;left:0;top:0;width:186px;height:186px;background:radial-gradient(72% 72% at 62% 62%,rgba(233,169,79,.3),transparent 70%)"></div>
+</div>
+<div style="margin-top:16px;font-size:13.5px;line-height:1.65;color:#a2958a;text-wrap:pretty">The Cover Board only. Three quarters of the plate are still dashed — nothing is guessed at, and nothing is shown that hasn't been earned.</div>
+</div>
+
+<div style="width:380px">
+<div style="display:flex;align-items:baseline;gap:10px">
+<span style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Two of four</span>
+<span style="font-size:12px;color:#6f645c">Rooted</span>
+</div>
+<div style="margin-top:14px;width:380px;height:380px;position:relative">
+<div style="position:absolute;left:0;top:0;width:186px;height:186px;box-sizing:border-box;background-image:repeating-linear-gradient(108deg,#5a4a2a 0 14px,#2a2216 14px 28px);background-size:380px 380px;background-position:0 0"></div>
+<div style="position:absolute;left:194px;top:0;width:186px;height:186px;box-sizing:border-box;background-image:repeating-linear-gradient(108deg,#5a4a2a 0 14px,#2a2216 14px 28px);background-size:380px 380px;background-position:-194px 0"></div>
+<div style="position:absolute;left:0;top:194px;width:186px;height:186px;box-sizing:border-box;border:1px dashed rgba(244,236,225,.19);background:rgba(244,236,225,.015)"></div>
+<div style="position:absolute;left:194px;top:194px;width:186px;height:186px;box-sizing:border-box;border:1px dashed rgba(244,236,225,.12);background:rgba(244,236,225,.01)"></div>
+<div style="position:absolute;left:0;top:0;width:380px;height:186px;background:radial-gradient(58% 86% at 50% 60%,rgba(233,169,79,.26),transparent 72%)"></div>
+</div>
+<div style="margin-top:16px;font-size:13.5px;line-height:1.65;color:#a2958a;text-wrap:pretty">The Index Leaf joins it and the stripes run straight through the seam — because they are one image. This is where a player realises the pieces are halves of something, not four icons.</div>
+</div>
+
+<div style="width:380px">
+<div style="display:flex;align-items:baseline;gap:10px">
+<span style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#e9a94f">Four of four</span>
+<span style="font-size:12px;color:#6f645c">in pieces, but all present</span>
+</div>
+<div style="margin-top:14px;width:380px;height:380px;position:relative">
+<div style="position:absolute;left:0;top:0;width:186px;height:186px;background-image:repeating-linear-gradient(108deg,#5a4a2a 0 14px,#2a2216 14px 28px);background-size:380px 380px;background-position:0 0"></div>
+<div style="position:absolute;left:194px;top:0;width:186px;height:186px;background-image:repeating-linear-gradient(108deg,#5a4a2a 0 14px,#2a2216 14px 28px);background-size:380px 380px;background-position:-194px 0"></div>
+<div style="position:absolute;left:0;top:194px;width:186px;height:186px;background-image:repeating-linear-gradient(108deg,#5a4a2a 0 14px,#2a2216 14px 28px);background-size:380px 380px;background-position:0 -194px"></div>
+<div style="position:absolute;left:194px;top:194px;width:186px;height:186px;background-image:repeating-linear-gradient(108deg,#5a4a2a 0 14px,#2a2216 14px 28px);background-size:380px 380px;background-position:-194px -194px"></div>
+<div style="position:absolute;inset:0;background:radial-gradient(56% 56% at 50% 50%,rgba(233,169,79,.3),transparent 72%);animation:hc-pulse 3.4s ease-in-out infinite"></div>
+<div style="position:absolute;left:0;right:0;top:186px;height:8px;background:#12100f"></div>
+<div style="position:absolute;left:186px;top:0;bottom:0;width:8px;background:#12100f"></div>
+</div>
+<div style="margin-top:16px;font-size:13.5px;line-height:1.65;color:#c3b6a9;text-wrap:pretty">All four are held, and the gaps are still there. The book is not whole until you say so — <span style="color:#e9a94f">Bind the ledger →</span></div>
+</div>
+</div>
+
+<div style="position:absolute;left:52px;right:52px;top:790px;height:1px;background:linear-gradient(to right,rgba(244,236,225,.13),rgba(244,236,225,.13) 72%,transparent)"></div>
+<div style="position:absolute;left:52px;top:820px;width:640px;font-size:13px;line-height:1.7;color:#8e8278;text-wrap:pretty">Authoring note for the art: two seams cross the centre, so keep the focal subject out of a 14% band around the middle cross. Everything else is unchanged — <code style="font:11.5px ui-monospace,Menlo,monospace;color:#a2958a">object.icon</code>, 1:1, 1024².</div>
+<div style="position:absolute;right:52px;top:820px;width:620px;text-align:right;font-size:13px;line-height:1.7;color:#8e8278;text-wrap:pretty">The dashed cell is the same fixed box as <a class="dv-oid" href="#15b">15b</a>: a world with no relic art imported renders this exact layout, empty — never the overflowing placeholder.</div>
+</div>
+</div>
+
+<div class="dv-opt" id="16b"><div class="dv-olabel"><span class="dv-oid">16b</span>Binding the ledger — the sequence, the seams, and the missing state bit</div>
+<div class="dv-card" style="width:1060px;height:900px;position:relative;overflow:hidden;background:#12100f;color:#f4ece1;font-family:Figtree,system-ui,sans-serif;padding:44px 52px;box-sizing:border-box">
+<div style="position:absolute;inset:0;background:radial-gradient(70% 50% at 86% -6%,rgba(233,169,79,.1),transparent 62%)"></div>
+<div style="position:relative">
+<div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Restore sequence · 4.6 seconds, then it is just the Mastery screen</div>
+<div style="margin-top:10px;font-family:'Instrument Serif',serif;font-size:38px;line-height:1.04">Six beats. The seams<br>closing is the whole idea.</div>
+
+<div style="margin-top:22px;height:2px;background:linear-gradient(to right,#e9a94f 0%,#f6c67f 26%,rgba(244,236,225,.16) 44%,rgba(244,236,225,.16) 100%)"></div>
+<div style="margin-top:7px;display:flex;font:11px ui-monospace,Menlo,monospace;color:#6f645c">
+<span style="width:12%">click</span><span style="width:16%">0.42</span><span style="width:12%">1.02</span><span style="width:14%">1.18</span><span style="width:16%">1.9</span><span style="width:30%">hold → 4.6</span>
+</div>
+
+<div style="margin-top:18px;display:flex;flex-direction:column">
+<div style="display:flex;gap:20px;align-items:baseline;padding:6px 0;border-top:1px solid rgba(244,236,225,.09)">
+<span style="width:96px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#8e8278">0 – 260</span>
+<span style="width:172px;flex:none;font-size:14px;font-weight:600">The room quiets</span>
+<span style="flex:1;font-size:13px;line-height:1.55;color:#a2958a">The piece list, the track and the milestone copy dim to 22% and stop taking clicks. The block stays lit — <span style="color:#f4ece1">ease-out</span>.</span>
+</div>
+<div style="display:flex;gap:20px;align-items:baseline;padding:6px 0;border-top:1px solid rgba(244,236,225,.09)">
+<span style="width:96px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">0 – 420</span>
+<span style="width:172px;flex:none;font-size:14px;font-weight:600">The four lift</span>
+<span style="flex:1;font-size:13px;line-height:1.55;color:#a2958a">Each quarter scales to 1.03 and drifts 22px further out along its own diagonal, as if picked up. Its edge glow comes to full.</span>
+</div>
+<div style="display:flex;gap:20px;align-items:baseline;padding:6px 0;border-top:1px solid rgba(244,236,225,.09)">
+<span style="width:96px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">420 – 1020</span>
+<span style="width:172px;flex:none;font-size:14px;font-weight:600">They come together</span>
+<span style="flex:1;font-size:13px;line-height:1.55;color:#a2958a">Each slides to its exact cell, 90ms apart in reading order, the 8px gaps closing to 0 as they arrive — <span style="color:#f4ece1">cubic-bezier(.4,0,.2,1)</span>. Nothing rotates; a torn book does not spin.</span>
+</div>
+<div style="display:flex;gap:20px;align-items:baseline;padding:6px 0;border-top:1px solid rgba(244,236,225,.09)">
+<span style="width:96px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">1020 – 1180</span>
+<span style="width:172px;flex:none;font-size:14px;font-weight:600">The seams take</span>
+<span style="flex:1;font-size:13px;line-height:1.55;color:#a2958a">The four tear masks cross-fade to one unmasked plate at 100% background-size. One bloom leaves the centre cross and dies inside 400ms; a single sheen crosses the whole face.</span>
+</div>
+<div style="display:flex;gap:20px;align-items:baseline;padding:6px 0;border-top:1px solid rgba(244,236,225,.09)">
+<span style="width:96px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#8e8278">1180 – 1700</span>
+<span style="width:172px;flex:none;font-size:14px;font-weight:600">The name sets</span>
+<span style="flex:1;font-size:13px;line-height:1.55;color:#a2958a">“The Unwritten Ledger — whole.” rises 14px beside the plate, 34px serif. The rank reading is untouched: binding grants no points.</span>
+</div>
+<div style="display:flex;gap:20px;align-items:baseline;padding:6px 0;border-top:1px solid rgba(244,236,225,.09);border-bottom:1px solid rgba(244,236,225,.09)">
+<span style="width:96px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#8e8278">1900 – 2400</span>
+<span style="width:172px;flex:none;font-size:14px;font-weight:600">What it can do now</span>
+<span style="flex:1;font-size:13px;line-height:1.55;color:#a2958a">One line, then the action: <span style="color:#c3b6a9">Development pays every 20 shards instead of 25.</span> <span style="color:#e9a94f">Install it into a Program →</span></span>
+</div>
+</div>
+
+<div style="margin-top:22px;display:flex;gap:36px;align-items:flex-start">
+<div style="width:230px;flex:none">
+<div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">The seams — authored once</div>
+<div style="margin-top:14px;width:230px;height:230px;position:relative;background:rgba(244,236,225,.03)">
+<div style="position:absolute;left:0;top:0;width:230px;height:230px;background-image:repeating-linear-gradient(108deg,#5a4a2a 0 12px,#2a2216 12px 24px);clip-path:polygon(0 0,54% 0,52% 18%,56% 34%,51% 52%,53% 60%,34% 58%,18% 62%,0 59%)"></div>
+<div style="position:absolute;left:0;top:0;width:230px;height:230px;background-image:repeating-linear-gradient(108deg,#5a4a2a 0 12px,#2a2216 12px 24px);opacity:.82;clip-path:polygon(56% 0,100% 0,100% 54%,82% 51%,66% 56%,55% 61%,53% 60%,51% 52%,56% 34%,52% 18%,54% 0)"></div>
+<div style="position:absolute;left:0;top:0;width:230px;height:230px;background-image:repeating-linear-gradient(108deg,#5a4a2a 0 12px,#2a2216 12px 24px);opacity:.66;clip-path:polygon(0 61%,18% 64%,34% 60%,53% 62%,51% 78%,55% 90%,52% 100%,0 100%)"></div>
+<div style="position:absolute;left:0;top:0;width:230px;height:230px;background-image:repeating-linear-gradient(108deg,#5a4a2a 0 12px,#2a2216 12px 24px);opacity:.5;clip-path:polygon(55% 63%,66% 58%,82% 53%,100% 56%,100% 100%,54% 100%,55% 90%,51% 78%,53% 62%)"></div>
+<div style="position:absolute;left:0;right:0;top:41%;height:18%;background:radial-gradient(60% 100% at 50% 50%,rgba(233,169,79,.16),transparent 72%)"></div>
+</div>
+<div style="margin-top:12px;font-size:12.5px;line-height:1.6;color:#8e8278;text-wrap:pretty">Four <code style="font:11.5px ui-monospace,Menlo,monospace;color:#a2958a">clip-path</code> polygons whose shared edges are exact complements — a tear down the gutter and one across the quire. One set, every world's relic.</div>
+</div>
+<div style="flex:1">
+<div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">It can always be cut short</div>
+<div style="margin-top:10px;font-size:13px;line-height:1.6;color:#a2958a;text-wrap:pretty">Any click or key jumps to the bound state, exactly as the promotion sequence does — the same <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">settle()</code> shape, so this is a second caller of the machinery in <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">src/ui/promotion.js</code> rather than new animation code.</div>
+<div style="margin-top:18px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">prefers-reduced-motion</div>
+<div style="margin-top:10px;font-size:13px;line-height:1.6;color:#a2958a;text-wrap:pretty">No lift, no travel, no sheen. The gaps close and the masks drop in one 180ms cross-fade; the name and the consequence line fade in behind it.</div>
+<div style="margin-top:18px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">If there is no relic art</div>
+<div style="margin-top:10px;font-size:13px;line-height:1.6;color:#a2958a;text-wrap:pretty">The sequence still plays on the four dashed cells: they travel, the gaps close, and one bordered plate is left. The moment is the binding, not the picture.</div>
+<div style="margin-top:20px;display:flex;gap:12px;align-items:flex-start">
+<span style="position:relative;top:7px;width:7px;height:7px;flex:none;border-radius:50%;background:#e9a94f;animation:hc-pulse 2.8s ease-in-out infinite"></span>
+<div style="font-size:13px;line-height:1.6;color:#a2958a;text-wrap:pretty">What dev has to add: a <strong style="color:#f4ece1;font-weight:500">restored bit</strong>. <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">relicStatus()</code> reports only <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">complete</code>, and <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">installRelic()</code> already accepts a complete relic — so a player who found all four and never pressed the button would have a working Program bonus and an unbound book. Gate the install on <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">state.relics[worldId].restored</code>, set by this sequence, or the button is decoration.</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<p class="dv-next">Next: the two Mastery states that actually break a screen — a world with nothing bound at all, and the milestone choice sheets (which family the cache holds, who receives the shards).</p>
+</section>
+
+<section class="dv-turn" id="t15">
+<div class="dv-thd"><span class="dv-tid">15</span><span class="dv-tname">Mastery, led by the relic — and Programs folded into the world</span></div>
+<p style="margin:-8px 0 26px;max-width:1000px;font:400 13.5px/1.7 Figtree,sans-serif;color:#a2958a">Mastery's score is fully derived — <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">350</code> campaign, <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">350</code> heroes, <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">200</code> gear, <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">100</code> relic — which is exactly why it should not lead. A number that moves when you play elsewhere is a consequence, not a goal. The four buried relic pieces are the goal: findable, nameable, and the only part of this track you go somewhere to get. Both directions below lead with them and let the points settle underneath. <strong style="color:#f4ece1;font-weight:500">Neither states a completion date</strong> — the track shows the next station and nothing beyond it.<br><br>This also fixes what you saw. The dotted square that overflowed the page and the stacked links are <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">artPlaceholder()</code> inside <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">.relic-pieces</code>: with no relic art imported, four unsized placeholders each expand to the row's full width and push their <em>buried at →</em> links into a pile. Below, a piece cell is a <strong style="color:#f4ece1;font-weight:500">fixed 240 × 240 box either way</strong> — art or no art — and the unarted state is designed rather than fallen back into. <a class="dv-oid" href="#15a">15a</a> and <a class="dv-oid" href="#15b">15b</a> are the two directions; <a class="dv-oid" href="#15c">15c</a> folds Programs into the world hub, replacing <a class="dv-oid" href="#12b">12b</a>'s Headquarters row.</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="15a"><div class="dv-olabel"><span class="dv-oid">15a</span>Direction one — the four pieces laid out as a dig site</div>
+<div class="dv-card" style="width:1440px;height:900px;position:relative;overflow:hidden;background:#12100f;color:#f4ece1;font-family:Figtree,system-ui,sans-serif">
+<div style="position:absolute;inset:0;background:radial-gradient(58% 44% at 24% -8%,rgba(233,169,79,.10),transparent 60%)"></div>
+
+<div style="position:absolute;left:52px;top:36px;font-size:13px;color:#a2958a">← Eden Magic Academy</div>
+
+<div style="position:absolute;left:52px;top:84px;width:820px">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Eden Magic Academy · Mastery</div>
+<div style="margin-top:9px;font-family:'Instrument Serif',serif;font-size:54px;line-height:1.02">The Unwritten Ledger</div>
+<div style="margin-top:11px;font-size:14px;line-height:1.65;color:#a2958a;max-width:620px;text-wrap:pretty">Four pieces of the book the founders agreed not to keep. Each one found teaches the Academy something about itself — and the whole ledger, once bound, installs into a Program.</div>
+</div>
+
+<div style="position:absolute;right:52px;top:88px;width:420px;text-align:right">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Standing</div>
+<div style="margin-top:8px;font-family:'Instrument Serif',serif;font-size:38px;line-height:1">Established</div>
+<div style="margin-top:6px;font-size:13px;color:#a2958a">612 of 1,000 · Rooted opens at 700</div>
+</div>
+
+<div style="position:absolute;left:52px;right:52px;top:238px;height:2px;background:linear-gradient(to right,#e9a94f 0,#e9a94f 61.2%,rgba(244,236,225,.13) 61.2%,rgba(244,236,225,.13) 100%)"></div>
+<div style="position:absolute;left:52px;right:52px;top:248px;display:flex;font:11px ui-monospace,Menlo,monospace;color:#6f645c">
+<span style="width:20%">Known · 200</span><span style="width:25%">Established · 450</span><span style="width:25%;color:#e9a94f">Rooted · 700</span><span style="width:30%;text-align:right">Mastered · 1,000</span>
+</div>
+
+<div style="position:absolute;left:52px;top:302px;font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">The ledger · one of four bound</div>
+
+<div style="position:absolute;left:52px;top:334px;display:flex;gap:32px">
+
+<div style="width:240px">
+<div style="width:240px;height:240px;position:relative;box-sizing:border-box;overflow:hidden;background:repeating-linear-gradient(108deg,#5a4a2a 0 10px,#2a2216 10px 20px)">
+<div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 50% 46%,rgba(233,169,79,.34),transparent 68%)"></div>
+<div style="position:absolute;left:0;right:0;top:112px;text-align:center;font:10.5px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.42)">object.icon · 1024²</div>
+</div>
+<div style="margin-top:14px;font-family:'Instrument Serif',serif;font-size:21px;line-height:1.15">The Cover Board</div>
+<div style="margin-top:5px;font-size:12.5px;line-height:1.55;color:#8e8278;text-wrap:pretty">Boiled leather, no title stamped.</div>
+<div style="margin-top:8px;font-size:12.5px;color:#6fc9a0">Bound · +25 Mastery</div>
+</div>
+
+<div style="width:240px">
+<div style="width:240px;height:240px;position:relative;box-sizing:border-box;border:1px dashed rgba(244,236,225,.2);background:rgba(244,236,225,.017)">
+<div style="position:absolute;left:0;right:0;top:104px;text-align:center;font:10.5px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.3);line-height:1.7">not recovered<br>object.icon · 1024²</div>
+</div>
+<div style="margin-top:14px;font-family:'Instrument Serif',serif;font-size:21px;line-height:1.15;color:#c3b6a9">The Index Leaf</div>
+<div style="margin-top:5px;font-size:12.5px;line-height:1.55;color:#8e8278;text-wrap:pretty">Names every room the Academy has closed.</div>
+<div style="margin-top:8px;font-size:12.5px;color:#e9a94f">Buried at Bellringer's Stair →</div>
+</div>
+
+<div style="width:240px">
+<div style="width:240px;height:240px;position:relative;box-sizing:border-box;border:1px dashed rgba(244,236,225,.2);background:rgba(244,236,225,.017)">
+<div style="position:absolute;left:0;right:0;top:104px;text-align:center;font:10.5px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.3);line-height:1.7">not recovered<br>object.icon · 1024²</div>
+</div>
+<div style="margin-top:14px;font-family:'Instrument Serif',serif;font-size:21px;line-height:1.15;color:#c3b6a9">The Middle Quire</div>
+<div style="margin-top:5px;font-size:12.5px;line-height:1.55;color:#8e8278;text-wrap:pretty">Nine hundred years, in one hand throughout.</div>
+<div style="margin-top:8px;font-size:12.5px;color:#e9a94f">Buried in the Sealed Wing →</div>
+</div>
+
+<div style="width:240px">
+<div style="width:240px;height:240px;position:relative;box-sizing:border-box;border:1px dashed rgba(244,236,225,.14);background:rgba(244,236,225,.012)">
+<div style="position:absolute;left:0;right:0;top:104px;text-align:center;font:10.5px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.22);line-height:1.7">not recovered<br>object.icon · 1024²</div>
+</div>
+<div style="margin-top:14px;font-family:'Instrument Serif',serif;font-size:21px;line-height:1.15;color:#8e8278">The Closing Seal</div>
+<div style="margin-top:5px;font-size:12.5px;line-height:1.55;color:#6f645c;text-wrap:pretty">Still wax. Still holding.</div>
+<div style="margin-top:8px;font-size:12.5px;color:#6f645c">Behind Chapter 5 · not yet reachable</div>
+</div>
+</div>
+
+<div style="position:absolute;left:52px;right:52px;top:712px;height:1px;background:linear-gradient(to right,rgba(244,236,225,.13),rgba(244,236,225,.13) 68%,transparent)"></div>
+
+<div style="position:absolute;left:52px;top:744px;width:520px">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Rooted brings</div>
+<div style="margin-top:12px;font-size:14px;line-height:1.7;color:#c3b6a9;text-wrap:pretty">Two Field Supplies, a cache of ten materials in a family you pick, and Suzume's <em style="font-style:normal;color:#e9a94f">Lantern Year</em> look.</div>
+<div style="margin-top:10px;font-size:13px;color:#e9a94f">15 shards from Established are still waiting for a name →</div>
+</div>
+
+<div style="position:absolute;right:52px;top:744px;width:700px">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">What is already counting</div>
+<div style="margin-top:12px;display:flex;gap:0">
+<div style="flex:1"><div style="font-size:12.5px;color:#8e8278">Campaign</div><div style="margin-top:4px;font-size:14px">245<span style="color:#6f645c"> / 350</span></div><div style="margin-top:5px;height:2px;background:rgba(244,236,225,.12)"><div style="width:70%;height:2px;background:#a2958a"></div></div></div>
+<div style="width:24px"></div>
+<div style="flex:1"><div style="font-size:12.5px;color:#8e8278">Heroes</div><div style="margin-top:4px;font-size:14px">214<span style="color:#6f645c"> / 350</span></div><div style="margin-top:5px;height:2px;background:rgba(244,236,225,.12)"><div style="width:61%;height:2px;background:#a2958a"></div></div></div>
+<div style="width:24px"></div>
+<div style="flex:1"><div style="font-size:12.5px;color:#8e8278">Gear</div><div style="margin-top:4px;font-size:14px">128<span style="color:#6f645c"> / 200</span></div><div style="margin-top:5px;height:2px;background:rgba(244,236,225,.12)"><div style="width:64%;height:2px;background:#a2958a"></div></div></div>
+<div style="width:24px"></div>
+<div style="flex:1"><div style="font-size:12.5px;color:#8e8278">Ledger</div><div style="margin-top:4px;font-size:14px;color:#e9a94f">25<span style="color:#6f645c"> / 100</span></div><div style="margin-top:5px;height:2px;background:rgba(244,236,225,.12)"><div style="width:25%;height:2px;background:#e9a94f"></div></div></div>
+</div>
+<div style="margin-top:14px;font-size:12.5px;color:#6f645c">All four move on their own as you play the Academy. Only the ledger asks you to go somewhere.</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="15b"><div class="dv-olabel"><span class="dv-oid">15b</span>Direction two — the ledger as one object, assembling</div>
+<div class="dv-card" style="width:1440px;height:900px;position:relative;overflow:hidden;background:#12100f;color:#f4ece1;font-family:Figtree,system-ui,sans-serif">
+<div style="position:absolute;inset:0;background:radial-gradient(46% 52% at 27% 54%,rgba(233,169,79,.13),transparent 66%)"></div>
+
+<div style="position:absolute;left:52px;top:36px;font-size:13px;color:#a2958a">← Eden Magic Academy</div>
+<div style="position:absolute;left:52px;top:82px;font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Eden Magic Academy · Mastery · Established</div>
+
+<div style="position:absolute;left:52px;top:150px;width:520px;height:520px">
+<div style="position:absolute;left:0;top:0;width:250px;height:250px;box-sizing:border-box;overflow:hidden;background:repeating-linear-gradient(108deg,#5a4a2a 0 10px,#2a2216 10px 20px)">
+<div style="position:absolute;inset:0;background:radial-gradient(80% 80% at 62% 62%,rgba(233,169,79,.4),transparent 70%)"></div>
+<div style="position:absolute;left:0;right:0;top:116px;text-align:center;font:10.5px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.44)">object.icon · 1024²</div>
+</div>
+<div style="position:absolute;left:262px;top:0;width:250px;height:250px;box-sizing:border-box;border:1px dashed rgba(244,236,225,.2);background:rgba(244,236,225,.017)">
+<div style="position:absolute;left:0;right:0;top:110px;text-align:center;font:10.5px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.28);line-height:1.7">object.icon · 1024²<br>not recovered</div>
+</div>
+<div style="position:absolute;left:0;top:262px;width:250px;height:250px;box-sizing:border-box;border:1px dashed rgba(244,236,225,.2);background:rgba(244,236,225,.017)">
+<div style="position:absolute;left:0;right:0;top:110px;text-align:center;font:10.5px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.28);line-height:1.7">object.icon · 1024²<br>not recovered</div>
+</div>
+<div style="position:absolute;left:262px;top:262px;width:250px;height:250px;box-sizing:border-box;border:1px dashed rgba(244,236,225,.13);background:rgba(244,236,225,.012)">
+<div style="position:absolute;left:0;right:0;top:110px;text-align:center;font:10.5px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.2);line-height:1.7">object.icon · 1024²<br>not yet reachable</div>
+</div>
+</div>
+<div style="position:absolute;left:52px;top:698px;font-size:12.5px;color:#6f645c">One of four bound. The book is the only part of Mastery you go somewhere to get.</div>
+
+<div style="position:absolute;left:632px;top:132px;width:756px">
+<div style="font-family:'Instrument Serif',serif;font-size:50px;line-height:1.02">The Unwritten Ledger</div>
+<div style="margin-top:12px;font-size:14px;line-height:1.65;color:#a2958a;max-width:600px;text-wrap:pretty">The book the founders agreed not to keep, in four pieces, buried along the Academy's own campaign. Bound whole, it installs into one Program and visibly improves it.</div>
+</div>
+
+<div style="position:absolute;left:632px;top:296px;right:52px;height:1px;background:linear-gradient(to right,rgba(244,236,225,.14),transparent 92%)"></div>
+
+<div style="position:absolute;left:632px;top:324px;width:756px;display:flex;flex-direction:column">
+<div style="display:flex;gap:20px;align-items:baseline;padding:13px 0;border-bottom:1px solid rgba(244,236,225,.09)">
+<span style="width:20px;flex:none;text-align:center;font-size:13px;color:#6fc9a0">✓</span>
+<span style="width:190px;flex:none;font-size:15px">The Cover Board</span>
+<span style="flex:1;font-size:13px;color:#8e8278">Boiled leather, no title stamped.</span>
+<span style="width:130px;flex:none;text-align:right;font-size:12.5px;color:#6fc9a0">bound · +25</span>
+</div>
+<div style="display:flex;gap:20px;align-items:baseline;padding:13px 0;border-bottom:1px solid rgba(244,236,225,.09)">
+<span style="width:20px;flex:none;text-align:center;font-size:13px;color:#6f645c">◇</span>
+<span style="width:190px;flex:none;font-size:15px">The Index Leaf</span>
+<span style="flex:1;font-size:13px;color:#8e8278">Names every room the Academy has closed.</span>
+<span style="width:130px;flex:none;text-align:right;font-size:12.5px;color:#e9a94f">Bellringer's Stair →</span>
+</div>
+<div style="display:flex;gap:20px;align-items:baseline;padding:13px 0;border-bottom:1px solid rgba(244,236,225,.09)">
+<span style="width:20px;flex:none;text-align:center;font-size:13px;color:#6f645c">◇</span>
+<span style="width:190px;flex:none;font-size:15px">The Middle Quire</span>
+<span style="flex:1;font-size:13px;color:#8e8278">Nine hundred years, in one hand throughout.</span>
+<span style="width:130px;flex:none;text-align:right;font-size:12.5px;color:#e9a94f">the Sealed Wing →</span>
+</div>
+<div style="display:flex;gap:20px;align-items:baseline;padding:13px 0;border-bottom:1px solid rgba(244,236,225,.09)">
+<span style="width:20px;flex:none;text-align:center;font-size:13px;color:#4f4741">◇</span>
+<span style="width:190px;flex:none;font-size:15px;color:#8e8278">The Closing Seal</span>
+<span style="flex:1;font-size:13px;color:#6f645c">Still wax. Still holding.</span>
+<span style="width:130px;flex:none;text-align:right;font-size:12.5px;color:#6f645c">behind Chapter 5</span>
+</div>
+</div>
+
+<div style="position:absolute;left:632px;top:568px;width:756px">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">The track, as a consequence</div>
+<div style="margin-top:14px;display:flex;align-items:baseline;gap:14px">
+<span style="font-family:'Instrument Serif',serif;font-size:34px;line-height:1">612</span>
+<span style="font-size:13px;color:#a2958a">of 1,000 · Rooted opens at 700</span>
+</div>
+<div style="margin-top:14px;display:flex;height:8px;gap:2px">
+<div style="width:24.5%;background:#8e8278" title="campaign"></div>
+<div style="width:21.4%;background:#a2958a" title="heroes"></div>
+<div style="width:12.8%;background:#c3b6a9" title="gear"></div>
+<div style="width:2.5%;background:#e9a94f" title="ledger"></div>
+<div style="flex:1;background:rgba(244,236,225,.1)"></div>
+</div>
+<div style="margin-top:10px;display:flex;font-size:12.5px;color:#8e8278">
+<span style="width:24.5%">Campaign 245</span><span style="width:21.4%">Heroes 214</span><span style="width:16%">Gear 128</span><span style="flex:1;color:#e9a94f">Ledger 25 of 100</span>
+</div>
+<div style="margin-top:22px;font-size:13.5px;line-height:1.7;color:#c3b6a9;text-wrap:pretty">Rooted brings two Field Supplies, a cache of ten materials in a family you pick, and Suzume's <em style="font-style:normal;color:#e9a94f">Lantern Year</em> look.</div>
+<div style="margin-top:9px;font-size:13px;color:#e9a94f">15 shards from Established are still waiting for a name →</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="15c"><div class="dv-olabel"><span class="dv-oid">15c</span>Programs, folded into the world — replacing the old Headquarters row</div>
+<div class="dv-card" style="width:1440px;height:900px;position:relative;overflow:hidden;background:#12100f;color:#f4ece1;font-family:Figtree,system-ui,sans-serif">
+<div style="position:absolute;left:0;right:0;top:0;height:396px;background:repeating-linear-gradient(96deg,#2c3a3a 0 14px,#1a2222 14px 28px)"></div>
+<div style="position:absolute;left:0;right:0;top:0;height:396px;background:radial-gradient(70% 100% at 64% 8%,rgba(233,169,79,.20),transparent 62%)"></div>
+<div style="position:absolute;left:0;right:0;top:0;height:396px;background:linear-gradient(to bottom,rgba(18,16,15,.52),rgba(18,16,15,.16) 34%,#12100f 100%)"></div>
+<div style="position:absolute;left:0;right:0;top:0;height:396px;background:linear-gradient(to right,rgba(18,16,15,.82) 20%,transparent 62%)"></div>
+<div style="position:absolute;left:620px;top:302px;font:11px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.32)">world art — scene.key_art · 1600 × 900</div>
+
+<div style="position:absolute;left:52px;top:36px;font-size:13px;color:#a2958a">← Worlds</div>
+
+<div style="position:absolute;left:52px;top:132px;width:760px">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Day 148 · Established · 612 of 1,000</div>
+<div style="margin-top:10px;font-family:'Instrument Serif',serif;font-size:60px;line-height:1.04">Eden Magic Academy</div>
+<div style="margin-top:12px;font-size:15px;line-height:1.6;color:#b8aca1;max-width:560px;text-wrap:pretty">Nine hundred years of lecture halls built over something the founders agreed not to write down.</div>
+</div>
+
+<div style="position:absolute;right:52px;top:150px;width:300px;text-align:right">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Held here</div>
+<div style="margin-top:10px;display:flex;justify-content:flex-end;gap:30px">
+<div>
+<div style="font-family:'Instrument Serif',serif;font-size:32px;line-height:1">86</div>
+<div style="margin-top:3px;font-size:12px;color:#8e8278">Academy Sigils</div>
+</div>
+<div>
+<div style="font-family:'Instrument Serif',serif;font-size:32px;line-height:1">9<span style="font-size:19px;color:#6f645c"> / 12</span></div>
+<div style="margin-top:3px;font-size:12px;color:#8e8278">characters</div>
+</div>
+</div>
+</div>
+
+<div style="position:absolute;left:52px;top:412px;right:52px;height:1px;background:linear-gradient(to right,rgba(244,236,225,.16),rgba(244,236,225,.16) 66%,transparent)"></div>
+
+<div style="position:absolute;left:52px;top:444px;width:640px">
+
+<div style="padding:0 0 26px">
+<div style="display:flex;align-items:baseline;gap:14px">
+<span style="width:7px;height:7px;flex:none;border-radius:50%;background:#c9705f;animation:hc-pulse 2.8s ease-in-out infinite"></span>
+<div style="font-family:'Instrument Serif',serif;font-size:34px;line-height:1.1">The Sundering Ward</div>
+<div style="font-size:11.5px;letter-spacing:.13em;text-transform:uppercase;color:#c9705f">crisis · today only</div>
+</div>
+<div style="margin-top:8px;padding-left:21px;font-size:13.5px;line-height:1.6;color:#a2958a;text-wrap:pretty;max-width:560px">Three Fronts, four characters each. No Energy, no penalty for refusing. <span style="color:#e9a94f">Answer it →</span></div>
+</div>
+
+<div style="height:1px;background:linear-gradient(to right,rgba(244,236,225,.10),transparent 86%)"></div>
+
+<div style="padding:24px 0 25px">
+<div style="display:flex;align-items:baseline;justify-content:space-between">
+<div style="font-family:'Instrument Serif',serif;font-size:32px;line-height:1.1;padding-left:21px">Chapters</div>
+<div style="font-size:13px;color:#a2958a">Chapter 4 of 6 · 21 of 30 cleared</div>
+</div>
+<div style="margin-top:10px;margin-left:21px;height:2px;background:linear-gradient(to right,#e9a94f 0%,#e9a94f 70%,rgba(244,236,225,.14) 70%,rgba(244,236,225,.14) 86%,transparent)"></div>
+<div style="margin-top:9px;padding-left:21px;font-size:13.5px;color:#a2958a">Bellringer's Stair holds a ledger piece. <span style="color:#e9a94f">Continue →</span></div>
+</div>
+
+<div style="height:1px;background:linear-gradient(to right,rgba(244,236,225,.10),transparent 86%)"></div>
+
+<div style="padding:24px 0 25px">
+<div style="display:flex;align-items:baseline;justify-content:space-between">
+<div style="font-family:'Instrument Serif',serif;font-size:32px;line-height:1.1;padding-left:21px">Mastery</div>
+<div style="font-size:13px;color:#a2958a">Established · Rooted at 700</div>
+</div>
+<div style="margin-top:9px;padding-left:21px;font-size:13.5px;color:#a2958a">One of four ledger pieces bound; 15 shards still unnamed. <span style="color:#e9a94f">Open the ledger →</span></div>
+</div>
+</div>
+
+<div style="position:absolute;right:52px;top:444px;width:660px">
+<div style="display:flex;align-items:baseline;justify-content:space-between">
+<div style="font-family:'Instrument Serif',serif;font-size:32px;line-height:1.1">Programs</div>
+<div style="font-size:13px;color:#a2958a">all three advance on their own</div>
+</div>
+
+<div style="margin-top:22px;display:flex;gap:22px;align-items:baseline">
+<div style="width:132px;flex:none;font-size:14.5px;font-weight:600">Procurement</div>
+<div style="flex:1">
+<div style="height:3px;background:rgba(244,236,225,.12)"><div style="width:78%;height:3px;background:#e9a94f"></div></div>
+<div style="margin-top:8px;font-size:13px;line-height:1.6;color:#a2958a;text-wrap:pretty">Next shipment: 6 × Refined Sigil-Ash after 26 more Energy spent here.</div>
+</div>
+</div>
+
+<div style="margin-top:20px;display:flex;gap:22px;align-items:baseline">
+<div style="width:132px;flex:none;font-size:14.5px;font-weight:600">Development</div>
+<div style="flex:1">
+<div style="height:3px;background:rgba(244,236,225,.12)"><div style="width:44%;height:3px;background:#e9a94f"></div></div>
+<div style="margin-top:8px;font-size:13px;line-height:1.6;color:#a2958a;text-wrap:pretty">Every 25 shards the Academy's heroes receive, Suzume gains 1 more — 14 to the next.</div>
+</div>
+</div>
+
+<div style="margin-top:20px;display:flex;gap:22px;align-items:baseline">
+<div style="width:132px;flex:none;font-size:14.5px;font-weight:600">Operations</div>
+<div style="flex:1">
+<div style="height:3px;background:rgba(244,236,225,.12)"><div style="width:50%;height:3px;background:rgba(244,236,225,.4)"></div></div>
+<div style="margin-top:8px;font-size:13px;line-height:1.6;color:#8e8278;text-wrap:pretty">One more completed Academy route banks a visible bonus on a future cycle board.</div>
+</div>
+</div>
+
+<div style="margin-top:26px;height:1px;background:linear-gradient(to right,rgba(244,236,225,.10),transparent 86%)"></div>
+
+<div style="margin-top:22px;display:flex;gap:22px;align-items:flex-start">
+<div style="width:132px;flex:none;font-size:14.5px;font-weight:600;color:#c3b6a9">The relic slot</div>
+<div style="flex:1;font-size:13px;line-height:1.6;color:#8e8278;text-wrap:pretty">Empty until the Unwritten Ledger is whole. Installed, it moves Development to every 20 shards — and it can be moved again any time.</div>
+</div>
+
+<div style="margin-top:30px;font-size:13px;color:#a2958a">A Program only needs you when a priority changes. <span style="color:#e9a94f">Change one →</span></div>
+
+<div style="margin-top:34px;height:1px;background:linear-gradient(to right,rgba(244,236,225,.12),transparent 84%)"></div>
+<div style="margin-top:22px;font-size:13px;line-height:1.7;color:#8e8278;text-wrap:pretty">Payouts land at the daily reset. A Program missing its choice banks the meter instead of wasting it — nothing here is ever lost.</div>
+</div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">Next: pick <a class="dv-oid" href="#15a">15a</a> or <a class="dv-oid" href="#15b">15b</a> and I'll draw the two states that break a Mastery screen — a world with nothing bound yet, and the moment a piece comes home — plus the milestone choice sheets (cache family, who gets the shards).</p>
+</section>
+
+<section class="dv-turn" id="t14">
+<div class="dv-thd"><span class="dv-tid">14</span><span class="dv-tname">Expeditions as a list — one 16:9 plate per route, reused as the party screen's ground</span></div>
+<p style="margin:-8px 0 26px;max-width:1000px;font:400 13.5px/1.7 Figtree,sans-serif;color:#a2958a">Five portrait cards side by side make five equal strangers — nothing leads, nothing is skimmable, and the art is too small to be worth commissioning. Stacked rows fix all three: the eye runs down a single column, each route gets a wide plate that can actually hold a scene, and <strong style="color:#f4ece1;font-weight:500">that same 16:9 file becomes the background of its party builder</strong> — one asset, two screens, and opening a route feels like walking into the picture. The plates bleed off the right and dissolve at their left, top and bottom edges, so the list reads as one surface with light on it rather than five boxes. <a class="dv-oid" href="#14a">14a</a> is the board; <a class="dv-oid" href="#14b">14b</a> is the same plate carrying the party screen. One thing for dev: the code still asks for portrait offer art (<code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">660 × 860</code>, <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">expeditions.js</code>) and the World Hub art vocabulary has no 16:9 route role — <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">scene.key_art</code> carries no shape and <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">world.background</code> is a full-screen backdrop. This design needs one named role at <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">tile_16x9</code> geometry (1600 × 900), and a vocabulary bump with it. The party slots below are the vocabulary as it already stands: <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">character.full_body</code>, 900 × 1600.</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="14a"><div class="dv-olabel"><span class="dv-oid">14a</span>The board — five routes, top down</div>
+<div class="dv-card" style="width:1440px;height:900px;position:relative;overflow:hidden;background:#12100f;color:#f4ece1;font-family:Figtree,system-ui,sans-serif">
+<div style="position:absolute;inset:0;background:radial-gradient(70% 50% at 18% -12%,rgba(233,169,79,.09),transparent 58%)"></div>
+
+<div style="position:absolute;left:52px;top:38px;width:820px">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Cycle 1 · Day 1 · 2 Intelligence</div>
+<div style="margin-top:8px;font-family:'Instrument Serif',serif;font-size:42px;line-height:1.05">Five routes are on the board.</div>
+<div style="margin-top:8px;font-size:13.5px;color:#a2958a;text-wrap:pretty">Choose up to three, assign every party, and launch them together. The board waits — it never expires.</div>
+</div>
+<div style="position:absolute;right:52px;top:42px;text-align:right;font-size:12.5px;color:#6f645c;line-height:1.85">
+<div>One free reroll this cycle · then 1 Intelligence</div>
+<div>One free pin this cycle · reveal costs 1</div>
+</div>
+
+<div style="position:absolute;left:52px;top:176px;font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Routes this cycle</div>
+
+<div style="position:absolute;left:52px;top:202px;right:0;display:flex;flex-direction:column">
+
+<div style="position:relative;height:124px;overflow:hidden">
+<div style="position:absolute;inset:0;-webkit-mask-image:linear-gradient(to right,transparent 4%,rgba(0,0,0,.5) 30%,#000 58%,#000 93%,transparent 100%);mask-image:linear-gradient(to right,transparent 4%,rgba(0,0,0,.5) 30%,#000 58%,#000 93%,transparent 100%)">
+<div style="position:absolute;inset:0;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 30%,#000 72%,transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 30%,#000 72%,transparent 100%);background:repeating-linear-gradient(102deg,#1f3a33 0 11px,#152420 11px 22px)"></div>
+</div>
+<div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(18,16,15,.97) 26%,rgba(18,16,15,.62) 56%,rgba(18,16,15,.3) 88%)"></div>
+<div style="position:absolute;left:680px;top:50%;transform:translateY(-50%);font:10.5px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.3)">scene.key_art · 16:9 · 1600 × 900</div>
+<div style="position:absolute;left:0;top:24px;bottom:24px;width:2px;background:#6fc9a0"></div>
+<div style="position:absolute;left:24px;top:50%;transform:translateY(-50%);width:600px">
+<div style="font:10.5px Figtree,sans-serif;letter-spacing:.15em;text-transform:uppercase;color:#6fc9a0">Guaranteed Field Supply</div>
+<div style="margin-top:6px;font-family:'Instrument Serif',serif;font-size:27px;line-height:1.1">A Field Cache Beyond the Gate</div>
+</div>
+<div style="position:absolute;right:250px;top:50%;transform:translateY(-50%);text-align:right;font-size:12.5px;color:#a2958a;line-height:1.6">3 characters<div style="color:#6f645c">recommends 4,100 Power</div></div>
+<div style="position:absolute;right:52px;top:50%;transform:translateY(-50%);text-align:right;font-size:13px;color:#e9a94f">Build party →</div>
+</div>
+<div style="height:1px;background:linear-gradient(to right,rgba(244,236,225,.13) 0,rgba(244,236,225,.13) 70%,transparent 96%)"></div>
+
+<div style="position:relative;height:124px;overflow:hidden">
+<div style="position:absolute;inset:0;-webkit-mask-image:linear-gradient(to right,transparent 4%,rgba(0,0,0,.5) 30%,#000 58%,#000 93%,transparent 100%);mask-image:linear-gradient(to right,transparent 4%,rgba(0,0,0,.5) 30%,#000 58%,#000 93%,transparent 100%)">
+<div style="position:absolute;inset:0;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 30%,#000 72%,transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 30%,#000 72%,transparent 100%);background:repeating-linear-gradient(102deg,#3a2c22 0 11px,#241c15 11px 22px)"></div>
+</div>
+<div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(18,16,15,.97) 26%,rgba(18,16,15,.62) 56%,rgba(18,16,15,.3) 88%)"></div>
+<div style="position:absolute;left:680px;top:50%;transform:translateY(-50%);font:10.5px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.3)">scene.key_art · 16:9 · 1600 × 900</div>
+<div style="position:absolute;left:24px;top:50%;transform:translateY(-50%);width:600px">
+<div style="font:10.5px Figtree,sans-serif;letter-spacing:.15em;text-transform:uppercase;color:#8e8278">Across worlds</div>
+<div style="margin-top:6px;font-family:'Instrument Serif',serif;font-size:27px;line-height:1.1">Quiet Roads, Useful Rumours</div>
+</div>
+<div style="position:absolute;right:250px;top:50%;transform:translateY(-50%);text-align:right;font-size:12.5px;color:#a2958a;line-height:1.6">4 characters<div style="color:#6f645c">recommends 6,800 Power</div></div>
+<div style="position:absolute;right:52px;top:50%;transform:translateY(-50%);text-align:right;font-size:13px;color:#e9a94f">Build party →</div>
+</div>
+<div style="height:1px;background:linear-gradient(to right,rgba(244,236,225,.13) 0,rgba(244,236,225,.13) 70%,transparent 96%)"></div>
+
+<div style="position:relative;height:124px;overflow:hidden">
+<div style="position:absolute;inset:0;-webkit-mask-image:linear-gradient(to right,transparent 4%,rgba(0,0,0,.5) 30%,#000 58%,#000 93%,transparent 100%);mask-image:linear-gradient(to right,transparent 4%,rgba(0,0,0,.5) 30%,#000 58%,#000 93%,transparent 100%)">
+<div style="position:absolute;inset:0;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 30%,#000 72%,transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 30%,#000 72%,transparent 100%);background:repeating-linear-gradient(102deg,#2f4a5a 0 11px,#161f26 11px 22px)"></div>
+</div>
+<div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(18,16,15,.97) 26%,rgba(18,16,15,.62) 56%,rgba(18,16,15,.3) 88%)"></div>
+<div style="position:absolute;left:680px;top:50%;transform:translateY(-50%);font:10.5px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.3)">scene.key_art · 16:9 · 1600 × 900</div>
+<div style="position:absolute;left:24px;top:50%;transform:translateY(-50%);width:600px">
+<div style="font:10.5px Figtree,sans-serif;letter-spacing:.15em;text-transform:uppercase;color:#8e8278">Hidden Village</div>
+<div style="margin-top:6px;font-family:'Instrument Serif',serif;font-size:27px;line-height:1.1">Work Only Hidden Village Can Finish</div>
+</div>
+<div style="position:absolute;right:250px;top:50%;transform:translateY(-50%);text-align:right;font-size:12.5px;color:#a2958a;line-height:1.6">5 characters<div style="color:#6f645c">recommends 9,300 Power</div></div>
+<div style="position:absolute;right:52px;top:50%;transform:translateY(-50%);text-align:right;font-size:13px;color:#e9a94f">Build party →</div>
+</div>
+<div style="height:1px;background:linear-gradient(to right,rgba(244,236,225,.13) 0,rgba(244,236,225,.13) 70%,transparent 96%)"></div>
+
+<div style="position:relative;height:124px;overflow:hidden">
+<div style="position:absolute;inset:0;-webkit-mask-image:linear-gradient(to right,transparent 4%,rgba(0,0,0,.5) 30%,#000 58%,#000 93%,transparent 100%);mask-image:linear-gradient(to right,transparent 4%,rgba(0,0,0,.5) 30%,#000 58%,#000 93%,transparent 100%)">
+<div style="position:absolute;inset:0;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 30%,#000 72%,transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 30%,#000 72%,transparent 100%);background:repeating-linear-gradient(102deg,#3c2f4a 0 11px,#1d1826 11px 22px)"></div>
+</div>
+<div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(18,16,15,.97) 26%,rgba(18,16,15,.62) 56%,rgba(18,16,15,.3) 88%)"></div>
+<div style="position:absolute;left:680px;top:50%;transform:translateY(-50%);font:10.5px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.3)">scene.key_art · 16:9 · 1600 × 900</div>
+<div style="position:absolute;left:24px;top:50%;transform:translateY(-50%);width:600px">
+<div style="font:10.5px Figtree,sans-serif;letter-spacing:.15em;text-transform:uppercase;color:#8e8278">Across worlds</div>
+<div style="margin-top:6px;font-family:'Instrument Serif',serif;font-size:27px;line-height:1.1">The Right Hands for It</div>
+</div>
+<div style="position:absolute;right:250px;top:50%;transform:translateY(-50%);text-align:right;font-size:12.5px;color:#a2958a;line-height:1.6">5 characters<div style="color:#6f645c">recommends 8,400 Power</div></div>
+<div style="position:absolute;right:52px;top:50%;transform:translateY(-50%);text-align:right;font-size:13px;color:#e9a94f">Build party →</div>
+</div>
+<div style="height:1px;background:linear-gradient(to right,rgba(244,236,225,.13) 0,rgba(244,236,225,.13) 70%,transparent 96%)"></div>
+
+<div style="position:relative;height:124px;overflow:hidden">
+<div style="position:absolute;inset:0;-webkit-mask-image:linear-gradient(to right,transparent 4%,rgba(0,0,0,.5) 30%,#000 58%,#000 93%,transparent 100%);mask-image:linear-gradient(to right,transparent 4%,rgba(0,0,0,.5) 30%,#000 58%,#000 93%,transparent 100%)">
+<div style="position:absolute;inset:0;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 30%,#000 72%,transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 30%,#000 72%,transparent 100%);background:repeating-linear-gradient(102deg,#3a2426 0 11px,#1e1517 11px 22px)"></div>
+</div>
+<div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(18,16,15,.97) 26%,rgba(18,16,15,.62) 56%,rgba(18,16,15,.3) 88%)"></div>
+<div style="position:absolute;left:680px;top:50%;transform:translateY(-50%);font:10.5px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.3)">scene.key_art · 16:9 · 1600 × 900</div>
+<div style="position:absolute;left:24px;top:50%;transform:translateY(-50%);width:600px">
+<div style="font:10.5px Figtree,sans-serif;letter-spacing:.15em;text-transform:uppercase;color:#8e8278">Across worlds</div>
+<div style="margin-top:6px;font-family:'Instrument Serif',serif;font-size:27px;line-height:1.1">People Who Already Trust Each Other</div>
+</div>
+<div style="position:absolute;right:250px;top:50%;transform:translateY(-50%);text-align:right;font-size:12.5px;color:#a2958a;line-height:1.6">3 characters<div style="color:#6f645c">recommends 5,200 Power</div></div>
+<div style="position:absolute;right:52px;top:50%;transform:translateY(-50%);text-align:right;font-size:13px;color:#e9a94f">Build party →</div>
+</div>
+</div>
+
+<div style="position:absolute;left:52px;right:52px;top:844px;display:flex;align-items:baseline;justify-content:space-between">
+<div style="font-size:13.5px;color:#a2958a">Nothing is staged yet. Open a route to assign its party; up to three launch together.</div>
+<div style="font-size:12.5px;color:#6f645c">Reports arrive here when a cycle returns</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="14b"><div class="dv-olabel"><span class="dv-oid">14b</span>The same plate, one screen deeper — party selection</div>
+<div class="dv-card" style="width:1440px;height:900px;position:relative;overflow:hidden;background:#12100f;color:#f4ece1;font-family:Figtree,system-ui,sans-serif">
+<div style="position:absolute;inset:0;background:repeating-linear-gradient(102deg,#1f3a33 0 15px,#152420 15px 30px)"></div>
+<div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(12,11,10,.55) 0,rgba(12,11,10,.8) 34%,rgba(12,11,10,.97) 62%)"></div>
+<div style="position:absolute;left:52px;top:238px;font:10.5px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.26)">the same scene.key_art plate · 1600 × 900 · full bleed</div>
+
+<div style="position:absolute;left:52px;top:40px;width:760px">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#6fc9a0">Guaranteed Field Supply · ← back to the board</div>
+<div style="margin-top:10px;font-family:'Instrument Serif',serif;font-size:44px;line-height:1.05">A Field Cache Beyond the Gate</div>
+<div style="margin-top:10px;font-size:14px;color:#c3b6a9;text-wrap:pretty;max-width:600px">Three go out. The cache is already there — the only question is whether they can carry it back before the gate closes.</div>
+</div>
+<div style="position:absolute;right:52px;top:44px;text-align:right;font-size:12.5px;color:#a2958a;line-height:1.9">
+<div>Recommends 4,100 Power</div>
+<div>Returns next cycle</div>
+</div>
+
+<div style="position:absolute;left:52px;top:300px;font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">The party · 2 of 3 assigned</div>
+<div style="position:absolute;left:52px;top:326px;display:flex;gap:20px">
+<div style="width:220px;height:391px;position:relative;overflow:hidden;background:repeating-linear-gradient(104deg,#5a3a2a 0 9px,#2a1c16 9px 18px)">
+<div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(10,9,8,.95) 20%,transparent 62%)"></div>
+<div style="position:absolute;left:0;right:0;top:150px;text-align:center;font:10.5px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.3)">character.full_body · 900 × 1600</div>
+<div style="position:absolute;left:14px;right:14px;bottom:14px"><div style="font-family:'Instrument Serif',serif;font-size:20px">Ashley</div><div style="margin-top:3px;font-size:12px;color:#a2958a">2,442 Power · ★★★★☆</div></div>
+</div>
+<div style="width:220px;height:391px;position:relative;overflow:hidden;background:repeating-linear-gradient(104deg,#4a3a5c 0 9px,#201a28 9px 18px)">
+<div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(10,9,8,.95) 20%,transparent 62%)"></div>
+<div style="position:absolute;left:0;right:0;top:150px;text-align:center;font:10.5px ui-monospace,Menlo,monospace;color:rgba(244,236,225,.3)">character.full_body · 900 × 1600</div>
+<div style="position:absolute;left:14px;right:14px;bottom:14px"><div style="font-family:'Instrument Serif',serif;font-size:20px">Rin</div><div style="margin-top:3px;font-size:12px;color:#a2958a">1,880 Power · ★★★☆☆</div></div>
+</div>
+<div style="width:220px;height:391px;position:relative;box-sizing:border-box;border:1px dashed rgba(244,236,225,.22);display:flex;align-items:center;justify-content:center;font-size:13px;color:#8e8278">Add a third +</div>
+</div>
+
+<div style="position:absolute;right:52px;top:334px;width:420px">
+<div style="font:11px Figtree,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">What this party reads as</div>
+<div style="margin-top:16px;display:flex;align-items:baseline;gap:12px"><span style="font-family:'Instrument Serif',serif;font-size:38px;line-height:1">4,322</span><span style="font-size:13px;color:#a2958a">of 4,100 recommended</span></div>
+<div style="margin-top:14px;height:3px;background:rgba(244,236,225,.1)"><div style="width:100%;height:3px;background:#6fc9a0"></div></div>
+<div style="margin-top:16px;font-size:13px;color:#c3b6a9;line-height:1.7;text-wrap:pretty">A third body still helps — the cache is heavy, and the third slot is what turns <em style="color:#6fc9a0;font-style:normal">successful</em> into <em style="color:#6fc9a0;font-style:normal">exceptional</em>.</div>
+</div>
+
+<div style="position:absolute;left:52px;right:52px;bottom:64px;height:1px;background:linear-gradient(to right,rgba(244,236,225,.14),transparent 88%)"></div>
+<div style="position:absolute;left:52px;bottom:26px;font-size:12.5px;color:#6f645c">Staging does not spend the cycle — three routes can wait here together.</div>
+<div style="position:absolute;right:52px;bottom:22px;font-size:13.5px;color:#e9a94f">Stage this route →</div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">Next: what a staged board looks like with three routes queued, and the launch that sends them all at once.</p>
+</section>
+
 <section class="dv-turn" id="t13">
 <div class="dv-thd"><span class="dv-tid">13</span><span class="dv-tname">The star promotion — the one moment worth stopping the screen for</span></div>
 <p style="margin:-8px 0 26px;max-width:1000px;font:400 13.5px/1.7 Figtree,sans-serif;color:#a2958a">Today a promotion is a button that stops being disabled and a toast that says <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">⭐ Ashley: 2,192 → 2,442 Power</code> (<code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">promoteWithFeedback</code>, <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">src/ui/character.js</code>). It is the largest single jump a character ever makes — days of shards, spent in one act — and it currently reads smaller than crafting a component. Three decisions: it happens <strong style="color:#f4ece1;font-weight:500">in place</strong>, no modal, because the reward is <em>this</em> character being more than she was; <strong style="color:#f4ece1;font-weight:500">the shards become the star</strong> — the progress bar's own light is what detaches, flies up and strikes the empty slot, so the spend and the gain are one gesture; and the payoff is <strong style="color:#f4ece1;font-weight:500">consequences, not confetti</strong> — three sentences naming what is newly possible. <a class="dv-oid" href="#13a">13a</a> plays on a loop; <a class="dv-oid" href="#13b">13b</a> is the beat sheet to build from.</p>
 <div class="dv-opts">
 
-<div class="dv-opt" id="13a"><div class="dv-olabel"><span class="dv-oid">13a</span>The moment, playing — 7.4s, looping</div>
+<div class="dv-opt" id="13a"><div class="dv-olabel"><span class="dv-oid">13a</span>The moment, playing — shipped in <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">src/ui/promotion.js</code> · 6.8s in game (the loop adds a 600ms lead-in)</div>
 <div class="dv-card" style="width:1440px;height:900px;position:relative;overflow:hidden;background:#12100f;color:#f4ece1;font-family:Figtree,system-ui,sans-serif">
 <div style="position:absolute;inset:0;background:radial-gradient(75% 80% at 22% 62%,rgba(226,96,63,.28),transparent 60%);animation:hc-prelight 7.4s ease-in-out infinite"></div>
 
@@ -160,57 +1097,52 @@ a{color:#e9a94f;text-decoration:none}a:hover{color:#f6c67f}
 <div class="dv-card" style="width:1060px;height:900px;position:relative;overflow:hidden;background:#12100f;color:#f4ece1;font-family:Figtree,system-ui,sans-serif;padding:44px 52px;box-sizing:border-box">
 <div style="position:absolute;inset:0;background:radial-gradient(70% 50% at 84% -6%,rgba(233,169,79,.1),transparent 62%)"></div>
 <div style="position:relative">
-<div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Promotion sequence · 7.4 seconds, then it is just the character screen</div>
-<div style="margin-top:10px;font-family:'Instrument Serif',serif;font-size:40px;line-height:1.04">Nine beats. Only three of them<br>are decoration.</div>
+<div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#8e8278">Promotion sequence · shipped · 6.8 seconds, then it is just the character screen</div>
+<div style="margin-top:10px;font-family:'Instrument Serif',serif;font-size:40px;line-height:1.04">Eight beats. Only three of them<br>are decoration.</div>
 
 <div style="margin-top:24px;height:2px;background:linear-gradient(to right,#e2603f 0%,#e9a94f 22%,#f6c67f 34%,rgba(244,236,225,.16) 58%,rgba(244,236,225,.16) 100%)"></div>
 <div style="margin-top:7px;display:flex;font:11px ui-monospace,Menlo,monospace;color:#6f645c">
-<span style="width:14.6%">0s</span><span style="width:13.5%">1.0</span><span style="width:9.5%">1.7</span><span style="width:12.2%">2.4</span><span style="width:16.2%">3.6</span><span style="width:34%">hold →</span>
+<span style="width:11%">click</span><span style="width:9%">0.4</span><span style="width:8%">0.9</span><span style="width:12%">1.1</span><span style="width:11%">1.8</span><span style="width:14%">2.4</span><span style="width:35%">hold → 6.8</span>
 </div>
 
 <div style="margin-top:20px;display:flex;flex-direction:column;gap:0">
 <div style="display:flex;gap:22px;align-items:baseline;padding:5px 0;border-top:1px solid rgba(244,236,225,.09)">
-<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#8e8278">0 – 600</span>
-<span style="width:186px;flex:none;font-size:14px;font-weight:600">Quiet</span>
-<span style="flex:1;font-size:13.5px;line-height:1.55;color:#a2958a">The bar is full, the ember dot breathes, the sentence offers the star. Nothing is disabled and nothing shouts.</span>
-</div>
-<div style="display:flex;gap:22px;align-items:baseline;padding:5px 0;border-top:1px solid rgba(244,236,225,.09)">
-<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#8e8278">600 – 1000</span>
+<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#8e8278">0 – 400</span>
 <span style="width:186px;flex:none;font-size:14px;font-weight:600">Everything else leaves</span>
 <span style="flex:1;font-size:13.5px;line-height:1.55;color:#a2958a">Gear row and footer fall 16px and go to zero; eyebrow and back-link dim to 22%. Name, stars, power and art stay lit — <span style="color:#f4ece1">ease-out</span>.</span>
 </div>
 <div style="display:flex;gap:22px;align-items:baseline;padding:5px 0;border-top:1px solid rgba(244,236,225,.09)">
-<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">1000 – 1500</span>
+<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">400 – 900</span>
 <span style="width:186px;flex:none;font-size:14px;font-weight:600">The shards collapse</span>
 <span style="flex:1;font-size:13.5px;line-height:1.55;color:#a2958a">The fill scales toward its own right end until only a bead of light is left — the spend, drawn once. <span style="color:#f4ece1">cubic-bezier(.7,0,.3,1)</span>.</span>
 </div>
 <div style="display:flex;gap:22px;align-items:baseline;padding:5px 0;border-top:1px solid rgba(244,236,225,.09)">
-<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">1500 – 1700</span>
+<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">900 – 1100</span>
 <span style="width:186px;flex:none;font-size:14px;font-weight:600">The bead travels</span>
-<span style="flex:1;font-size:13.5px;line-height:1.55;color:#a2958a">477px left, 150px up, into the fifth slot, shrinking to 55%. The empty ☆ fades out to meet it.</span>
+<span style="flex:1;font-size:13.5px;line-height:1.55;color:#a2958a">Measured at play time — the bar’s right end to the empty slot’s centre, shrinking to 55%. The empty ☆ fades out to meet it.</span>
 </div>
 <div style="display:flex;gap:22px;align-items:baseline;padding:5px 0;border-top:1px solid rgba(244,236,225,.09)">
-<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">1700 – 1900</span>
+<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">1100 – 1620</span>
 <span style="width:186px;flex:none;font-size:14px;font-weight:600">Strike</span>
 <span style="flex:1;font-size:13.5px;line-height:1.55;color:#a2958a">A bloom expands from the slot and dies inside 500ms. The star lands from scale 2.8 and −26°, overshoots to 1.18, settles. The four earned stars flare once.</span>
 </div>
 <div style="display:flex;gap:22px;align-items:baseline;padding:5px 0;border-top:1px solid rgba(244,236,225,.09)">
-<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">1700 – 2550</span>
+<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">1100 – 1950</span>
 <span style="width:186px;flex:none;font-size:14px;font-weight:600">The number answers</span>
 <span style="flex:1;font-size:13.5px;line-height:1.55;color:#a2958a">2,192 rolls to 2,442 over 850ms, ease-out, tabular figures so nothing jitters. The numeral bumps 6%; the rank line swaps for the new standing.</span>
 </div>
 <div style="display:flex;gap:22px;align-items:baseline;padding:5px 0;border-top:1px solid rgba(244,236,225,.09)">
-<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#8e8278">1800 – 3200</span>
+<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#8e8278">1200 – 2600</span>
 <span style="width:186px;flex:none;font-size:14px;font-weight:600">Her art relights</span>
 <span style="flex:1;font-size:13.5px;line-height:1.55;color:#a2958a">The ambient radial in her colour grows 8% and stays there. One sheen crosses the full body. Seven embers drift 260px up and die — no confetti, no burst.</span>
 </div>
 <div style="display:flex;gap:22px;align-items:baseline;padding:5px 0;border-top:1px solid rgba(244,236,225,.09)">
-<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#8e8278">2400 – 2900</span>
+<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#8e8278">1800 – 2300</span>
 <span style="width:186px;flex:none;font-size:14px;font-weight:600">The sentence</span>
 <span style="flex:1;font-size:13.5px;line-height:1.55;color:#a2958a">“The fifth star is hers.” — 60px serif, rising 14px into the space the gear row left behind.</span>
 </div>
 <div style="display:flex;gap:22px;align-items:baseline;padding:5px 0;border-top:1px solid rgba(244,236,225,.09);border-bottom:1px solid rgba(244,236,225,.09)">
-<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#8e8278">3000 – 4300</span>
+<span style="width:88px;flex:none;font:11.5px ui-monospace,Menlo,monospace;color:#8e8278">2400 – 3700</span>
 <span style="width:186px;flex:none;font-size:14px;font-weight:600">The consequences</span>
 <span style="flex:1;font-size:13.5px;line-height:1.55;color:#a2958a">Three lines, 140ms apart, each naming something newly possible — a node in reach, a gear tier allowed, the next star priced. This is the reward.</span>
 </div>
@@ -229,7 +1161,7 @@ a{color:#e9a94f;text-decoration:none}a:hover{color:#f6c67f}
 
 <div style="margin-top:20px;display:flex;gap:12px;align-items:flex-start">
 <span style="position:relative;top:7px;width:7px;height:7px;flex:none;border-radius:50%;background:#e9a94f;animation:hc-pulse 2.8s ease-in-out infinite"></span>
-<div style="font-size:13.5px;line-height:1.6;color:#a2958a;text-wrap:pretty">Where it hooks: <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">promoteWithFeedback()</code> replaces its <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">toast()</code> with this sequence. <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">promoteStar()</code> already returns <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">powerBefore</code>/<code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">powerAfter</code> for the roll, and <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">balance.starPowerCumulative</code> gives the +250. The three consequence lines need one new selector — the same reach/gear/next-star check the roster already runs for <em>a star is ready</em>.</div>
+<div style="font-size:13.5px;line-height:1.6;color:#a2958a;text-wrap:pretty">Built as specced: <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">src/ui/promotion.js</code> — <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">playPromotion()</code> walks the settled screen forward from the click, <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">settlePromotion()</code> cuts it short on pointerdown, keydown or hashchange, and the consequence selector landed as <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">rankShift()</code> in <code style="font:11.5px ui-monospace,Menlo,monospace;color:#e9a94f">src/core/consequences.js</code>. One deviation, and it is the right one: the quiet beat was dropped — that beat is the screen the player clicked on.</div>
 </div>
 </div>
 </div>

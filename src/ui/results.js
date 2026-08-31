@@ -1,6 +1,6 @@
 import { append, h, fmt } from './dom.js';
 import { openModal } from '../app.js';
-import { clearNode, checkClear, preferredPartyIndex } from '../core/state.js';
+import { clearNode, checkClear, nodePartyMembers } from '../core/state.js';
 
 export function resultIsMeaningful(result) {
   const rewards = result.rewards;
@@ -123,19 +123,30 @@ function shardColumn(store, characterId, qty) {
     h('div.caption', `${fmt(cs.shards)} of ${fmt(need)} — ${fmt(Math.max(0, need - cs.shards))} from the next milestone`));
 }
 
+// The reward column shows the quarter of the relic this piece just uncovered:
+// the same plate the Mastery board draws, at the same quadrant, so the reward
+// and the track are visibly the same object.
+const QUADRANTS = ['0% 0%', '100% 0%', '0% 100%', '100% 100%'];
+
 function relicPieceColumn(store, pieceId) {
   const piece = store.content.relicPieceById[pieceId];
   const relic = piece ? store.content.relicByWorld[piece.world] : null;
-  const image = store.content.images.relic[pieceId] ?? null;
+  const image = relic ? store.content.images.relic[relic.world] ?? null : null;
   const ownedCount = relic ? relic.pieces.filter(entry => store.state.relics.pieces[entry.id]).length : 0;
   const complete = relic && ownedCount === relic.pieces.length;
+  const quarter = h('div.result-relic-piece', { 'aria-hidden': 'true' });
+  if (image) {
+    Object.assign(quarter.style, {
+      backgroundImage: `url("${image}")`,
+      backgroundSize: '200% 200%',
+      backgroundPosition: QUADRANTS[((piece?.position ?? 1) - 1) % 4]
+    });
+  }
   return h('div.reward-column.fragment',
-    image
-      ? h('img.result-relic-piece', { src: image, alt: '' })
-      : h('div.shard-icon', '🗿'),
+    image ? quarter : h('div.shard-icon', '🗿'),
     h('div.title', piece?.displayName ?? 'Relic piece'),
     h('div.caption', complete
-      ? `${relic.displayName} is whole — install it into a Program.`
+      ? `${relic.displayName} is whole — bind it on the Mastery track.`
       : relic ? `${ownedCount} of ${relic.pieces.length} pieces of ${relic.displayName} recovered.` : 'A piece has found its place.'));
 }
 
@@ -159,8 +170,7 @@ export function showResults(store, result, { onClose, compactRoot, members, coun
 }
 
 function selectedMembers(store, nodeId) {
-  const index = preferredPartyIndex(store.state, nodeId);
-  return store.state.parties[index].members.filter(Boolean);
+  return nodePartyMembers(store.state, nodeId).filter(Boolean);
 }
 
 function numberWord(number) {

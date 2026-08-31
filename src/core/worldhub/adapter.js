@@ -103,10 +103,12 @@ export function adaptPackageToManifest(pkg, mediaUrl) {
       relic: {
         name: own.hc_relic_name || `The ${entity.name ?? 'World'} Relic`,
         lore: own.hc_relic_lore || '',
+        // One plate for the whole object; the Mastery track shows a quarter of
+        // it per recovered piece, so the pieces carry names and lore only.
+        image: mediaUrl(setAsset('hc_relic_art', hubId), pkg.recipesFor('hc_relic_art')),
         pieces: (own.hc_relic_pieces ?? []).map((piece) => ({
           name: piece.piece_name,
           lore: piece.piece_lore || '',
-          image: piece.piece_art ? mediaUrl(piece.piece_art, pkg.recipesFor('piece_art')) : null,
         })),
       },
       masteryCosmetics,

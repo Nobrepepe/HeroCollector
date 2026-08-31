@@ -10,7 +10,7 @@ import { grantRewardEntries } from './resources.js';
 import { generateCycleBoard, resolveDueCycle } from './expeditions.js';
 import { FIELD_SUPPLY_ID, fieldSupplyLimits, frontierMomentumPreview, resetDailyEnergySystems, surgedPower } from './energy.js';
 import { FOCUS_SLOTS, applyFocusEnergy, revealCharacter } from './focus.js';
-import { grantRelicPiece } from './relics.js';
+import { grantRelicPiece, relicStatus } from './relics.js';
 import { applyMasteryMilestones, unlockedSkins } from './mastery.js';
 import { addProcurementEnergy, addDevelopmentShards, deliverProgramPayouts } from './programs.js';
 import {
@@ -132,7 +132,8 @@ export function newPlayerState(content, now = Date.now(), { starters: chosen = n
         sort: 'power', direction: 'desc'
       },
       campaignId: 'main',
-      nodePartyById: {}
+      nodePartyById: {},
+      nodePartyMembersById: {}
     },
     progressLog: [],
     lastResetSummary: null,
@@ -149,7 +150,7 @@ export function newPlayerState(content, now = Date.now(), { starters: chosen = n
       }
     },
     programs: {},
-    relics: { pieces: {} },
+    relics: { pieces: {}, restored: {} },
     mastery: {},
     surge: null,
     energySystems: { daily: { day: 1, momentumRefunded: 0 } },
@@ -259,13 +260,29 @@ export function syncSaveWithContent(content, state) {
   if (state.pins.length < beforePins) report.push(`Removed ${beforePins - state.pins.length} pin(s) for missing content.`);
   state.ui ??= {
     roster: { world: 'all', archetype: 'all', faction: 'all', ownership: 'all', sort: 'power', direction: 'desc' },
-    campaignId: 'main', nodePartyById: {}
+    campaignId: 'main', nodePartyById: {}, nodePartyMembersById: {}
   };
   state.ui.nodePartyById ??= {};
   for (const [nodeId, index] of Object.entries(state.ui.nodePartyById)) {
     if (!content.nodeById[nodeId] || !Number.isInteger(index) || index < 0 || index >= state.parties.length) {
       delete state.ui.nodePartyById[nodeId];
       report.push(`Removed an invalid saved party preference for ${nodeId}.`);
+    }
+  }
+  // A node's own five outlive content updates only while every one of them is
+  // still a real, owned, unrepeated character. Anything less falls back to the
+  // preset rather than running a party that cannot exist.
+  state.ui.nodePartyMembersById ??= {};
+  const partySize = content.balance.partySize;
+  for (const [nodeId, members] of Object.entries(state.ui.nodePartyMembersById)) {
+    const filled = Array.isArray(members) ? members.filter(Boolean) : [];
+    const usable = content.nodeById[nodeId]
+      && Array.isArray(members) && members.length === partySize
+      && members.every(id => id === null || state.characters[id]?.owned)
+      && new Set(filled).size === filled.length;
+    if (!usable) {
+      delete state.ui.nodePartyMembersById[nodeId];
+      report.push(`Removed a saved party for ${nodeId} that can no longer stand.`);
     }
   }
   const campaigns = new Set(['main', ...content.worlds.map(w => w.campaignId)]);
@@ -309,6 +326,19 @@ export function syncSaveWithContent(content, state) {
         report.push(`Cleared the Development hero for ${worldId}: they are no longer in the game.`);
       }
     }
+  }
+  // The binding is newer than the pieces. A save written before it exists has
+  // no `restored` map at all, and a relic it already installed into a Program
+  // was bound under the old rules — that reading is honoured rather than
+  // revoked. A complete relic that was never installed stays unbound, so the
+  // player is owed the sequence rather than robbed of it.
+  state.relics.restored ??= {};
+  for (const world of content.worlds) {
+    if (state.relics.restored[world.id]) continue;
+    if (!state.programs[world.id]?.relicSlot) continue;
+    if (!relicStatus(content, state, world.id)?.complete) continue;
+    state.relics.restored[world.id] = true;
+    report.push(`Recorded ${content.relicByWorld[world.id]?.displayName ?? 'a relic'} as bound: it was already installed into a Program.`);
   }
   // A waiting route board referencing content that left the game is simply
   // regenerated; a launched cycle keeps running (reward grants are guarded).
@@ -881,8 +911,53 @@ export function selectPartyPreset(state, partyIndex, nodeId = null) {
     state.ui ??= {};
     state.ui.nodePartyById ??= {};
     state.ui.nodePartyById[nodeId] = partyIndex;
+    // Choosing a preset re-fills the node from it: that is what a preset is
+    // for, and it is the way back from a set of one-off swaps.
+    delete state.ui.nodePartyMembersById?.[nodeId];
   }
   return { ok: true, partyIndex };
+}
+
+// The five a node will actually run with. A preset pre-fills it; the moment a
+// player swaps someone here, the node keeps its own five and the preset is
+// left exactly as they built it. Everything that reads a node's power — the
+// node screen, Find Sources, Today's Continue line — goes through this, so no
+// two of them can be reading a different party.
+export function nodePartyMembers(state, nodeId) {
+  const custom = state.ui?.nodePartyMembersById?.[nodeId];
+  if (Array.isArray(custom)) return [...custom];
+  return [...(state.parties[preferredPartyIndex(state, nodeId)]?.members ?? [])];
+}
+
+// True once a node holds swaps of its own, so the screen can offer the way back.
+export function nodePartyIsCustom(state, nodeId) {
+  return Array.isArray(state.ui?.nodePartyMembersById?.[nodeId]);
+}
+
+export function setNodePartyMember(content, state, nodeId, slot, characterId) {
+  if (!content.nodeById[nodeId]) return { ok: false, reasons: ['Unknown node.'] };
+  const members = nodePartyMembers(state, nodeId);
+  if (!Number.isInteger(slot) || slot < 0 || slot >= members.length) {
+    return { ok: false, reasons: ['Unknown party place.'] };
+  }
+  if (characterId !== null) {
+    const cs = state.characters[characterId];
+    if (!cs || !cs.owned) return { ok: false, reasons: ['Character not owned.'] };
+    // No one stands in two places: choosing someone already placed moves them.
+    const existing = members.indexOf(characterId);
+    if (existing !== -1 && existing !== slot) members[existing] = null;
+  }
+  members[slot] = characterId;
+  state.ui ??= {};
+  state.ui.nodePartyMembersById ??= {};
+  state.ui.nodePartyMembersById[nodeId] = members;
+  return { ok: true, nodeId, slot, characterId };
+}
+
+// Drop the node's own five and fall back to whichever preset it points at.
+export function resetNodeParty(state, nodeId) {
+  delete state.ui?.nodePartyMembersById?.[nodeId];
+  return { ok: true, nodeId };
 }
 
 export function preferredPartyIndex(state, nodeId = null) {

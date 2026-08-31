@@ -9,8 +9,8 @@ import { masteryRank } from '../core/mastery.js';
 import { relicStatus } from '../core/relics.js';
 import { programOverview, PROGRAM_NAMES } from '../core/programs.js';
 import { eligibleCrisisDefinitions } from '../core/crises.js';
-import { portrait, selectorWorldName } from './shared.js';
-import { charactersByWorld, countWord, ordinalWord } from './presentation.js';
+import { selectorWorldName } from './shared.js';
+import { charactersByWorld, countWord, crisisAsking, ordinalWord } from './presentation.js';
 
 export function renderWorlds(store, root, arg) {
   if (arg) return renderWorldHub(store, root, arg);
@@ -40,9 +40,9 @@ export function worldReading(store, world) {
   const crisis = active?.worldId === world.id ? active : null;
   // A Crisis still wants an answer while it is unresolved, and again while its
   // Cache is unclaimed. Once both are done it is settled — still today's
-  // event, but nothing is asked of you.
-  const wantsAnswer = !!crisis && (crisis.status === 'planning'
-    || (crisis.status === 'resolved' && crisis.result?.outcome !== 'endured' && !crisis.cacheClaimed));
+  // event, but nothing is asked of you. Today reads the same predicate, so the
+  // hub and the notice on Today can never disagree about it.
+  const wantsAnswer = !!crisisAsking(state, world.id);
   const away = (state.expeditions?.active?.routes ?? []).filter(route => route.world === world.id);
   return {
     world, roster, owned, seen, entry, nodes, chapters, cleared, frontier,
@@ -203,9 +203,12 @@ function renderWorldHub(store, root, worldId) {
         h('div.world-held-label', 'characters')))));
 
   page.appendChild(h('div.fade-rule.world-hub-rule'));
+  // The side column is the Programs and nothing else. This world's characters
+  // are already counted in Held here above, and the routes leaving from here
+  // were a reading of the Expeditions board rather than of this world.
   page.appendChild(h('div.world-hub-body',
     destinations(store, reading),
-    h('div.world-hub-side', rosterPanel(store, reading), h('div.fade-rule.world-side-rule'), routesPanel(store, reading))));
+    h('div.world-hub-side', programsPanel(store, reading))));
   root.appendChild(page);
 }
 
@@ -222,7 +225,7 @@ function destinations(store, reading) {
   const list = h('div.world-destinations');
   const rows = [];
   if (reading.crisisActive) rows.push(crisisRow(store, reading));
-  rows.push(chaptersRow(store, reading), programsRow(store, reading), masteryRow(store, reading));
+  rows.push(chaptersRow(store, reading), masteryRow(store, reading));
   if (!reading.crisisActive) rows.push(crisisRow(store, reading));
   rows.forEach((row, index) => {
     if (index > 0) list.appendChild(h('div.world-destination-rule', { 'aria-hidden': 'true' }));
@@ -324,35 +327,96 @@ function chaptersRow(store, reading) {
   return row;
 }
 
-function programsRow(store, reading) {
+// ------------------------------------------------------------- 15c Programs
+// The Headquarters row is gone: a world's three Programs are the world's own
+// column, read at a glance beside its destinations. Nothing here is a control
+// — a Program only needs you when a priority changes, and that is one link.
+function programsPanel(store, reading) {
   const world = reading.world;
   const programs = reading.programs;
-  const relicNote = programs.relicSlot && programs.relic?.complete
-    ? `relic in ${PROGRAM_NAMES[programs.relicSlot]}`
-    : programs.relic?.complete ? 'relic uninstalled' : null;
-  // The Programs advance through relevant play everywhere the world is
-  // touched, so the row is only inert while nothing has ever fed them.
-  const touched = programs.procurement.meter > 0 || programs.procurement.delivered > 0
-    || programs.development.meter > 0 || programs.development.delivered > 0
-    || programs.operations.meter > 0 || programs.operations.delivered > 0;
-  const needsChoice = !programs.procurement.family || !programs.development.heroId;
-  let sentence;
-  if (!touched && !reading.unlocked) {
-    sentence = 'The three Programs advance on their own once play touches this world. Nothing here asks for a visit yet.';
-  } else if (needsChoice) {
-    sentence = [`${!programs.procurement.family ? 'Procurement is banking Energy without a chosen material family. ' : 'Development is banking shards without a chosen hero. '}`,
-      h('button.link', { onclick: () => store.go(`#/programs/${world.id}`) }, 'Set it →')];
-  } else {
-    const toShipment = Math.max(0, programs.procurement.threshold - programs.procurement.meter % programs.procurement.threshold);
-    sentence = [`The next shipment lands after ${fmt(toShipment)} more Energy of play here. `,
-      h('button.link', { onclick: () => store.go(`#/programs/${world.id}`) }, 'Visit →')];
+  const open = () => store.go(`#/programs/${world.id}`);
+  const section = h('section.world-programs');
+  section.appendChild(h('div.world-programs-top',
+    h('div.world-programs-title', 'Programs'),
+    h('div.world-programs-reading', 'all three advance on their own')));
+
+  const toShipment = Math.max(0, programs.procurement.threshold
+    - programs.procurement.meter % programs.procurement.threshold);
+  const material = programs.procurement.family
+    ? store.content.materialById[`mat_${programs.procurement.family}_${programs.procurement.grade}`] : null;
+  section.appendChild(programRow('Procurement', programs.procurement.meter, programs.procurement.threshold,
+    material
+      ? `Next shipment: ${programs.procurement.shipmentQty} × ${material.displayName} after ${fmt(toShipment)} more Energy spent here.`
+      : programs.procurement.meter > 0
+        ? `Banking ${fmt(programs.procurement.meter)} Energy without a chosen material family. Nothing is lost while it waits.`
+        : 'Waiting on a material family before it can ship anything. It banks Energy either way.',
+    { dim: !material }));
+
+  const hero = programs.development.heroId ? store.content.characterById[programs.development.heroId] : null;
+  const toShards = Math.max(0, programs.development.threshold
+    - programs.development.meter % programs.development.threshold);
+  section.appendChild(programRow('Development', programs.development.meter, programs.development.threshold,
+    hero
+      ? `Every ${fmt(programs.development.threshold)} shards ${selectorWorldName(world)} heroes receive, ${hero.displayName} gains ${programs.development.bonusShards} more — ${fmt(toShards)} to the next.`
+      : programs.development.meter > 0
+        ? `Banking ${fmt(programs.development.meter)} shard${programs.development.meter === 1 ? '' : 's'} without a chosen hero. Nothing is lost while it waits.`
+        : 'Waiting on a hero to receive its bonus shards. It banks shards either way.',
+    { dim: !hero }));
+
+  const toBoost = Math.max(1, programs.operations.threshold
+    - programs.operations.meter % programs.operations.threshold);
+  section.appendChild(programRow('Operations', programs.operations.meter, programs.operations.threshold,
+    programs.operations.boostCycles > 0
+      ? `The next cycle board’s ${selectorWorldName(world)} routes carry a visible bonus bundle.`
+      : `${countWord(toBoost, { capitalize: true })} more completed ${selectorWorldName(world)} route${toBoost === 1 ? '' : 's'} bank${toBoost === 1 ? 's' : ''} a visible bonus on a future cycle board.`,
+    { dim: true }));
+
+  section.appendChild(h('div.fade-rule.world-programs-rule'));
+  section.appendChild(h('div.world-program-row.is-slot',
+    h('div.world-program-name', 'The relic slot'),
+    h('div.world-program-body', h('p.world-program-sentence', relicSlotSentence(store, reading)))));
+
+  section.appendChild(h('p.world-programs-foot',
+    'A Program only needs you when a priority changes. ',
+    h('button.link', { onclick: open }, 'Change one →')));
+  section.appendChild(h('p.world-programs-note',
+    'Payouts land at the daily reset. A Program missing its choice banks the meter instead of wasting it — nothing here is ever lost.'));
+  return section;
+}
+
+function programRow(name, meter, threshold, sentence, { dim = false } = {}) {
+  const filled = threshold ? (meter % threshold) / threshold : 0;
+  return h('div.world-program-row',
+    h('div.world-program-name', name),
+    h('div.world-program-body',
+      h('div.world-program-meter' + (dim ? '.is-dim' : ''), { 'aria-hidden': 'true' },
+        h('i', { style: { width: `${Math.round(Math.min(1, filled) * 100)}%` } })),
+      h('p.world-program-sentence' + (dim ? '.is-dim' : ''), sentence)));
+}
+
+// The slot states its own gate. A relic held in four pieces is not installable
+// — the binding happens on the Mastery track — so this never offers a button
+// the Program screen would refuse.
+function relicSlotSentence(store, reading) {
+  const world = reading.world;
+  const relic = reading.relic;
+  const slot = reading.programs.relicSlot;
+  if (!relic) return 'No relic has been written for this world, so nothing can be installed here.';
+  if (!relic.complete) {
+    return [`Empty until ${relic.relic.displayName} is whole — ${countWord(relic.ownedCount)} of ${countWord(relic.total)} pieces recovered. `,
+      h('button.link', { onclick: () => store.go(`#/mastery/${world.id}`) }, 'See where the rest are buried →')];
   }
-  return destinationRow({
-    name: 'Programs',
-    reading: [relicNote, `${programs.procurement.delivered + programs.development.delivered + programs.operations.delivered} payouts so far`]
-      .filter(Boolean).join(' · '),
-    sentence, dim: !touched && !reading.unlocked
-  });
+  if (!relic.restored) {
+    // The Mastery row beside this one is already asking for the binding, so
+    // the slot states its own position instead of repeating the sentence.
+    return [`Empty until ${relic.relic.displayName} is bound whole — every piece of it is already held. `,
+      h('button.link', { onclick: () => store.go(`#/mastery/${world.id}`) }, 'Bind it →')];
+  }
+  if (!slot) {
+    return [`${relic.relic.displayName} is whole and waiting for a Program. `,
+      h('button.link', { onclick: () => store.go(`#/programs/${world.id}`) }, 'Install it →')];
+  }
+  return `${relic.relic.displayName} sits in ${PROGRAM_NAMES[slot]}, and can be moved again any time.`;
 }
 
 function masteryRow(store, reading) {
@@ -364,6 +428,11 @@ function masteryRow(store, reading) {
   if (reading.pendingChoices.length) {
     sentence = [`${countWord(reading.pendingChoices.length, { capitalize: true })} milestone reward${reading.pendingChoices.length === 1 ? ' is' : 's are'} waiting on a choice. `,
       h('button.link', { onclick: open }, 'Choose →')];
+  } else if (relic?.complete && !relic.restored) {
+    // The one thing this track ever asks for outright: it is finished, and
+    // waiting to be put back together.
+    sentence = [`All four pieces of ${relic.relic.displayName} are held, and it is still in pieces. `,
+      h('button.link', { onclick: open }, 'Restore it whole →')];
   } else if (relic && !relic.complete) {
     const nextPiece = relic.pieces.find(entry => !entry.owned);
     sentence = [nextPiece?.sourceNode
@@ -380,74 +449,7 @@ function masteryRow(store, reading) {
   return destinationRow({
     name: 'Mastery',
     reading: `${fmt(mastery.score)} of ${fmt(mastery.max)} · ${mastery.displayName}`
-      + (relic ? ` · relic ${relic.ownedCount} of ${relic.total}` : ''),
+      + (relic ? ` · relic ${relic.restored ? 'whole' : `${relic.ownedCount} of ${relic.total}`}` : ''),
     sentence, dim: mastery.score === 0
   });
-}
-
-function rosterPanel(store, reading) {
-  const { content, state } = store;
-  const section = h('section.world-roster',
-    h('div.eyebrow', `${selectorWorldName(reading.world)} characters`));
-  const tiles = h('div.world-roster-tiles');
-  reading.owned.forEach(def => tiles.appendChild(portrait(store, def.id, 'world-tile', { decorative: true })));
-  for (let index = reading.owned.length; index < reading.roster.length; index++) {
-    tiles.appendChild(h('div.world-roster-empty', { 'aria-hidden': 'true' }));
-  }
-  section.appendChild(tiles);
-
-  const away = reading.away.flatMap(item => item.party)
-    .filter(id => content.characterById[id]?.world === reading.world.id);
-  if (reading.owned.length >= content.balance.partySize) {
-    section.appendChild(h('p.world-roster-copy',
-      away.length
-        ? `${countWord(away.length, { capitalize: true })} ${away.length === 1 ? 'is' : 'are'} away on Expeditions and still count everywhere. `
-        : 'All of them are here, and none is committed elsewhere. ',
-      h('button.link', { onclick: () => openFilteredCollection(store, reading.world.id) }, 'Open the Collection, filtered →')));
-    return section;
-  }
-  // A thin roster is told what would thicken it rather than how empty it is.
-  const reachable = reading.roster
-    .filter(def => !state.characters[def.id]?.owned && (content.encounterNodesByCharacter[def.id] ?? []).length)
-    .slice(0, 2);
-  section.appendChild(h('p.world-roster-copy',
-    reachable.length
-      ? `${countWord(reachable.length, { capitalize: true })} more ${reachable.length === 1 ? 'is' : 'are'} reachable — ${reachable
-        .map(def => `${def.displayName}, encountered at ${(content.encounterNodesByCharacter[def.id] ?? [])[0].displayName}`).join(', and ')}. `
-      : 'No encounter for this world has been published yet, so the roster cannot grow here today. ',
-    reachable.length
-      ? h('button.link', { onclick: () => store.go(`#/character/${reachable[0].id}`) }, 'Show me →')
-      : h('button.link', { onclick: () => openFilteredCollection(store, reading.world.id) }, 'Open the Collection, filtered →')));
-  return section;
-}
-
-function openFilteredCollection(store, worldId) {
-  Object.assign(store.state.ui.roster, { world: worldId, ownership: 'all' });
-  store.save().then(() => store.go('#/roster'));
-}
-
-function routesPanel(store, reading) {
-  const section = h('section.world-routes', h('div.eyebrow', 'Routes leaving from here'));
-  const offers = (store.state.expeditions.board?.offers ?? []).filter(offer => offer.world === reading.world.id);
-  if (!offers.length && !reading.away.length) {
-    section.appendChild(h('p.world-routes-empty',
-      `No ${selectorWorldName(reading.world)} route is on the board today. ${reading.owned.length
-        ? `Across-world routes still accept these ${countWord(reading.owned.length)}.`
-        : 'Across-world routes accept anyone once someone from here has joined you.'}`));
-    return section;
-  }
-  const row = h('div.world-routes-row');
-  row.appendChild(h('div.grow', offers.length
-    ? [h('div.world-route-name', offers[0].name),
-      h('div.caption', `on the board today · ${offers[0].partySize} characters`)]
-    : [h('div.world-route-name', 'Nothing on the board'),
-      h('div.caption', 'across-world routes still accept these characters')]));
-  row.appendChild(h('div.grow', reading.away.length
-    ? [h('div.world-route-name', `${countWord(reading.away.length, { capitalize: true })} away`),
-      h('div.caption', `the cycle returns on day ${store.state.expeditions.active.returnDay}`)]
-    : [h('div.world-route-name', 'None away'),
-      h('div.caption', 'every one of them is here')]));
-  row.appendChild(h('button.link.world-routes-link', { onclick: () => store.go('#/expeditions') }, 'Expeditions →'));
-  section.appendChild(row);
-  return section;
 }

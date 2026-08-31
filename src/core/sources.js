@@ -1,14 +1,14 @@
 // Read-only source projections shared by Find Sources and Campaign.
 import {
   nodeState, nodeUnlocked, nodeEnergyCost,
-  checkClear, maxSweepCount, preferredPartyIndex
+  checkClear, maxSweepCount, preferredPartyIndex, nodePartyMembers
 } from './state.js';
 import { focusStatus, isRevealed } from './focus.js';
 
 export function rankMaterialSources(content, state, materialId, partyMembers = null) {
   const rows = (content.nodesByMaterial[materialId] ?? []).map(node => {
     const partyIndex = preferredPartyIndex(state, node.id);
-    const members = partyMembers ?? state.parties[partyIndex]?.members.filter(Boolean) ?? [];
+    const members = partyMembers ?? nodePartyMembers(state, node.id).filter(Boolean);
     const status = nodeState(state, node.id);
     const unlock = nodeUnlocked(content, state, node);
     const check = checkClear(content, state, node.id, members, 1);

@@ -1,3 +1,4 @@
+import { nodePartyIsCustom, nodePartyMembers, preferredPartyIndex } from '../core/state.js';
 import { characterPower } from '../core/power.js';
 import { activeTier } from '../core/power.js';
 import { evaluateParty } from '../core/synergy.js';
@@ -22,14 +23,16 @@ export function sceneImage(store, node = null) {
 }
 
 export function selectedPartyPower(store, node) {
-  const preferred = store.state.ui.nodePartyById?.[node.id];
-  const index = Number.isInteger(preferred) ? preferred : store.state.activePartyIndex;
-  const party = store.state.parties[index] ?? store.state.parties[0];
-  const members = party?.members.filter(Boolean) ?? [];
+  const party = store.state.parties[preferredPartyIndex(store.state, node.id)] ?? store.state.parties[0];
+  // The node may hold five of its own; the reading has to be of those, and it
+  // must not go on calling them by the preset's name once it does.
+  const custom = nodePartyIsCustom(store.state, node.id);
+  const members = nodePartyMembers(store.state, node.id).filter(Boolean);
   const raw = members.reduce((sum, id) => sum + characterPower(store.content, store.state.characters[id]), 0);
   const evaluation = members.length === 5 ? evaluateParty(store.content, store.state, members) : null;
   return {
-    party, members, raw, effective: evaluation?.effectivePower ?? raw
+    party, custom, name: custom ? 'party' : party?.name ?? 'party',
+    members, raw, effective: evaluation?.effectivePower ?? raw
   };
 }
 
@@ -74,49 +77,24 @@ export function bestPartySwap(content, state, slots) {
   return candidates[0] ?? { kind: 'none', before };
 }
 
-export function rankTodayHook(content, state, readyItems, frontiers) {
+// The Crisis is the one thing on Today that can still ask for an answer before
+// the reset, so it is the only hook the screen carries. A ready gear tier and
+// the next ground to take are already stated a few lines below in Ready when
+// you are and Continue; they never needed a second voice at the top.
+export function crisisAsking(state, worldId = null) {
   const crisis = state.crises?.active;
-  if (crisis && (crisis.status === 'planning' || (crisis.status === 'resolved' && crisis.result?.outcome !== 'endured' && !crisis.cacheClaimed))) {
-    return { kind: 'crisis', crisis, def: content.crisisById[crisis.definitionId] };
-  }
-  const shardCandidates = content.characters.flatMap((def, order) => {
-    const cs = state.characters[def.id];
-    const need = cs.owned
-      ? (cs.stars < 7 ? content.balance.starShards[cs.stars] : null)
-      : content.balance.rosterProgression.recruitShards;
-    return need == null ? [] : [{ kind: 'shards', def, cs, need, gap: Math.max(0, need - cs.shards), order }];
-  }).filter(item => item.gap > 0).sort((a, b) => a.gap - b.gap || a.order - b.order);
-  if (shardCandidates.length) return shardCandidates[0];
-
-  const complete = readyItems.find(item => item.type === 'completeTier');
-  if (complete) return { kind: 'gear', item: complete, def: content.characterById[complete.characterId] };
-
-  if (frontiers.length) return { kind: 'campaign', node: [...frontiers].sort((a, b) => a.threshold - b.threshold)[0] };
-  return { kind: 'quiet' };
+  if (!crisis || (worldId && crisis.worldId !== worldId)) return null;
+  const asking = crisis.status === 'planning'
+    || (crisis.status === 'resolved' && crisis.result?.outcome !== 'endured' && !crisis.cacheClaimed);
+  return asking ? crisis : null;
 }
 
-export function todayHookText(hook) {
-  if (hook.kind === 'crisis') return {
-    headline: hook.crisis.status === 'planning'
-      ? `${hook.crisis.name} is asking for an answer.` : 'An Emergency Cache is still waiting.',
-    route: '#/crisis'
-  };
-  if (hook.kind === 'shards') {
-    const goal = hook.cs.owned ? `${hook.cs.stars + 1}${ordinal(hook.cs.stars + 1)} star` : 'unlock';
-    return {
-      headline: `${hook.def.displayName} is ${hook.gap} shard${hook.gap === 1 ? '' : 's'} from ${hook.cs.owned ? `their ${goal}` : 'joining you'}.`,
-      route: `#/character/${hook.def.id}`
-    };
-  }
-  if (hook.kind === 'gear') return {
-    headline: `${hook.def.displayName}'s next gear tier is ready.`,
-    route: `#/character/${hook.def.id}`
-  };
-  if (hook.kind === 'campaign') return {
-    headline: `${hook.node.displayName} is the next ground to take.`,
-    route: `#/node/${hook.node.id}`
-  };
-  return { headline: 'Nothing is waiting — the courtyard is quiet.', route: '#/campaign' };
+export function crisisNotice(state) {
+  const crisis = crisisAsking(state);
+  if (!crisis) return null;
+  return crisis.status === 'planning'
+    ? { crisis, text: `${crisis.name} is open until reset.`, verb: 'Review it →' }
+    : { crisis, text: `${crisis.name} is answered and its Emergency Cache is still waiting.`, verb: 'Open the Cache →' };
 }
 
 function ordinal(n) {
@@ -127,13 +105,29 @@ function ordinal(n) {
 }
 
 const COUNT_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight',
-  'nine', 'ten', 'eleven', 'twelve'];
+  'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen',
+  'seventeen', 'eighteen', 'nineteen'];
+
+const TENS_WORDS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy',
+  'eighty', 'ninety'];
 
 // Headlines count in words; readings and totals stay numerals. "Five routes are
-// waiting." reads as a sentence, "5 routes" reads as a table cell.
+// waiting." reads as a sentence, "5 routes" reads as a table cell. Today's
+// headline counts Energy the same way, so this spells the whole storage cap.
 export function countWord(n, { capitalize = false } = {}) {
-  const word = COUNT_WORDS[n] ?? String(n);
+  const word = spellCount(n);
   return capitalize ? word[0].toUpperCase() + word.slice(1) : word;
+}
+
+function spellCount(n) {
+  if (!Number.isInteger(n) || n < 0 || n > 999) return String(n);
+  if (n < COUNT_WORDS.length) return COUNT_WORDS[n];
+  if (n < 100) {
+    const tens = TENS_WORDS[Math.floor(n / 10)];
+    return n % 10 ? `${tens}-${COUNT_WORDS[n % 10]}` : tens;
+  }
+  const hundreds = `${COUNT_WORDS[Math.floor(n / 100)]} hundred`;
+  return n % 100 ? `${hundreds} and ${spellCount(n % 100)}` : hundreds;
 }
 
 const ORDINAL_WORDS = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh',

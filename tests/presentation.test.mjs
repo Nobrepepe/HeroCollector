@@ -1,78 +1,38 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  rankTodayHook, todayHookText, sceneImage,
+  crisisAsking, crisisNotice, countWord, sceneImage,
   partyHeadline, bestPartySwap
 } from '../src/ui/presentation.js';
 import { loadContent, maxOut, newGame } from './helpers.mjs';
 import { evaluateParty } from '../src/core/synergy.js';
 
-test('Today chooses the smallest remaining shard gap with stable content-order ties', () => {
-  const content = {
-    characters: [
-      { id: 'a', displayName: 'Ashley' },
-      { id: 'b', displayName: 'Bridget' }
-    ],
-    balance: {
-      starShards: [10, 25, 50, 75, 110, 150, 200],
-      rosterProgression: { recruitShards: 10 }
-    }
-  };
-  const state = {
-    characters: {
-      a: { owned: true, stars: 4, shards: 65 },
-      b: { owned: true, stars: 4, shards: 65 }
-    }
-  };
-  const hook = rankTodayHook(content, state, [], []);
-  assert.equal(hook.def.id, 'a');
-  assert.equal(hook.gap, 45);
-  assert.match(todayHookText(hook).headline, /Ashley/);
+test('Today carries the Crisis and nothing else: it asks while unresolved, and again for its Cache', () => {
+  const planning = { crises: { active: { definitionId: 'c', worldId: 'w', status: 'planning', name: 'The Sundering Ward' } } };
+  assert.equal(crisisNotice(planning).verb, 'Review it →');
+  assert.match(crisisNotice(planning).text, /open until reset/);
+
+  const cache = { crises: { active: { worldId: 'w', status: 'resolved', result: { outcome: 'held' }, cacheClaimed: false, name: 'The Sundering Ward' } } };
+  assert.equal(crisisNotice(cache).verb, 'Open the Cache →');
+
+  const settled = { crises: { active: { worldId: 'w', status: 'resolved', result: { outcome: 'held' }, cacheClaimed: true, name: 'The Sundering Ward' } } };
+  assert.equal(crisisNotice(settled), null, 'a claimed Cache asks for nothing');
+  assert.equal(crisisNotice({}), null, 'no Crisis, no notice');
 });
 
-test('an unrecruited hero is ranked by the one recruitment cost everyone shares', () => {
-  const content = {
-    characters: [{ id: 'a', displayName: 'Ashley' }, { id: 'b', displayName: 'Bridget' }],
-    balance: { starShards: [10, 25], rosterProgression: { recruitShards: 40 } }
-  };
-  const state = {
-    characters: {
-      a: { owned: false, stars: 0, shards: 33 },   // 7 short
-      b: { owned: false, stars: 0, shards: 12 }    // 28 short
-    }
-  };
-  const hook = rankTodayHook(content, state, [], []);
-  assert.equal(hook.def.id, 'a', 'the smallest remaining gap wins');
-  assert.equal(hook.need, 40, 'every hero costs the same to recruit');
-  assert.equal(hook.gap, 7);
+test('crisisAsking scopes to one world so the hub and Today cannot disagree', () => {
+  const state = { crises: { active: { worldId: 'w', status: 'planning', name: 'A Crisis' } } };
+  assert.ok(crisisAsking(state, 'w'));
+  assert.equal(crisisAsking(state, 'other'), null);
+  assert.equal(crisisAsking({ crises: { active: { worldId: 'w', status: 'endured' } } }, 'w'), null);
 });
 
-test('Today falls through to gear, campaign, then quiet', () => {
-  const content = {
-    characters: [{ id: 'a', displayName: 'Ashley' }],
-    characterById: { a: { id: 'a', displayName: 'Ashley' } },
-    balance: {
-      starShards: [10, 25, 50, 75, 110, 150, 200],
-      rosterProgression: { recruitShards: 10 }
-    }
-  };
-  const maxed = { characters: { a: { owned: true, stars: 7, shards: 0 } } };
-  assert.equal(rankTodayHook(content, maxed, [{ type: 'completeTier', characterId: 'a' }], []).kind, 'gear');
-  assert.equal(rankTodayHook(content, maxed, [], [{ id: 'n', displayName: 'Gate', threshold: 100 }]).kind, 'campaign');
-  assert.equal(rankTodayHook(content, maxed, [], []).kind, 'quiet');
-});
-
-test('an unresolved Crisis outranks every ordinary Today hook', () => {
-  const content = {
-    characters: [{ id: 'a', displayName: 'Ashley' }],
-    characterById: { a: { id: 'a', displayName: 'Ashley' } }, crisisById: { c: { id: 'c' } },
-    balance: { starShards: [10], rosterProgression: { recruitShards: 10 } }
-  };
-  const state = { characters: { a: { owned: true, stars: 1, shards: 0 } },
-    crises: { active: { definitionId: 'c', status: 'planning', name: 'A Crisis' } } };
-  const hook = rankTodayHook(content, state, [{ type: 'completeTier', characterId: 'a' }], [{ id: 'n', threshold: 1 }]);
-  assert.equal(hook.kind, 'crisis');
-  assert.equal(todayHookText(hook).route, '#/crisis');
+test("Today's headline counts Energy in words all the way to the storage cap", () => {
+  assert.equal(countWord(96, { capitalize: true }), 'Ninety-six');
+  assert.equal(countWord(40), 'forty');
+  assert.equal(countWord(240), 'two hundred and forty');
+  assert.equal(countWord(0), 'no', 'zero keeps the sentence reading');
+  assert.equal(countWord(9), 'nine');
 });
 
 test('scene presentation helpers cover partial and missing art', () => {

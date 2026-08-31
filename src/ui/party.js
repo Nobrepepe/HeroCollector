@@ -191,8 +191,10 @@ function rerenderParty(store, root) {
 }
 
 function pickMember(store, partyIndex, slotIndex, root, recommendedId = null) {
+  const party = store.state.parties[partyIndex];
   openCharacterPicker(store, {
-    partyIndex,
+    members: party.members,
+    title: party.name,
     slotIndex,
     recommendedId,
     onSelect: async characterId => {

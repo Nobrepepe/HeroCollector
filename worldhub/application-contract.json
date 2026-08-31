@@ -156,7 +156,7 @@
           "required": true,
           "minItems": 4,
           "maxItems": 4,
-          "hint": "The game decides which campaign nodes hide them.",
+          "hint": "The game decides which campaign nodes hide them. Each piece uncovers a quarter of the relic art above \u2014 they are not illustrated separately.",
           "fields": [
             {
               "id": "piece_name",
@@ -171,18 +171,6 @@
               "type": "multilineText",
               "required": false,
               "maxLength": 600
-            },
-            {
-              "id": "piece_art",
-              "label": "Piece art",
-              "type": "assetRef",
-              "required": false,
-              "assetKinds": [
-                "image"
-              ],
-              "recipes": [
-                "square"
-              ]
             }
           ]
         },
@@ -259,6 +247,22 @@
           "min": 0,
           "max": 3,
           "hint": "One image per campaign chapter, in chapter order."
+        },
+        {
+          "id": "hc_relic_art",
+          "label": "Relic \u2014 the whole object",
+          "kinds": [
+            "image"
+          ],
+          "roles": [
+            "object.icon"
+          ],
+          "recipes": [
+            "square"
+          ],
+          "min": 0,
+          "max": 1,
+          "hint": "One square image of the relic entire. The Mastery track shows a quarter of it per recovered piece, so keep the subject clear of a narrow band around the middle cross \u2014 two seams run through it until the relic is bound."
         }
       ]
     },

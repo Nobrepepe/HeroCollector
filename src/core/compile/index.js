@@ -185,9 +185,8 @@ export function compileManifest(systemRaw, manifest) {
     world.chapterImages.forEach((image, index) => {
       if (image) images.chapter[`wc_${world.id}:${index + 1}`] = image;
     });
-    world.relic.pieces.forEach((piece, index) => {
-      if (piece.image) images.relic[`relic_${world.id}_p${index + 1}`] = piece.image;
-    });
+    // Keyed by world: one plate, quartered by whoever draws it.
+    if (world.relic.image) images.relic[world.id] = world.relic.image;
     world.masteryCosmetics.forEach((cosmetic, index) => {
       if (index >= cosmeticRanks.length) return;
       if (cosmetic.portrait || cosmetic.fullBody) {

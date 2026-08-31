@@ -6,7 +6,7 @@ import { clearNode } from '../src/core/state.js';
 import { makeRng } from '../src/core/rng.js';
 import {
   FOCUS_SLOTS, assignFocus, clearFocusSlot, focusStatus, applyFocusEnergy,
-  revealCharacter, isRevealed
+  focusYield, revealCharacter, isRevealed
 } from '../src/core/focus.js';
 
 const content = loadContent();
@@ -30,6 +30,39 @@ test('120 Energy across the three slots yields exactly 12 shards', () => {
   assert.equal(state.characters.char_suzume.shards, 5);
   // remainders carry: 120 = 5×24 exactly, 4×30 exactly, 3×40 exactly
   for (const slot of FOCUS_SLOTS) assert.equal(state.focus.slots[slot].progress, 0);
+});
+
+test('focusYield predicts exactly what the run pays, and writes nothing doing it', () => {
+  const state = readyState();
+  const heroes = ['char_suzume', 'char_hoshi', 'char_ayame'];
+  FOCUS_SLOTS.forEach((slot, i) => assignFocus(content, state, slot, heroes[i]));
+  applyFocusEnergy(content, state, 17);  // leave every meter part-full first
+
+  const before = JSON.stringify(state);
+  const predicted = focusYield(content, state, 96);
+  assert.equal(JSON.stringify(state), before, 'the prediction is pure');
+  assert.deepEqual(predicted.map(entry => entry.shards), [4, 3, 2]);
+
+  const grants = applyFocusEnergy(content, state, 96);
+  assert.deepEqual(grants.map(grant => grant.shards), predicted.map(entry => entry.shards));
+  for (const entry of predicted) {
+    assert.equal(state.focus.slots[entry.slot].progress, entry.remainder,
+      'the promise and the payout leave the same remainder');
+  }
+});
+
+test('a halted slot is predicted to pay nothing and holds its progress', () => {
+  const state = readyState();
+  assignFocus(content, state, 'primary', 'char_suzume');
+  applyFocusEnergy(content, state, 20);
+  state.characters.char_suzume.owned = true;
+  state.characters.char_suzume.stars = 7;
+  const [primary] = focusYield(content, state, 120);
+  assert.equal(primary.halted, true);
+  assert.equal(primary.shards, 0);
+  assert.equal(primary.remainder, 20, 'a stalled meter stands still');
+  applyFocusEnergy(content, state, 120);
+  assert.equal(state.focus.slots.primary.progress, 20);
 });
 
 test('progress carries across grants and days without resetting', () => {

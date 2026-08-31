@@ -38,15 +38,15 @@ export function renderRoster(store, root) {
         h('span.collection-view-separator', '·'),
         densityControl(store, preferences, 'Gallery', 'gallery'),
         densityControl(store, preferences, 'Compact', 'compact')),
-      h('input.character-search', {
-        type: 'search', placeholder: 'Search by name…', 'aria-label': 'Search characters',
-        oninput: event => { search = event.target.value; paint(); }
-      }))));
+      // Search and the rest of the filters share one line: the field never
+      // needed the full width, and the drawer never needed a line of its own.
+      h('div.collection-search-row',
+        h('input.character-search', {
+          type: 'search', placeholder: 'Search by name…', 'aria-label': 'Search characters',
+          oninput: event => { search = event.target.value; paint(); }
+        }),
+        moreFilters(store, preferences, paint)))));
   store.registerSearchInput(root.querySelector('.character-search'));
-
-  const more = h('details.collection-more', h('summary', 'More filters'));
-  more.appendChild(characterFilterBar(store, preferences, () => { store.save(); paint(); }, { ownership: false }));
-  root.appendChild(more);
   const gallery = h('div.collection-gallery');
   enableMouseDragScroll(gallery);
   const compact = h('div.collection-compact-grid');
@@ -82,6 +82,41 @@ export function renderRoster(store, root) {
     footer.hidden = preferences.collectionDensity !== 'compact';
   }
   paint();
+}
+
+// The filter drawer, and the one control that puts every filter back: without
+// it a narrowed Collection can only be widened one select at a time, and a
+// player who has forgotten which of them is set cannot see the ones that are.
+const FILTER_DEFAULTS = {
+  world: 'all', archetype: 'all', faction: 'all', ownership: 'all',
+  sort: 'power', direction: 'desc'
+};
+let moreFiltersOpen = false;
+
+function moreFilters(store, preferences, paint) {
+  const more = h('details.collection-more', { open: moreFiltersOpen },
+    h('summary', 'More filters'));
+  more.addEventListener('toggle', () => { moreFiltersOpen = more.open; });
+  const clear = h('button.link.clear-filters', {
+    onclick: () => {
+      Object.assign(preferences, FILTER_DEFAULTS);
+      store.save().then(() => rerenderRoster(store));
+    }
+  });
+  // The control states whether there is anything to clear, so it answers the
+  // question a player opens this drawer with. It is refreshed rather than
+  // rebuilt: rebuilding the bar would take the focus off the select they just
+  // used.
+  const refresh = () => {
+    const filtered = Object.entries(FILTER_DEFAULTS).some(([key, value]) => preferences[key] !== value);
+    clear.disabled = !filtered;
+    clear.textContent = filtered ? 'Clear filters' : 'Nothing is filtered';
+  };
+  refresh();
+  more.appendChild(h('div.collection-more-panel',
+    characterFilterBar(store, preferences, () => { store.save(); refresh(); paint(); }, { ownership: false }),
+    clear));
+  return more;
 }
 
 function densityControl(store, preferences, label, density) {

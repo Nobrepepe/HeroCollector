@@ -1,7 +1,8 @@
 import { h, fmt, pct } from './dom.js';
 import {
   nodeState, nodeUnlocked, nodeEnergyCost, checkClear,
-  clearNode, maxSweepCount, preferredPartyIndex, selectPartyPreset
+  clearNode, maxSweepCount, preferredPartyIndex, selectPartyPreset,
+  nodePartyMembers, nodePartyIsCustom, setNodePartyMember, resetNodeParty
 } from '../core/state.js';
 import { isRevealed } from '../core/focus.js';
 import { evaluateParty, objectiveSatisfied } from '../core/synergy.js';
@@ -10,6 +11,7 @@ import { portrait, portraitSlot } from './shared.js';
 import { characterPower } from '../core/power.js';
 import { showResults } from './results.js';
 import { openModal, render } from '../app.js';
+import { openCharacterPicker } from './character-picker.js';
 import { sceneImage } from './presentation.js';
 import { frontierMomentumPreview } from '../core/energy.js';
 
@@ -47,6 +49,9 @@ export function renderNode(store, root, nodeId) {
   head.appendChild(nodeNavigation(store, node));
   main.appendChild(head);
 
+  // A preset fills this node; it does not own it. Swapping someone here leaves
+  // the saved preset alone and gives the node its own five, so the party a
+  // threshold needs never costs the player the party they built.
   const partyPanel = h('section.node-party');
   const select = h('select', { 'aria-label': 'Party preset' });
   let selectedIndex = preferredPartyIndex(state, node.id);
@@ -58,8 +63,9 @@ export function renderNode(store, root, nodeId) {
     await store.tx(() => selectPartyPreset(state, selectedIndex, node.id), { rerender: false });
     paint();
   });
-  partyPanel.append(h('div.party-heading', h('div.eyebrow', 'Your party'), select,
-    h('button.link', { onclick: () => store.go('#/party') }, 'edit')));
+  const partyHeading = h('div.party-heading', h('div.eyebrow', 'Your party'), select,
+    h('button.link', { onclick: () => store.go('#/party') }, 'edit presets'));
+  partyPanel.appendChild(partyHeading);
   const partyDynamic = h('div.node-party-dynamic');
   partyPanel.appendChild(partyDynamic);
   main.append(partyPanel, nodeRewards(store, node, ns));
@@ -71,8 +77,9 @@ export function renderNode(store, root, nodeId) {
   function paint() {
     partyDynamic.replaceChildren();
     rail.replaceChildren();
-    const party = state.parties[selectedIndex];
-    const members = party.members.filter(Boolean);
+    const slots = nodePartyMembers(state, node.id);
+    const custom = nodePartyIsCustom(state, node.id);
+    const members = slots.filter(Boolean);
     const check = checkClear(content, state, node.id, members, 1);
     const evaluation = members.length === 5 ? evaluateParty(content, state, members) : null;
     const comparison = h('section.node-comparison');
@@ -89,17 +96,24 @@ export function renderNode(store, root, nodeId) {
         h('div.powerbar', h('i', { class: clears ? 'good-fill' : 'bad-fill',
           style: { width: `${Math.min(100, evaluation.effectivePower / Math.max(node.threshold, evaluation.effectivePower) * 100)}%` } })));
     } else comparison.appendChild(h('div.power-reading',
-      h('div.eyebrow', 'Your Vanguard reads'), h('div.display-l.bad', '—'),
+      h('div.eyebrow', 'Your party reads'), h('div.display-l.bad', '—'),
       h('p.bad', `Add ${5 - members.length} more character${members.length === 4 ? '' : 's'}. The attempt cannot start.`)));
 
     const faces = h('div.node-faces', { 'aria-label': 'Selected party' });
-    party.members.forEach(id => faces.appendChild(id
-      ? h('div.node-member', portrait(store, id, 'md'),
-        h('span.node-member-name', content.characterById[id].displayName),
-        h('span.caption', `${fmt(characterPower(content, state.characters[id]))} power`))
-      : h('div.node-member.empty',
-        portraitSlot({ size: 'md', state: 'empty', glyph: '+' }),
-        h('span', 'empty'))));
+    slots.forEach((id, slotIndex) => faces.appendChild(h(
+      'button.node-member' + (id ? '' : '.empty'),
+      {
+        onclick: () => swap(slotIndex),
+        'aria-label': id
+          ? `Change ${content.characterById[id].displayName}, place ${slotIndex + 1} of ${slots.length}`
+          : `Choose someone for place ${slotIndex + 1} of ${slots.length}`
+      },
+      id
+        ? [portrait(store, id, 'md', { decorative: true }),
+          h('span.node-member-name', content.characterById[id].displayName),
+          h('span.caption', `${fmt(characterPower(content, state.characters[id]))} power`)]
+        : [portraitSlot({ size: 'md', state: 'empty', glyph: '+', decorative: true }),
+          h('span', 'empty')])));
     const synergy = h('section.node-synergy', h('div.node-rail-heading', 'Active synergies'));
     if (evaluation) {
       evaluation.active.slice(0, 4).forEach(item => synergy.appendChild(h('div.node-synergy-row',
@@ -114,9 +128,28 @@ export function renderNode(store, root, nodeId) {
     }
     const actions = actionRow(store, node, ns, members, check, cost);
     partyDynamic.appendChild(faces);
+    // The preset name above is no longer the truth once someone is swapped, so
+    // the panel says so and offers the one step back.
+    partyDynamic.appendChild(h('p.node-party-note', custom
+      ? [`These five stand here only — ${state.parties[selectedIndex].name} is untouched. `,
+        h('button.link', {
+          onclick: () => store.tx(() => resetNodeParty(state, node.id), { rerender: false }).then(paint)
+        }, `Refill from ${state.parties[selectedIndex].name} →`)]
+      : 'Tap anyone to swap them for this threshold. The preset stays as you built it.'));
     rail.append(comparison, synergy, actions);
   }
   paint();
+
+  function swap(slotIndex) {
+    openCharacterPicker(store, {
+      members: nodePartyMembers(state, node.id),
+      title: node.displayName,
+      slotIndex,
+      onSelect: characterId => store
+        .tx(() => setNodePartyMember(content, state, node.id, slotIndex, characterId), { rerender: false })
+        .then(paint)
+    });
+  }
 
   function showNodeSynergies(evaluation) {
     openModal((modal, close) => {
