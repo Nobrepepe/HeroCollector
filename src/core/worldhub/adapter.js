@@ -38,6 +38,28 @@ export function adaptPackageToManifest(pkg, mediaUrl) {
   };
   const setAssets = (slot, entityId) => (assetSets[`${slot}:${entityId}`] ?? []).map((item) => item.assetId);
 
+  /* ---- faction membership: canonical, not a value typed into a production ----
+     Who belongs to a faction is a fact about the fiction, so it lives in World
+     Hub as a connection between a character and a group. It used to be stored
+     twice: once as that group being selected under Factions, and again as a
+     per-character reference — two places that could disagree, and did.
+
+     The kind to read is named by the contract rather than by this file, so a
+     rename over there needs no change over here. The one-faction rule is the
+     game's and stays the game's: canon allows several memberships, and the
+     first that names a selected faction wins. */
+  const factionIds = new Set(selections.hc_factions ?? []);
+  const membershipKinds = (pkg.contract.connectionSelections ?? [])
+    .filter((selection) => selection.targetSelection === 'hc_factions')
+    .flatMap((selection) => selection.kinds ?? []);
+  const factionOf = (characterId) => {
+    for (const kindId of membershipKinds) {
+      const held = pkg.connectionsFrom(characterId, kindId).find((connection) => factionIds.has(connection.targetId));
+      if (held) return held.targetId;
+    }
+    return null;
+  };
+
   /* ---- characters: selection order is roster order ---- */
   const characterIds = selections.hc_characters ?? [];
   const characters = characterIds.map((hubId) => {
@@ -59,7 +81,7 @@ export function adaptPackageToManifest(pkg, mediaUrl) {
       description: entity.summary ?? '',
       lore: profile.biography ?? '',
       archetype: own.hc_archetype,
-      faction: own.hc_faction || null,
+      faction: factionOf(hubId),
       portrait: mediaUrl(setAsset('hc_portrait', hubId), pkg.recipesFor('hc_portrait')),
       fullBody: mediaUrl(setAsset('hc_full_body', hubId), pkg.recipesFor('hc_full_body')),
       equipment,

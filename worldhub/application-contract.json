@@ -309,16 +309,6 @@
           ]
         },
         {
-          "id": "hc_faction",
-          "label": "Faction",
-          "type": "entityRef",
-          "entityTypes": [
-            "group"
-          ],
-          "required": false,
-          "hint": "A group this character belongs to. Select the same group under Factions for it to grant party synergy; how much it is worth is the game's to tune."
-        },
-        {
           "id": "hc_equipment",
           "label": "Equipment lines",
           "section": "Equipment",
@@ -425,7 +415,7 @@
         "group"
       ],
       "min": 0,
-      "hint": "Groups whose members work well together. Name and description come from the canonical group profile; a character joins one by selecting it as their Faction. Selecting no groups is fine \u2014 the game simply has no faction synergy.",
+      "hint": "Groups whose members work well together. Name and description come from the canonical group profile, and who belongs to one is a canonical connection in World Hub rather than anything typed here. Selecting no groups is fine \u2014 the game simply has no faction synergy.",
       "fields": [
         {
           "id": "hc_faction_explanation",
@@ -436,6 +426,20 @@
           "hint": "Shown when a party lights this faction's synergy. Defaults to the group's own summary."
         }
       ]
+    }
+  ],
+  "connectionSelections": [
+    {
+      "id": "hc_faction_membership",
+      "label": "Faction memberships",
+      "kinds": [
+        "member_of"
+      ],
+      "sourceSelection": "hc_characters",
+      "targetSelection": "hc_factions",
+      "minPerSource": 0,
+      "maxPerSource": 1,
+      "hint": "Membership is canonical fiction, recorded in World Hub between a character and a group. World Hub lets a character belong to several groups; this game shows one faction, so it asks for at most one of them to be selected under Factions \u2014 that restriction is the game's, not the canon's."
     }
   ],
   "assetSets": [

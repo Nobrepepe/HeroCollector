@@ -95,6 +95,38 @@ test('the representative package builds valid, ready runtime content', () => {
   void pkg;
 });
 
+test('faction membership arrives as canonical fact, not as a value copied per hero', () => {
+  const { pkg, manifest, content } = buildFromFixture('valid-v1.zip');
+
+  /* The publication states it once, between a character and a group. What
+     the kind means travels with the package, so nothing here hard-codes it. */
+  const memberships = pkg.relationships.filter((connection) => connection.kindId === 'member_of');
+  assert.ok(memberships.length > 0, 'the package carries membership connections');
+  assert.ok(pkg.connectionKindsById().has('member_of'),
+    'and the definition of the kind, so a custom kind would need no change here');
+
+  const factionIds = new Set(pkg.content.selections.hc_factions ?? []);
+  assert.ok(factionIds.size > 0, 'the pack selects at least one faction');
+
+  /* Every hero the adapter produced carries the faction the connection names,
+     and no hero carries one the publication did not select. */
+  const heroes = manifest.characters ?? [];
+  assert.ok(heroes.length > 0);
+  for (const hero of heroes) {
+    const held = pkg.connectionsFrom(hero.id, 'member_of').filter((c) => factionIds.has(c.targetId));
+    assert.equal(hero.faction, held.length ? held[0].targetId : null,
+      `${hero.displayName}'s faction is read from canon`);
+  }
+  assert.ok(heroes.some((hero) => hero.faction), 'and at least one really is in a faction');
+
+  /* Nothing per-character in the publication says so any more, so the two
+     copies that used to be able to disagree are down to one. */
+  for (const own of Object.values(pkg.content.entityValues ?? {})) {
+    assert.equal(own.hc_faction, undefined, 'membership is no longer duplicated into production values');
+  }
+  void content;
+});
+
 test('every packaged art class resolves through the media path', () => {
   const { content } = buildFromFixture('valid-v1.zip');
   const images = content.images;
@@ -232,7 +264,7 @@ test('the contract asks for creative facts only — every field is accounted for
     'hc_relic_name', 'hc_relic_lore', 'hc_relic_pieces', 'piece_name', 'piece_lore',
     'hc_mastery_cosmetics', 'mc_character', 'mc_name', 'mc_art',
     // Characters: who they are, and the art that shows them.
-    'hc_archetype', 'hc_faction', 'hc_equipment', 'equip_slot', 'equip_name', 'equip_art',
+    'hc_archetype', 'hc_equipment', 'equip_slot', 'equip_name', 'equip_art',
     // Factions: identity only.
     'hc_faction_explanation',
   ]);
